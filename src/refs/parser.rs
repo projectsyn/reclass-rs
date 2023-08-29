@@ -3,6 +3,7 @@ use nom::{
     bytes::complete::{tag, take},
     character::complete::none_of,
     combinator::{all_consuming, map, not, peek},
+    error::{context, VerboseError},
     multi::many1,
     sequence::{delimited, preceded, tuple},
     IResult,
@@ -28,109 +29,145 @@ fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
     res
 }
 
-fn ref_open(input: &str) -> IResult<&str, &str> {
-    tag("${")(input)
+fn ref_open(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+    context("ref_open", tag("${"))(input)
 }
 
-fn ref_close(input: &str) -> IResult<&str, &str> {
-    tag("}")(input)
+fn ref_close(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+    context("ref_close", tag("}"))(input)
 }
 
-fn ref_escape_open(input: &str) -> IResult<&str, String> {
-    map(preceded(tag("\\"), ref_open), String::from)(input)
-}
-
-fn ref_escape_close(input: &str) -> IResult<&str, String> {
-    map(preceded(tag("\\"), ref_close), String::from)(input)
-}
-
-fn double_escape(input: &str) -> IResult<&str, String> {
+fn ref_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
-        tuple((tag(r"\\"), peek(alt((ref_open, ref_close))))),
+        context("ref_escape_open", preceded(tag("\\"), ref_open)),
+        String::from,
+    )(input)
+}
+
+fn ref_escape_close(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(
+        context("ref_escape_close", preceded(tag("\\"), ref_close)),
+        String::from,
+    )(input)
+}
+
+fn double_escape(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(
+        context(
+            "double_escape",
+            tuple((tag(r"\\"), peek(alt((ref_open, ref_close))))),
+        ),
         |_| r"\".to_string(),
     )(input)
 }
 
-fn ref_not_open(input: &str) -> IResult<&str, ()> {
+fn ref_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
     // don't advance parse position, just check for ref_open variants
     map(
-        tuple((not(tag("${")), not(tag("\\${")), not(tag("\\\\${")))),
+        context(
+            "ref_not_open",
+            tuple((not(tag("${")), not(tag("\\${")), not(tag("\\\\${")))),
+        ),
         |(_, _, _)| (),
     )(input)
 }
 
-fn ref_content(input: &str) -> IResult<&str, String> {
-    fn ref_not_close(input: &str) -> IResult<&str, ()> {
+fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    fn ref_not_close(input: &str) -> IResult<&str, (), VerboseError<&str>> {
         // don't advance parse position, just check for ref_close variants
         map(
-            tuple((not(tag("}")), not(tag("\\}")), not(tag("\\\\}")))),
+            context(
+                "ref_not_close",
+                tuple((not(tag("}")), not(tag("\\}")), not(tag("\\\\}")))),
+            ),
             |(_, _, _)| (),
         )(input)
     }
 
-    fn ref_text(input: &str) -> IResult<&str, String> {
-        alt((
-            map(many1(none_of("\\${}")), |ch| ch.iter().collect::<String>()),
-            map(tuple((not(tag("}")), take(1usize))), |(_, c): (_, &str)| {
-                c.to_string()
-            }),
-        ))(input)
+    fn ref_text(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+        context(
+            "ref_text",
+            alt((
+                map(many1(none_of("\\${}")), |ch| ch.iter().collect::<String>()),
+                map(tuple((not(tag("}")), take(1usize))), |(_, c): (_, &str)| {
+                    c.to_string()
+                }),
+            )),
+        )(input)
     }
 
     map(
-        tuple((ref_not_open, ref_not_close, ref_text)),
+        context(
+            "ref_content",
+            tuple((ref_not_open, ref_not_close, ref_text)),
+        ),
         |(_, _, t)| t,
     )(input)
 }
 
-fn ref_string(input: &str) -> IResult<&str, String> {
+fn ref_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
-        many1(alt((
-            double_escape,
-            ref_escape_open,
-            ref_escape_close,
-            ref_content,
-        ))),
+        context(
+            "ref_string",
+            many1(alt((
+                double_escape,
+                ref_escape_open,
+                ref_escape_close,
+                ref_content,
+            ))),
+        ),
         |s| s.join(""),
     )(input)
 }
 
-fn ref_item(input: &str) -> IResult<&str, Token> {
-    alt((reference, map(ref_string, Token::Literal)))(input)
+fn ref_item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
+    context(
+        "ref_item",
+        alt((reference, map(ref_string, Token::Literal))),
+    )(input)
 }
 
-fn reference(input: &str) -> IResult<&str, Token> {
-    map(delimited(ref_open, many1(ref_item), ref_close), |tokens| {
-        Token::Ref(coalesce_literals(tokens))
-    })(input)
+fn reference(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
+    context(
+        "reference",
+        map(delimited(ref_open, many1(ref_item), ref_close), |tokens| {
+            Token::Ref(coalesce_literals(tokens))
+        }),
+    )(input)
 }
 
-fn string(input: &str) -> IResult<&str, String> {
-    fn text(input: &str) -> IResult<&str, String> {
-        alt((
-            map(many1(none_of("${}\\")), |ch| ch.iter().collect::<String>()),
-            map(take(1usize), std::string::ToString::to_string),
-        ))(input)
+fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    fn text(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+        context(
+            "text",
+            alt((
+                map(many1(none_of("${}\\")), |ch| ch.iter().collect::<String>()),
+                map(take(1usize), std::string::ToString::to_string),
+            )),
+        )(input)
     }
 
-    fn content(input: &str) -> IResult<&str, String> {
-        map(many1(tuple((ref_not_open, text))), |strings| {
-            strings
-                .iter()
-                .map(|((), s)| s.clone())
-                .collect::<Vec<String>>()
-                .join("")
-        })(input)
+    fn content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+        context(
+            "content",
+            map(many1(tuple((ref_not_open, text))), |strings| {
+                strings
+                    .iter()
+                    .map(|((), s)| s.clone())
+                    .collect::<Vec<String>>()
+                    .join("")
+            }),
+        )(input)
     }
 
-    alt((double_escape, ref_escape_open, content))(input)
+    context("string", alt((double_escape, ref_escape_open, content)))(input)
 }
 
-fn item(input: &str) -> IResult<&str, Token> {
-    alt((reference, map(string, Token::Literal)))(input)
+fn item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
+    context("item", alt((reference, map(string, Token::Literal))))(input)
 }
 
-pub fn parse_ref(input: &str) -> IResult<&str, Token> {
+pub fn parse_ref(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     map(all_consuming(many1(item)), |tokens| {
         let tokens = coalesce_literals(tokens);
         if tokens.len() > 1 {
@@ -445,8 +482,6 @@ mod test_parser_funcs {
         let refstr = r#"${foo:${bar}"#.to_string();
 
         let res = parse_ref(&refstr);
-        // TODO(sg): the nom error are currently useless, figure out how to wrap them in nice parse
-        // errors, maybe nom-supreme or some other wrapper/helper crate can help.
         println!("{:#?}", res);
         assert!(res.is_err());
     }
