@@ -66,6 +66,33 @@ mod test_refs {
     }
 
     #[test]
+    fn test_parse_nested() {
+        let tstr = "${foo:${bar}}";
+        assert_eq!(
+            parse_ref(tstr).unwrap(),
+            Token::Ref(vec![
+                Token::Literal("foo:".into()),
+                Token::Ref(vec![Token::Literal("bar".into())])
+            ])
+        );
+    }
+
+    #[test]
+    fn test_parse_nested_deep() {
+        let tstr = "${foo:${bar:${foo:baz}}}";
+        assert_eq!(
+            parse_ref(tstr).unwrap(),
+            Token::Ref(vec![
+                Token::Literal("foo:".into()),
+                Token::Ref(vec![
+                    Token::Literal("bar:".into()),
+                    Token::Ref(vec![Token::Literal("foo:baz".into()),])
+                ])
+            ])
+        );
+    }
+
+    #[test]
     fn test_parse_ref_error_1() {
         let input = "foo-${bar";
         let res = parse_ref(input);

@@ -35,8 +35,6 @@ impl Token {
 mod test_token {
     use super::*;
 
-    use crate::refs::parse_ref;
-
     #[test]
     fn test_is_ref() {
         assert_eq!(Token::Literal("foo".into()).is_ref(), false);
@@ -52,33 +50,6 @@ mod test_token {
         assert_eq!(
             Token::Ref(vec![Token::Literal("foo".into())]).is_literal(),
             false
-        );
-    }
-
-    #[test]
-    fn test_parse_nested() {
-        let tstr = "${foo:${bar}}";
-        assert_eq!(
-            parse_ref(tstr).unwrap(),
-            Token::Ref(vec![
-                Token::Literal("foo:".into()),
-                Token::Ref(vec![Token::Literal("bar".into())])
-            ])
-        );
-    }
-
-    #[test]
-    fn test_parse_nested_deep() {
-        let tstr = "${foo:${bar:${foo:baz}}}";
-        assert_eq!(
-            parse_ref(tstr).unwrap(),
-            Token::Ref(vec![
-                Token::Literal("foo:".into()),
-                Token::Ref(vec![
-                    Token::Literal("bar:".into()),
-                    Token::Ref(vec![Token::Literal("foo:baz".into()),])
-                ])
-            ])
         );
     }
 }
