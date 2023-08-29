@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci --pytest github
 #
-name: CI
+name: Python
 
 on:
   push:
