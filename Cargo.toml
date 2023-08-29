@@ -1,0 +1,14 @@
+[package]
+name = "reclass-rs"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+keywords = ["yaml", "reclass", "hierarchical config"]
+
+[lib]
+name = "reclass_rs"
+# cdylib for pyo3 and rlib for `cargo test`
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = "0.19.2"
