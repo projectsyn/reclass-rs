@@ -6,9 +6,13 @@ use nom::error::{convert_error, VerboseError};
 pub use self::token::Token;
 
 #[derive(Debug)]
+/// Wraps errors generated when trying to parse a string which may contain Reclass references
 pub struct ParseError<'a> {
+    /// Holds a reference to the original input string
     input: &'a str,
+    /// Holds a `nom::error::VerboseError`, if parsing failed with a `nom::Err::Error` or `nom::Err::Failure`
     nom_err: Option<VerboseError<&'a str>>,
+    /// Holds a human-readable summary of the parse error
     summary: String,
 }
 
@@ -23,6 +27,12 @@ impl<'a> std::fmt::Display for ParseError<'a> {
 }
 
 #[allow(unused)]
+/// Parses the provided input string and emits a `Token` which represents any Reclass references
+/// that were found in the input string.
+///
+/// The function currently doesn't allow customizing the Reclass reference start and end markers,
+/// or the escape character. The default Reclass reference format `${...}` and the default escape
+/// character '\' are recognized by the parser.
 pub fn parse_ref(input: &str) -> Result<Token, ParseError> {
     use self::parser::parse_ref;
     let (uncons, token) = parse_ref(input).map_err(|e| match e {
