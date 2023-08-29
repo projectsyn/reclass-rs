@@ -1,7 +1,12 @@
 #[derive(Debug, PartialEq, Eq)]
+/// Represents a parsed Reclass reference
 pub enum Token {
+    /// A parsed input string which doesn't contain any Reclass references
     Literal(String),
+    /// A parsed reference
     Ref(Vec<Token>),
+    /// A parsed input string which is composed of one or more references, potentially with
+    /// interspersed non-reference sections.
     Combined(Vec<Token>),
 }
 
