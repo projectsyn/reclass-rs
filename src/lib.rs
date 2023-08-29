@@ -20,3 +20,13 @@ fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Reclass>()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reclass() {
+        let _ = Reclass {};
+    }
+}
