@@ -1,3 +1,5 @@
+#![deny(clippy::suspicious)]
+
 use pyo3::prelude::*;
 
 /// Reclass allows configuring various library behaviors
