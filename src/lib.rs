@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 
 /// Reclass allows configuring various library behaviors
 #[pyclass]
+#[derive(Default)]
 pub struct Reclass {
     // TODO(sg): add config options
 }
@@ -28,7 +29,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_reclass() {
-        let _ = Reclass {};
+    fn test_reclass_new() {
+        let _ = Reclass::new();
+        let _ = Reclass::default();
     }
 }
