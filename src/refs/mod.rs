@@ -53,6 +53,20 @@ mod test_refs {
     use super::*;
 
     #[test]
+    fn test_parse_no_ref() {
+        let input = "foo-bar-baz";
+        let res = parse_ref(input).unwrap();
+        assert_eq!(res, Token::literal_from_str("foo-bar-baz"))
+    }
+
+    #[test]
+    fn test_parse_escaped_ref() {
+        let input = r"foo-bar-\${baz}";
+        let res = parse_ref(input).unwrap();
+        assert_eq!(res, Token::literal_from_str("foo-bar-${baz}"))
+    }
+
+    #[test]
     fn test_parse_ref() {
         let input = "foo-${bar:baz}";
         let res = parse_ref(input).unwrap();
