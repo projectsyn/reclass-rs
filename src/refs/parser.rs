@@ -11,6 +11,8 @@ use nom::{
 
 use super::token::Token;
 
+/// Merges adjacent literal tokens into a single literal token to reduce the number of tokens in
+/// parsed references.
 fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
     let mut tokiter = tokens.into_iter();
     let mut res = vec![tokiter.next().unwrap()];
@@ -72,6 +74,7 @@ fn ref_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
     )(input)
 }
 
+/// Parses a section of the input which can't contain a reference (escaped or otherwise)
 fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     fn ref_not_close(input: &str) -> IResult<&str, (), VerboseError<&str>> {
         // don't advance parse position, just check for ref_close variants
@@ -105,6 +108,8 @@ fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     )(input)
 }
 
+/// Parses a section of the contents of a reference which doesn't contain nested Reclass
+/// references, taking into account escaped reference start markers
 fn ref_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context(
@@ -120,6 +125,7 @@ fn ref_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     )(input)
 }
 
+/// Parses the contents of a reference, taking into account that there may be nested references
 fn ref_item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     context(
         "ref_item",
@@ -127,6 +133,7 @@ fn ref_item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     )(input)
 }
 
+/// Parses a single Reclass reference which may contain nested references
 fn reference(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     context(
         "reference",
@@ -136,6 +143,7 @@ fn reference(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     )(input)
 }
 
+/// Parses a section of the input which doesn't contain any Reclass references
 fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     fn text(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         context(
@@ -163,10 +171,12 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     context("string", alt((double_escape, ref_escape_open, content)))(input)
 }
 
+/// Parses either a Reclass reference or a section of the input with no references
 fn item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     context("item", alt((reference, map(string, Token::Literal))))(input)
 }
 
+/// Parses a string containing zero or more Reclass references
 pub fn parse_ref(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     map(all_consuming(many1(item)), |tokens| {
         let tokens = coalesce_literals(tokens);
