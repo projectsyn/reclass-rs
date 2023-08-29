@@ -18,12 +18,17 @@ fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
     let mut res = vec![tokiter.next().unwrap()];
     for tok in tokiter {
         if res.last().unwrap().is_literal() && tok.is_literal() {
-            let t = res.pop().unwrap();
-            res.push(Token::Literal(format!(
-                "{}{}",
-                t.as_string(),
-                tok.as_string()
-            )));
+            // TODO(sg): Move the if-let bindings into the if above this comment once the
+            // corresponding Rust feature is stabilized.
+            if let Token::Literal(t) = res.pop().unwrap() {
+                if let Token::Literal(tok) = tok {
+                    res.push(Token::Literal(format!("{}{}", t, tok)));
+                } else {
+                    panic!("this should be unreachable");
+                }
+            } else {
+                panic!("this should be unreachable");
+            }
         } else {
             res.push(tok);
         }

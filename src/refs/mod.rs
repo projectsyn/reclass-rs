@@ -132,4 +132,25 @@ mod test_refs {
         let e = res.unwrap_err();
         println!("{}", e);
     }
+
+    #[test]
+    fn test_parse_ref_format() {
+        let input = r"foo-${foo:${bar}}-${baz}-\${bar}-\\${qux}";
+        let res = parse_ref(&input).unwrap();
+        assert_eq!(
+            res,
+            Token::Combined(vec![
+                Token::literal_from_str("foo-"),
+                Token::Ref(vec![
+                    Token::literal_from_str("foo:"),
+                    Token::Ref(vec![Token::literal_from_str("bar")])
+                ]),
+                Token::literal_from_str("-"),
+                Token::Ref(vec![Token::literal_from_str("baz")]),
+                Token::literal_from_str(r"-${bar}-\"),
+                Token::Ref(vec![Token::literal_from_str("qux")]),
+            ])
+        );
+        assert_eq!(format!("{}", res), input);
+    }
 }
