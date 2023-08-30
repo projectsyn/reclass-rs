@@ -158,3 +158,120 @@ impl NodeInfo {
         Ok(dict.into())
     }
 }
+
+#[cfg(test)]
+mod nodeinfo_tests {
+    use super::*;
+
+    #[test]
+    fn test_as_py_dict() {
+        let m = r#"
+        a: a
+        b: ['b', 'b']
+        c: 3
+        d:
+          d: d
+        e: true
+        "#;
+        let m: serde_yaml::Mapping = serde_yaml::from_str(m).unwrap();
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let d = as_py_dict(&m, py).unwrap();
+            assert!(d.as_ref(py).is_instance_of::<PyDict>());
+            let locals = PyDict::new(py);
+            locals.set_item("d", d).unwrap();
+            py.run(
+                r#"assert d == {"a": "a", "b": ["b", "b"], "c": 3,"d": {"d": "d"}, "e": True} "#,
+                None,
+                Some(locals),
+            )
+            .unwrap();
+        });
+    }
+
+    #[test]
+    fn test_as_py_obj_null() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let pyv = as_py_obj(&Value::Null, py).unwrap();
+            let v = pyv.as_ref(py);
+            assert!(v.is_none());
+        });
+    }
+
+    #[test]
+    fn test_as_py_obj_bool() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let pyb = as_py_obj(&Value::Bool(true), py).unwrap();
+            let b = pyb.as_ref(py);
+            assert!(b.is_instance_of::<pyo3::types::PyBool>());
+            assert!(b.downcast_exact::<pyo3::types::PyBool>().unwrap().is_true());
+        });
+    }
+
+    #[test]
+    fn test_as_py_obj_int() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let nums: Vec<Value> = vec![5.into(), (-2i64).into()];
+            for n in nums {
+                let pyn = as_py_obj(&n, py).unwrap();
+                let n = pyn.as_ref(py);
+                assert!(n.is_instance_of::<pyo3::types::PyInt>());
+                assert!(n
+                    .downcast_exact::<pyo3::types::PyInt>()
+                    .unwrap()
+                    .eq(n.into_py(py))
+                    .unwrap());
+            }
+        });
+    }
+
+    #[test]
+    fn test_as_py_obj_float() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let pyn = as_py_obj(&3.14.into(), py).unwrap();
+            let n = pyn.as_ref(py);
+            assert!(n.is_instance_of::<pyo3::types::PyFloat>());
+            assert!(n
+                .downcast_exact::<pyo3::types::PyFloat>()
+                .unwrap()
+                .eq(3.14.into_py(py))
+                .unwrap());
+        });
+    }
+
+    #[test]
+    fn test_as_py_obj_sequence() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let pys = as_py_obj(&vec![1, 2, 3].into(), py).unwrap();
+            let s = pys.as_ref(py);
+            assert!(s.is_instance_of::<pyo3::types::PyList>());
+            assert!(s
+                .downcast_exact::<pyo3::types::PyList>()
+                .unwrap()
+                .eq(pyo3::types::PyList::new(py, vec![1, 2, 3]))
+                .unwrap());
+        });
+    }
+
+    #[test]
+    fn test_as_py_obj_string() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let pys = as_py_obj(&"hello, world".into(), py).unwrap();
+            let s = pys.as_ref(py);
+            assert!(s.is_instance_of::<pyo3::types::PyString>());
+            assert_eq!(
+                s.downcast_exact::<pyo3::types::PyString>()
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                "hello, world"
+            );
+        });
+    }
+}
