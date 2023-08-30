@@ -1,0 +1,11 @@
+applications:
+  - app1
+  - app2
+classes:
+  - cls1
+  - cls2
+parameters:
+  foo: &foo
+    foo: foo
+  bar:
+    <<: *foo

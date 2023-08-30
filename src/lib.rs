@@ -6,6 +6,7 @@
 #![warn(let_underscore_drop)]
 
 mod list;
+mod node;
 mod refs;
 
 use pyo3::prelude::*;
