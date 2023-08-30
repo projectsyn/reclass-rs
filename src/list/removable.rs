@@ -61,7 +61,6 @@ impl From<Vec<String>> for RemovableList {
 impl From<RemovableList> for Vec<String> {
     #[inline]
     fn from(l: RemovableList) -> Self {
-        drop(l.negations);
         l.items
     }
 }
