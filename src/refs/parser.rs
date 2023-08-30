@@ -544,4 +544,70 @@ mod test_parser_funcs {
             Ok(("", Token::literal_from_str("foo}bar")))
         );
     }
+
+    #[test]
+    fn test_parse_escape_then_double_escaped_ref() {
+        // Reclass's reference parsing only requires escaping backslashes that should be literals
+        // when they precede a reference opening or closing symbol. Other backslashes don't need to
+        // be escaped. The parser will try to parse backslashes as single characters first, and
+        // will only interpret them as escape characters when they precede a reference opening or
+        // closing symbol.
+        //
+        // Therefore the string `\\\${foo}` is parsed as a freestanding `\` followed by a
+        // double-escaped reference resulting in `\\` followed by the contents of `${foo}` once
+        // interpolated.
+        let refstr = r#"\\\${foo}"#.to_string();
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok((
+                "",
+                Token::Combined(vec![
+                    Token::literal_from_str(r"\\"),
+                    Token::Ref(vec![Token::literal_from_str("foo")])
+                ])
+            ))
+        )
+    }
+
+    #[test]
+    fn test_parse_escape_escape_then_double_escaped_ref() {
+        // Reclass's reference parsing only requires escaping backslashes that should be literals
+        // when they precede a reference opening or closing symbol. Other backslashes don't need to
+        // be escaped. The parser will try to parse backslashes as single characters first, and
+        // will only interpret them as escape characters when they precede a reference opening or
+        // closing symbol.
+        //
+        // Therefore the string `\\\\${foo}` is parsed as two freestanding `\` followed by a
+        // double-escaped reference resulting in `\\\` followed by the contents of `${foo}` once
+        // interpolated.
+        let refstr = r#"\\\\${foo}"#.to_string();
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok((
+                "",
+                Token::Combined(vec![
+                    Token::literal_from_str(r"\\\"),
+                    Token::Ref(vec![Token::literal_from_str("foo")])
+                ])
+            ))
+        )
+    }
+
+    #[test]
+    fn test_parse_escape_then_double_escaped_ref_close() {
+        // Reclass's reference parsing only requires escaping backslashes that should be literals
+        // when they precede a reference opening or closing symbol. Other backslashes don't need to
+        // be escaped. The parser will try to parse backslashes as single characters first, and
+        // will only interpret them as escape characters when they precede a reference opening or
+        // closing symbol.
+        //
+        // Therefore the string `${foo\\\}` is parsed as a reference to `foo\\`. The first `\` in
+        // the reference is parsed as a freestanding `\` and the following `\\` is parsed as a
+        // double-escaped reference closing symbol.
+        let refstr = r#"${foo\\\}"#.to_string();
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok(("", Token::Ref(vec![Token::literal_from_str(r"foo\\")])))
+        )
+    }
 }
