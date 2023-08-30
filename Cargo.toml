@@ -11,4 +11,6 @@ name = "reclass_rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+anyhow = "1.0.75"
+nom = "7.1.3"
 pyo3 = "0.19.2"
