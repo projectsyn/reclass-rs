@@ -26,6 +26,7 @@ impl UniqueList {
 }
 
 impl From<Vec<String>> for UniqueList {
+    #[inline]
     fn from(item: Vec<String>) -> Self {
         let mut res = Self { items: vec![] };
         for it in item {
@@ -36,6 +37,7 @@ impl From<Vec<String>> for UniqueList {
 }
 
 impl From<UniqueList> for Vec<String> {
+    #[inline]
     fn from(l: UniqueList) -> Self {
         l.items
     }
