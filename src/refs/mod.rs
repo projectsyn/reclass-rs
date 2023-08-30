@@ -50,7 +50,7 @@ pub fn parse_ref(input: &str) -> Result<Token, ParseError> {
     // uncons can't be empty, since we use the all_consuming combinator in the nom parser, so
     // trailing data will result in a parse error.
     if !uncons.is_empty() {
-        panic!(
+        unreachable!(
             "Trailing data '{}' occurred when parsing '{}', this shouldn't happen! Parsed result: {}",
             uncons, input, token
         );

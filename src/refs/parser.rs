@@ -24,10 +24,10 @@ fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
                 if let Token::Literal(tok) = tok {
                     res.push(Token::Literal(format!("{}{}", t, tok)));
                 } else {
-                    panic!("this should be unreachable");
+                    unreachable!("Literal token isn't a literal?");
                 }
             } else {
-                panic!("this should be unreachable");
+                unreachable!("Literal token isn't a literal?");
             }
         } else {
             res.push(tok);
