@@ -5,6 +5,7 @@
 #![warn(clippy::redundant_closure_for_method_calls)]
 #![warn(let_underscore_drop)]
 
+mod list;
 mod refs;
 
 use pyo3::prelude::*;
