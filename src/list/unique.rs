@@ -44,6 +44,28 @@ impl From<UniqueList> for Vec<String> {
 }
 
 impl List for UniqueList {
+    #[inline]
+    fn new() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+        }
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    #[inline]
+    fn shrink_to_fit(&mut self) {
+        self.items.shrink_to_fit();
+    }
+
     /// Appends item to list if it's not present yet
     fn append_if_new(&mut self, item: String) {
         if item_pos(&self.items, &item).is_none() {

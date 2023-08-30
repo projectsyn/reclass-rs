@@ -67,6 +67,30 @@ impl From<RemovableList> for Vec<String> {
 }
 
 impl List for RemovableList {
+    #[inline]
+    fn new() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+            negations: vec![],
+        }
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    #[inline]
+    fn shrink_to_fit(&mut self) {
+        self.items.shrink_to_fit();
+        self.negations.shrink_to_fit();
+    }
+
     /// Appends or removes item from list
     ///
     /// Regular strings are inserted in the list if they're not present yet. When `item` is
