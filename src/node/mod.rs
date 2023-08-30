@@ -8,6 +8,10 @@ use yaml_merge_keys::merge_keys_serde;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::Reclass;
 
+mod nodeinfo;
+
+pub(crate) use nodeinfo::*;
+
 /// Represents a Reclass node or class
 #[derive(Debug, Default, Deserialize)]
 pub struct Node {
@@ -23,20 +27,22 @@ pub struct Node {
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,
+    #[serde(skip)]
+    meta: NodeInfoMeta,
 }
 
 const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
-fn load_file(npath: &Path) -> Result<String> {
-    let mut ncontents: Result<String> = Err(anyhow!(format!(
+fn load_file(npath: &Path) -> Result<(String, PathBuf)> {
+    let mut ncontents: Result<(String, PathBuf)> = Err(anyhow!(format!(
         "Node `{}.ya?ml` not found",
         npath.display()
     )));
     // Try both `.yml` and `.yaml` for both nodes and classes. Prefer `.yml` if both exist.
     for ext in SUPPORTED_YAML_EXTS {
         let np = npath.with_extension(ext);
-        if let Ok(contents) = std::fs::read_to_string(np) {
-            ncontents = Ok(contents);
+        if let Ok(contents) = std::fs::read_to_string(&np) {
+            ncontents = Ok((contents, np));
             break;
         }
     }
@@ -47,13 +53,16 @@ impl Node {
     /// Parse node from file with basename `name` in `r.nodes_path`.
     ///
     /// The heavy lifting is done in `load_file` and `Node::from_str`.
-    #[allow(unused)]
     pub fn parse(r: &Reclass, name: &str) -> Result<Self> {
+        let mut meta = NodeInfoMeta::new(name, name, "", "base");
+
         let mut npath = PathBuf::from(&r.nodes_path);
         npath.push(name);
-        let ncontents = load_file(&npath)?;
+        let (ncontents, fname) = load_file(&npath)?;
 
-        Node::from_str(None, &ncontents)
+        meta.uri = format!("yaml_fs://{}", std::fs::canonicalize(fname)?.display());
+
+        Node::from_str(meta, None, &ncontents)
     }
 
     /// Initializes a `Node` struct from a string.
@@ -61,9 +70,10 @@ impl Node {
     /// The given string is parsed as YAML. Parameter `npath` is interpreted as the node's location
     /// in the class hierarchy. If the parameter is `None`, relative includes are treated as
     /// relative to `classes_path`.
-    pub fn from_str(npath: Option<PathBuf>, ncontents: &str) -> Result<Self> {
+    pub fn from_str(meta: NodeInfoMeta, npath: Option<PathBuf>, ncontents: &str) -> Result<Self> {
         let mut n: Node = serde_yaml::from_str(ncontents)?;
         n.own_loc = npath;
+        n.meta = meta;
 
         // Transform any relative class names to absolute class names, based on the new node's
         // `own_loc`.
@@ -151,6 +161,7 @@ mod node_tests {
             false,
         );
         let n = Node::parse(&r, "n1").unwrap();
+        println!("{:#?}", n.meta);
         assert_eq!(
             n.classes,
             UniqueList::from(vec!["cls1".to_owned(), "cls2".to_owned()])
@@ -183,7 +194,7 @@ mod node_tests {
             bar: bar
         "#;
 
-        let n = Node::from_str(None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
         assert_eq!(
             n.classes,
             UniqueList::from(vec!["foo".to_owned(), "bar".to_owned()])
@@ -211,7 +222,7 @@ mod node_tests {
           fooer:
             <<: *foo
         "#;
-        let n = Node::from_str(None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
         let expected = r#"
         foo:
           bar: bar
@@ -232,7 +243,7 @@ mod node_tests {
             bar:
               <<: *foo
         "#;
-        let n = Node::from_str(None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
         let expected = r#"
         foo:
           bar: bar
@@ -258,7 +269,7 @@ mod node_tests {
             - <<: *a
             - <<: *b
         "#;
-        let n = Node::from_str(None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
         let expected = r#"
         a:
           a: a

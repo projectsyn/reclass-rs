@@ -9,7 +9,10 @@ mod list;
 mod node;
 mod refs;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+
+use crate::node::{Node, NodeInfo, NodeInfoMeta};
 
 /// This struct holds configuration fields for various library behaviors
 #[pyclass]
@@ -36,6 +39,13 @@ impl Reclass {
             ignore_class_notfound,
         }
     }
+
+    pub fn nodeinfo(&self, nodename: &str) -> PyResult<NodeInfo> {
+        let n = Node::parse(self, nodename).map_err(|e| {
+            PyValueError::new_err(format!("Error while processing {}: {}", nodename, e))
+        })?;
+        Ok(n.into())
+    }
 }
 
 impl Default for Reclass {
@@ -48,6 +58,9 @@ impl Default for Reclass {
 fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register the top-level `Reclass` Python class which is used to configure the library
     m.add_class::<Reclass>()?;
+    // Register the NodeInfoMeta and NodeInfo classes
+    m.add_class::<NodeInfoMeta>()?;
+    m.add_class::<NodeInfo>()?;
     Ok(())
 }
 
