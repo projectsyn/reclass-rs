@@ -61,7 +61,16 @@ impl NodeInfoMeta {
     }
 }
 
+#[pymethods]
+impl NodeInfoMeta {
+    fn __repr__(&self) -> String {
+        format!("{:#?}", self)
+    }
+}
+
+/// Rendered data for a Reclass node
 #[pyclass]
+#[derive(Clone, Debug)]
 pub struct NodeInfo {
     pub reclass: NodeInfoMeta,
     #[pyo3(get)]
@@ -128,6 +137,10 @@ fn as_py_dict(m: &Mapping, py: Python<'_>) -> PyResult<Py<PyDict>> {
 
 #[pymethods]
 impl NodeInfo {
+    fn __repr__(&self) -> String {
+        format!("{:#?}", self)
+    }
+
     /// Returns the NodeInfo data as a PyDict
     ///
     /// This method generates a PyDict which should be structured identically to Python Reclass's
