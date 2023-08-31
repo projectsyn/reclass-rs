@@ -238,6 +238,7 @@ impl Value {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn variant(&self) -> &str {
         match self {
             Self::Bool(_) => "Value::Bool",
@@ -282,6 +283,7 @@ impl Value {
         Ok(obj)
     }
 
+    #[allow(unused)]
     pub(super) fn strip_prefix(&self) -> (Self, Option<KeyPrefix>) {
         match self {
             Self::String(s) => {
