@@ -19,3 +19,6 @@ pyo3 = { version = "0.19.2", features = ["chrono"] }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_yaml = "0.9.25"
 yaml-merge-keys = { version = "0.6.0", features = ["serde_yaml"] }
+
+[dev-dependencies]
+paste = "1.0.14"
