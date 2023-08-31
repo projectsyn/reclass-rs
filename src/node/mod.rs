@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use yaml_merge_keys::merge_keys_serde;
 
 use crate::list::{List, RemovableList, UniqueList};
+use crate::types::Mapping;
 use crate::Reclass;
 
 mod nodeinfo;
@@ -24,6 +25,9 @@ pub struct Node {
     /// Reclass parameters for this node as parsed from YAML
     #[serde(default, rename = "parameters")]
     _params: serde_yaml::Mapping,
+    /// Reclass parameters for this node converted into our own mapping type
+    #[serde(skip)]
+    parameters: Mapping,
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,
@@ -86,15 +90,17 @@ impl Node {
         n.classes = classes;
 
         // Resolve YAML merge keys in `_params`
-        let mut p = merge_keys_serde(serde_yaml::Value::from(n._params))?
+        let p = merge_keys_serde(serde_yaml::Value::from(n._params))?
             .as_mapping()
             .unwrap()
             .to_owned();
-        // Inject `_reclass_` meta parameter into parameters
-        p.insert("_reclass_".into(), n.meta.as_reclass().into());
         n._params = p;
 
-        // TODO(sg): process _params -> we'll need a custom parameters type for that.
+        // Convert serde_yaml::Mapping into our own Mapping type
+        let mut params: Mapping = n._params.clone().into();
+        // Inject `_reclass_` meta parameter into parameters
+        params.insert("_reclass_".into(), n.meta.as_reclass().into());
+        n.parameters = params;
 
         Ok(n)
     }
@@ -190,7 +196,7 @@ mod node_tests {
             path: n1
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
-        assert_eq!(n._params, expected);
+        assert_eq!(n.parameters, expected.into());
     }
 
     #[test]
@@ -223,7 +229,6 @@ mod node_tests {
         );
         let mut params = serde_yaml::Mapping::new();
         params.insert(serde_yaml::Value::from("foo"), serde_yaml::Value::from(foo));
-        params.insert("_reclass_".into(), n.meta.as_reclass().into());
         assert_eq!(n._params, params);
     }
 
@@ -242,13 +247,6 @@ mod node_tests {
           bar: bar
         fooer:
           bar: bar
-        _reclass_:
-          environment: ""
-          name:
-            short: ""
-            parts: [""]
-            full: ""
-            path: ""
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
         assert_eq!(n._params, expected);
@@ -271,13 +269,6 @@ mod node_tests {
         fooer:
           bar:
             bar: bar
-        _reclass_:
-          environment: ""
-          name:
-            short: ""
-            parts: [""]
-            full: ""
-            path: ""
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
         assert_eq!(n._params, expected);
@@ -306,13 +297,6 @@ mod node_tests {
         c:
           - a: a
           - a: a
-        _reclass_:
-          environment: ""
-          name:
-            short: ""
-            parts: [""]
-            full: ""
-            path: ""
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
         assert_eq!(n._params, expected);
