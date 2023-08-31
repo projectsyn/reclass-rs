@@ -2,6 +2,8 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
@@ -102,6 +104,19 @@ impl Mapping {
     #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    /// Converts the `Mapping` into a `PyDict`
+    pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let dict = PyDict::new(py);
+
+        for (k, v) in self.iter() {
+            let pyk = k.as_py_obj(py)?;
+            let pyv = v.as_py_obj(py)?;
+            dict.set_item(pyk, pyv)?;
+        }
+
+        Ok(dict.into())
     }
 }
 
