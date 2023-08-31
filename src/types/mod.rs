@@ -5,10 +5,11 @@ mod value;
 pub use mapping::Mapping;
 pub use value::Value;
 
+/// A YAML sequence in which the elements are `reclass_rs::value::Value`
 pub type Sequence = Vec<Value>;
 
 /// Represents special key types in Reclass
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum KeyPrefix {
     /// Represents a key which is marked as constant
     ///

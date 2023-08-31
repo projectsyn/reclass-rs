@@ -9,18 +9,23 @@ use std::hash::{Hash, Hasher};
 
 use super::value::Value;
 
+/// Represents a YAML mapping in a form suitable to manage Reclass parameters.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Mapping {
+    /// Holds the mapping data.
     map: IndexMap<Value, Value>,
+    /// Holds the list of keys in the mapping which were marked as constant.
     const_keys: Vec<Value>,
 }
 
 impl Mapping {
+    /// Creates a new mapping.
     #[inline]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Creates a new mapping with the given initial capacity.
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
@@ -29,23 +34,32 @@ impl Mapping {
         }
     }
 
+    /// Reserves capacity for at least `additional` more elements.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the new allocation size overflows `usize`.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
         self.map.reserve(additional);
     }
 
+    /// Shrinks the map's capacity as much as possible to fit the current contents.
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.map.shrink_to_fit();
         self.const_keys.shrink_to_fit();
     }
 
+    /// Removes all data from the mapping.
     #[inline]
     pub fn clear(&mut self) {
         self.map.clear();
         self.const_keys.clear();
     }
 
+    /// Inserts key-value pair in the mapping. If the key already existed, the old value is
+    /// returned..
     #[inline]
     pub fn insert(&mut self, k: Value, v: Value) -> Option<Value> {
         self.map.insert(k, v)
@@ -60,53 +74,61 @@ impl Mapping {
         }
     }
 
+    /// Returns a reference to the underlying `IndexMap`.
     #[inline]
     pub fn as_map(&self) -> &IndexMap<Value, Value> {
         &self.map
     }
 
+    /// Returns a mutable reference to the underlying `IndexMap`.
     #[inline]
     pub fn as_map_mut(&mut self) -> &mut IndexMap<Value, Value> {
         &mut self.map
     }
 
+    /// Returns `true` if the mapping contains key `k`.
     #[inline]
     pub fn contains_key(&self, k: &Value) -> bool {
         self.map.contains_key(k)
     }
 
+    /// Returns a reference to the value for key `k` if the key is present in the mapping.
     #[inline]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         self.map.get(k)
     }
 
+    /// Returns a mutable reference to the value for key `k` if the key is present in the mapping.
     #[inline]
     pub fn get_mut(&mut self, k: &Value) -> Option<&mut Value> {
         self.map.get_mut(k)
     }
 
+    /// Returns the given key's entry in the map for insertion and/or in-place updates.
     #[inline]
     pub fn entry(&mut self, k: Value) -> indexmap::map::Entry<Value, Value> {
         self.map.entry(k)
     }
 
+    /// Removes the entry for key `k` from the map and returns its value if the key was present in the map.
     #[inline]
     pub fn remove(&mut self, k: &Value) -> Option<Value> {
         self.map.remove(k)
     }
 
+    /// Removes and returns the key-value pair for `k` if the key is present in the map.
     #[inline]
     pub fn remove_entry(&mut self, k: &Value) -> Option<(Value, Value)> {
         self.map.remove_entry(k)
     }
 
-    /// Returns the number of key-value pairs in the map
+    /// Returns the number of key-value pairs in the map.
     #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
-    /// Converts the `Mapping` into a `PyDict`
+    /// Converts the `Mapping` into a `PyDict`.
     pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
 
@@ -121,6 +143,7 @@ impl Mapping {
 }
 
 impl From<serde_yaml::Mapping> for Mapping {
+    /// Converts a `serde_yaml::Mapping` into a `Mapping`.
     fn from(m: serde_yaml::Mapping) -> Self {
         let mut new = Self::with_capacity(m.len());
         for (k, v) in m {
@@ -131,6 +154,7 @@ impl From<serde_yaml::Mapping> for Mapping {
 }
 
 impl From<Mapping> for serde_yaml::Mapping {
+    /// Converts a `Mapping` into a `serde_yaml::Mapping`.
     fn from(m: Mapping) -> Self {
         let mut new = Self::with_capacity(m.map.len());
         for (k, v) in m.map {
@@ -143,17 +167,23 @@ impl From<Mapping> for serde_yaml::Mapping {
 impl std::str::FromStr for Mapping {
     type Err = anyhow::Error;
 
+    /// Converts a `&str` into a `Mapping`.
+    ///
+    /// This function returns an error if the given string can't be parsed as YAML by
+    /// `serde_yaml::from_str`.
     #[inline]
     fn from_str(s: &str) -> Result<Self> {
+        // TODO(sg): handle const keys here
         let m = serde_yaml::from_str::<serde_yaml::Mapping>(s)?;
         Ok(Self::from(m))
     }
 }
 
 impl FromIterator<(Value, Value)> for Mapping {
-    // TODO(sg): handle const keys here
+    /// Creates a `Mapping` from an Iterator over `(Value, Value)`.
     #[inline]
     fn from_iter<I: IntoIterator<Item = (Value, Value)>>(iter: I) -> Self {
+        // TODO(sg): handle const keys here
         Mapping {
             map: IndexMap::from_iter(iter),
             const_keys: vec![],
@@ -161,7 +191,7 @@ impl FromIterator<(Value, Value)> for Mapping {
     }
 }
 
-/// Iterator over `&reclass_rs::types::mapping::Mapping`.
+/// Iterator over `Mapping`.
 pub struct Iter<'a> {
     iter: indexmap::map::Iter<'a, Value, Value>,
 }

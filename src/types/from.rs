@@ -1,18 +1,25 @@
 use super::{Mapping, Value};
 
 impl From<&str> for Value {
+    /// Converts a string slice into a `Value::String`.
     fn from(s: &str) -> Self {
         Self::String(s.to_string())
     }
 }
 
 impl From<String> for Value {
+    /// Converts a String into a `Value::String`.
     fn from(s: String) -> Self {
         Self::String(s)
     }
 }
 
 impl From<serde_yaml::Value> for Value {
+    /// Converts a `serde_yaml::Value` into a `Value`.
+    ///
+    /// `serde_yaml::Value::String` is always converted into `Value::String`.
+    ///
+    /// `serde_yaml::Tagged` values are not supported yet.
     fn from(v: serde_yaml::Value) -> Self {
         match v {
             serde_yaml::Value::Null => Self::Null,
@@ -35,6 +42,11 @@ impl From<serde_yaml::Value> for Value {
 }
 
 impl From<Value> for serde_yaml::Value {
+    /// Converts a `Value` into a `serde_yaml::Value`.
+    ///
+    /// `Value::String` and `Value::Literal` are both converted to `serde_yaml::Value::String`.
+    ///
+    /// `Value::ValueList` is converted to `serde_yaml::Value::Sequence`.
     fn from(v: Value) -> Self {
         match v {
             Value::Null => Self::Null,
@@ -42,7 +54,7 @@ impl From<Value> for serde_yaml::Value {
             Value::Number(n) => Self::Number(n),
             Value::String(s) => Self::String(s),
             Value::Literal(s) => Self::String(s),
-            Value::Sequence(s) => {
+            Value::Sequence(s) | Value::ValueList(s) => {
                 let mut seq: Vec<serde_yaml::Value> = Vec::with_capacity(s.len());
                 for v in s {
                     seq.push(serde_yaml::Value::from(v));
@@ -50,17 +62,18 @@ impl From<Value> for serde_yaml::Value {
                 Self::Sequence(seq)
             }
             Value::Mapping(m) => Self::Mapping(serde_yaml::Mapping::from(m)),
-            Value::ValueList(_) => todo!(),
         }
     }
 }
 
 impl From<Mapping> for Value {
+    /// Converts a `Mapping` into a `Value::Mapping`.
     fn from(value: Mapping) -> Self {
         Value::Mapping(value)
     }
 }
 impl From<serde_yaml::Mapping> for Value {
+    /// Converts a `serde_yaml::Mapping` into a `Value::Mapping`
     fn from(value: serde_yaml::Mapping) -> Self {
         Value::Mapping(value.into())
     }
@@ -86,7 +99,7 @@ from_number! {
 }
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
-    /// Convert a `Vec` into a `Value::Sequence`
+    /// Converts a `Vec` into a `Value::Sequence`.
     ///
     /// This implementation works for any `Vec<T>` whose element type can be converted into a
     /// `Value`.
@@ -96,7 +109,7 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 }
 
 impl<'a, T: Clone + Into<Value>> From<&'a [T]> for Value {
-    /// Convert a slice into a `Value::Sequence`
+    /// Converts a slice into a `Value::Sequence`.
     ///
     /// This implementation works for any slice `&[T]` whose element type can be converted into a
     /// `Value`.

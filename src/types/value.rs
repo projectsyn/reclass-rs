@@ -8,26 +8,25 @@ use std::mem;
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
 
+/// Represents a YAML value in a form suitable for processing Reclass parameters.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    /// Represents a YAML `null` value
+    /// Represents a YAML null value.
     Null,
-    /// Represents a YAML boolean value
+    /// Represents a YAML boolean value.
     Bool(bool),
-    /// Represents an unparsed string value which may contain reclass
-    /// references.
+    /// Represents a raw string value which may contain reclass references.
     String(String),
-    /// Represents a string literal value which can't contain reclass
-    /// references.
+    /// Represents a string literal value which can't contain reclass references.
     Literal(String),
-    /// Represents a YAML number
+    /// Represents a YAML numerical value.
     Number(Number),
-    /// Represents a YAML mapping
+    /// Represents a YAML mapping.
     Mapping(Mapping),
-    /// Represents a YAML sequence
+    /// Represents a YAML sequence.
     Sequence(Sequence),
-    /// ValueList represents a list of layered values which may have different
-    /// types.  ValueLists are flattened during reference interpolation.
+    /// Represents a list of layered values which may have different types. ValueLists are
+    /// flattened during reference interpolation.
     ValueList(Sequence),
 }
 
@@ -49,6 +48,7 @@ impl Hash for Value {
     }
 }
 
+/// The default value is `Value::Null`.
 impl Default for Value {
     fn default() -> Self {
         Self::Null
@@ -56,16 +56,19 @@ impl Default for Value {
 }
 
 impl Value {
+    /// Checks if the `Value` is `Null`.
     #[inline]
     pub fn is_null(&self) -> bool {
         matches!(self, Self::Null)
     }
 
+    /// Checks if the `Value` is a boolean.
     #[inline]
     pub fn is_bool(&self) -> bool {
         matches!(self, Self::Bool(_))
     }
 
+    /// If the `Value` is a Boolean, return the associated bool. Returns None otherwise.
     #[inline]
     pub fn as_bool(&self) -> Option<bool> {
         match self {
@@ -74,6 +77,10 @@ impl Value {
         }
     }
 
+    /// Returns true if the `Value` is an integer between `i64::MIN` and `i64::MAX`.
+    ///
+    /// For any value for which `is_i64` returns true, `as_i64` is guaranteed to return the
+    /// integer value.
     #[inline]
     pub fn is_i64(&self) -> bool {
         match self {
@@ -82,6 +89,7 @@ impl Value {
         }
     }
 
+    /// If the `Value` is an integer, represent it as i64 if possible. Returns None otherwise.
     #[inline]
     pub fn as_i64(&self) -> Option<i64> {
         match self {
@@ -90,6 +98,10 @@ impl Value {
         }
     }
 
+    /// Returns true if the `Value` is an integer between `u64::MIN` and `u64::MAX`.
+    ///
+    /// For any value for which `is_u64` returns true, `as_u64` is guaranteed to return the
+    /// integer value.
     #[inline]
     pub fn is_u64(&self) -> bool {
         match self {
@@ -98,6 +110,7 @@ impl Value {
         }
     }
 
+    /// If the `Value` is an integer, represent it as u64 if possible. Returns None otherwise.
     #[inline]
     pub fn as_u64(&self) -> Option<u64> {
         match self {
@@ -106,6 +119,14 @@ impl Value {
         }
     }
 
+    /// Returns true if the `Value` can be represented by f64.
+    ///
+    /// For any value for which `is_f64` returns true, `as_f64` is guaranteed to return the
+    /// floating point value.
+    ///
+    /// Because we rely on the `serde_yaml::Number` type to implement this function, it currently
+    /// returns true if and only if both `is_i64` and `is_u64` return false, but since serde_yaml
+    /// doesn't guarantee this behavior in the future, this may change.
     #[inline]
     pub fn is_f64(&self) -> bool {
         match self {
@@ -114,6 +135,7 @@ impl Value {
         }
     }
 
+    /// If the `Value` is a number, represent it as f64 if possible. Returns None otherwise.
     #[inline]
     pub fn as_f64(&self) -> Option<f64> {
         match self {
@@ -122,16 +144,25 @@ impl Value {
         }
     }
 
+    /// Checks if the `Value` is a String.
+    ///
+    /// For any value for which `is_string()` returns true, `as_str` is guaranteed to return the
+    /// string slice.
     #[inline]
     pub fn is_string(&self) -> bool {
         matches!(self, Self::String(_))
     }
 
+    /// Checks if the `Value` is a Literal.
+    ///
+    /// For any value for which `is_literal()` returns true, `as_str` is guaranteed to return the
+    /// string slice.
     #[inline]
     pub fn is_literal(&self) -> bool {
         matches!(self, Self::Literal(_))
     }
 
+    /// If the `Value` is a String or Literal, return the associated `str`. Returns None otherwise.
     #[inline]
     pub fn as_str(&self) -> Option<&str> {
         match self {
@@ -141,11 +172,13 @@ impl Value {
         }
     }
 
+    /// Checks if the `Value` is a Mapping.
     #[inline]
     pub fn is_mapping(&self) -> bool {
         matches!(self, Self::Mapping(_))
     }
 
+    /// If the value is a Mapping, return a reference to it. Returns None otherwise.
     #[inline]
     pub fn as_mapping(&self) -> Option<&Mapping> {
         match self {
@@ -154,6 +187,7 @@ impl Value {
         }
     }
 
+    /// If the value is a Mapping, return a mutable reference to it. Returns None otherwise.
     #[inline]
     pub fn as_mapping_mut(&mut self) -> Option<&mut Mapping> {
         match self {
@@ -162,11 +196,13 @@ impl Value {
         }
     }
 
+    /// Checks if the `Value` is a Sequence.
     #[inline]
     pub fn is_sequence(&self) -> bool {
         matches!(self, Self::Sequence(_))
     }
 
+    /// If the value is a Sequence, return a reference to it. Returns None otherwise.
     #[inline]
     pub fn as_sequence(&self) -> Option<&Sequence> {
         match self {
@@ -175,6 +211,7 @@ impl Value {
         }
     }
 
+    /// If the value is a Sequence, return a mutable reference to it. Returns None otherwise.
     #[inline]
     pub fn as_sequence_mut(&mut self) -> Option<&mut Sequence> {
         match self {
@@ -183,11 +220,13 @@ impl Value {
         }
     }
 
+    /// Checks if the `Value` is a ValueList.
     #[inline]
     pub fn is_value_list(&self) -> bool {
         matches!(self, Self::ValueList(_))
     }
 
+    /// If the value is a ValueList, return a reference to it. Returns None otherwise.
     #[inline]
     pub fn as_value_list(&self) -> Option<&Sequence> {
         match self {
@@ -196,6 +235,7 @@ impl Value {
         }
     }
 
+    /// If the value is a ValueList, return a mutable reference to it. Returns None otherwise.
     #[inline]
     pub fn as_value_list_mut(&mut self) -> Option<&mut Sequence> {
         match self {
@@ -204,6 +244,14 @@ impl Value {
         }
     }
 
+    /// Access elements in a Sequence or Mapping, returning a reference to the value if the given
+    /// key exists. Returns None otherwise.
+    ///
+    /// An arbitrary `Value` key can be used to access a value in a Mapping. A `Value::Number`
+    /// which is within the bounds of the underlying sequence can be used to access a value in a
+    /// Sequence or a ValueList.
+    ///
+    /// Returns None for invalid keys, or keys which don't exist in the `Value`.
     #[inline]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         match self {
@@ -221,6 +269,14 @@ impl Value {
         }
     }
 
+    /// Access elements in a Sequence or Mapping, returning a mutable reference to the value if the
+    /// given key exists. Returns None otherwise.
+    ///
+    /// An arbitrary `Value` key can be used to access a value in a Mapping. A `Value::Number`
+    /// which is within the bounds of the underlying sequence can be used to access a value in a
+    /// Sequence or a ValueList.
+    ///
+    /// Returns None for invalid keys, or keys which don't exist in the `Value`.
     #[inline]
     pub fn get_mut(&mut self, k: &Value) -> Option<&mut Value> {
         match self {
@@ -238,6 +294,7 @@ impl Value {
         }
     }
 
+    /// Provides a nice string for each enum variant for debugging and pretty-printing.
     #[allow(unused)]
     pub(crate) fn variant(&self) -> &str {
         match self {
@@ -252,7 +309,7 @@ impl Value {
         }
     }
 
-    /// Converts the `Value` into a `PyObject`
+    /// Converts the `Value` into a `PyObject`.
     pub fn as_py_obj(&self, py: Python<'_>) -> PyResult<PyObject> {
         let obj = match self {
             Value::Literal(s) | Value::String(s) => s.into_py(py),
@@ -283,6 +340,13 @@ impl Value {
         Ok(obj)
     }
 
+    /// Handles special mapping key prefix values for `String` Values.
+    ///
+    /// For String values, if a mapping key prefix is present, the prefix is stripped from the
+    /// String, and the corresponding `KeyPrefix` variant is returned. Otherwise, the string is
+    /// cloned and returned.
+    ///
+    /// For non-String values, the value is unconditionally cloned and returned unmodified.
     #[allow(unused)]
     pub(super) fn strip_prefix(&self) -> (Self, Option<KeyPrefix>) {
         match self {
