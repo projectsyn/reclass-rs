@@ -8,6 +8,7 @@
 mod list;
 mod node;
 mod refs;
+mod types;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
