@@ -213,3 +213,187 @@ impl Hash for Mapping {
         xor.hash(state);
     }
 }
+
+#[cfg(test)]
+mod mapping_tests {
+    use super::*;
+    use std::str::FromStr;
+
+    fn create_map() -> Mapping {
+        let mut m = Mapping::new();
+        m.insert("a".into(), 1.into());
+        m.insert("b".into(), "foo".into());
+        m.insert("c".into(), 3.14.into());
+        m.insert("d".into(), Value::Bool(true));
+        m
+    }
+
+    #[test]
+    fn test_from_str() {
+        let input = r#"
+        a: 1
+        b: foo
+        c: 3.14
+        d: true
+        e: [1,2,3]
+        f:
+          foo: bar
+        "#;
+        let m = Mapping::from_str(input).unwrap();
+        let mut expected = create_map();
+        expected.insert("e".into(), vec![1, 2, 3].into());
+        expected.insert(
+            "f".into(),
+            Mapping::from_iter(vec![("foo".into(), "bar".into())]).into(),
+        );
+        assert_eq!(m, expected);
+    }
+
+    #[test]
+    fn test_iter() {
+        let m = create_map();
+
+        let items = m.iter().collect::<Vec<(&Value, &Value)>>();
+        assert_eq!(items.len(), 4);
+        assert_eq!(items[0], (&"a".into(), &1.into()));
+        assert_eq!(items[1], (&"b".into(), &"foo".into()));
+        assert_eq!(items[2], (&"c".into(), &3.14.into()));
+        assert_eq!(items[3], (&"d".into(), &Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_contains_key() {
+        let mut m = create_map();
+        m.insert(3.14.into(), "3.14".into());
+
+        assert!(m.contains_key(&"a".into()));
+        assert!(m.contains_key(&3.14.into()));
+        assert!(!m.contains_key(&"e".into()));
+        assert!(!m.contains_key(&5.into()));
+    }
+
+    #[test]
+    fn test_get() {
+        let mut m = create_map();
+        m.insert(3.14.into(), "3.14".into());
+
+        assert_eq!(m.get(&"a".into()), Some(&1.into()));
+        assert_eq!(m.get(&3.14.into()), Some(&"3.14".into()));
+        assert_eq!(m.get(&"e".into()), None);
+    }
+
+    #[test]
+    fn test_get_mut() {
+        let mut m = create_map();
+
+        assert_eq!(m.get(&"a".into()), Some(&1.into()));
+        let e = m.get_mut(&"a".into());
+        assert!(e.is_some());
+        let e = e.unwrap();
+        *e = 2.into();
+        assert_eq!(m.get(&"a".into()), Some(&2.into()));
+    }
+
+    #[test]
+    fn test_entry_existing() {
+        let mut m = create_map();
+
+        assert_eq!(m.get(&"a".into()), Some(&1.into()));
+        m.entry("a".into())
+            .and_modify(|e| *e = 3.into())
+            .or_insert(2.into());
+
+        assert_eq!(m.get(&"a".into()), Some(&3.into()));
+    }
+
+    #[test]
+    fn test_entry_new() {
+        let mut m = create_map();
+
+        assert_eq!(m.get(&"e".into()), None);
+        m.entry("e".into())
+            .and_modify(|e| *e = 3.into())
+            .or_insert(2.into());
+
+        assert_eq!(m.get(&"e".into()), Some(&2.into()));
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut m = create_map();
+
+        let e = m.remove(&"a".into());
+        assert_eq!(e, Some(1.into()));
+        assert!(!m.contains_key(&"a".into()));
+
+        let e = m.remove(&"a".into());
+        assert_eq!(e, None);
+    }
+
+    #[test]
+    fn test_remove_entry() {
+        let mut m = create_map();
+
+        let e = m.remove_entry(&"a".into());
+        assert_eq!(e, Some(("a".into(), 1.into())));
+        assert!(!m.contains_key(&"a".into()));
+    }
+
+    #[test]
+    fn test_as_py_dict() {
+        let mut m = create_map();
+        m.insert("e".into(), vec![1, 2, 3].into());
+        m.insert(
+            "f".into(),
+            Mapping::from_iter(vec![("foo".into(), "bar".into())]).into(),
+        );
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let pym = m.as_py_dict(py).unwrap();
+            let m = pym.as_ref(py);
+            assert_eq!(m.len(), 6);
+            assert_eq!(format!("{:?}", m.keys()), "['a', 'b', 'c', 'd', 'e', 'f']");
+            let a = m.get_item(&"a").unwrap();
+            assert!(a.is_instance_of::<pyo3::types::PyInt>());
+            assert!(a
+                .downcast_exact::<pyo3::types::PyInt>()
+                .unwrap()
+                .eq(1.into_py(py))
+                .unwrap());
+            let f = m.get_item(&"f").unwrap();
+            assert!(f.is_instance_of::<PyDict>());
+            let f = f.downcast_exact::<PyDict>().unwrap();
+            assert_eq!(f.len(), 1);
+            assert_eq!(format!("{:?}", f.keys()), "['foo']");
+            assert_eq!(format!("{:?}", f.values()), "['bar']");
+            // Remaining element checks omitted, since we have tests for all Value variants in
+            // value.rs.
+        });
+    }
+
+    #[test]
+    fn test_iter_len() {
+        let m = create_map();
+        assert_eq!(m.iter().len(), 4);
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let m = create_map();
+
+        let mut items = vec![];
+        for it in &m {
+            items.push(it)
+        }
+
+        assert_eq!(
+            items,
+            vec![
+                (&"a".into(), &1.into()),
+                (&"b".into(), &"foo".into()),
+                (&"c".into(), &3.14.into()),
+                (&"d".into(), &Value::Bool(true)),
+            ]
+        );
+    }
+}
