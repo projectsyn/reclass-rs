@@ -142,6 +142,12 @@ impl NodeInfo {
         format!("{:#?}", self)
     }
 
+    /// Returns the NodeInfo `parameters` field as a PyDict
+    #[getter]
+    fn parameters(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        as_py_dict(&self.parameters, py)
+    }
+
     /// Returns the NodeInfo data as a PyDict
     ///
     /// This method generates a PyDict which should be structured identically to Python Reclass's
@@ -154,12 +160,6 @@ impl NodeInfo {
         dict.set_item("environment", self.reclass.environment.clone().into_py(py))?;
         dict.set_item("parameters", self.parameters(py)?)?;
         Ok(dict.into())
-    }
-
-    /// Returns the NodeInfo `parameters` field as a PyDict
-    #[getter]
-    fn parameters(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        as_py_dict(&self.parameters, py)
     }
 
     /// Returns the NodeInfo `meta` field as a PyDict
