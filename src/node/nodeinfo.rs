@@ -72,6 +72,7 @@ impl NodeInfoMeta {
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct NodeInfo {
+    #[pyo3(get, name = "__reclass__")]
     pub reclass: NodeInfoMeta,
     #[pyo3(get)]
     pub applications: Vec<String>,
@@ -147,7 +148,7 @@ impl NodeInfo {
     /// `nodeinfo` return value.
     fn as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
-        dict.set_item("__reclass__", self.__reclass__(py)?)?;
+        dict.set_item("__reclass__", self.reclass_as_dict(py)?)?;
         dict.set_item("applications", self.applications.clone().into_py(py))?;
         dict.set_item("classes", self.classes.clone().into_py(py))?;
         dict.set_item("environment", self.reclass.environment.clone().into_py(py))?;
@@ -162,8 +163,7 @@ impl NodeInfo {
     }
 
     /// Returns the NodeInfo `meta` field as a PyDict
-    #[getter]
-    fn __reclass__(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+    fn reclass_as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
         dict.set_item("node", self.reclass.node.clone().into_py(py))?;
         dict.set_item("name", self.reclass.name.clone().into_py(py))?;
