@@ -41,6 +41,24 @@ impl NodeInfoMeta {
             render_time: Local::now(),
         }
     }
+
+    /// Generates a serde_yaml::Mapping suitable to use as meta parameter `_reclass_`
+    pub(crate) fn as_reclass(&self) -> Mapping {
+        let mut namedata = Mapping::new();
+        namedata.insert("full".into(), self.name.clone().into());
+        namedata.insert(
+            "parts".into(),
+            Value::Sequence(vec![self.name.clone().into()]),
+        );
+        namedata.insert("path".into(), self.name.clone().into());
+        namedata.insert("short".into(), self.name.clone().into());
+
+        let mut pmeta = Mapping::new();
+        pmeta.insert("environment".into(), self.environment.clone().into());
+        pmeta.insert("name".into(), Value::Mapping(namedata));
+
+        pmeta
+    }
 }
 
 #[pyclass]
@@ -55,36 +73,12 @@ pub struct NodeInfo {
 
 impl From<super::Node> for NodeInfo {
     /// Creates a `NodeInfo` struct from a `Node`
-    ///
-    /// This function inserts the `_reclass_` meta parameter in the Node's `parameters`.
     fn from(n: super::Node) -> Self {
-        //name:
-        //  full: n1
-        //  parts:
-        //    - n1
-        //  path: n1
-        //  short: n1
-        let mut namedata = Mapping::new();
-        namedata.insert("full".into(), n.meta.name.clone().into());
-        namedata.insert(
-            "parts".into(),
-            Value::Sequence(vec![n.meta.name.clone().into()]),
-        );
-        namedata.insert("path".into(), n.meta.name.clone().into());
-        namedata.insert("short".into(), n.meta.name.clone().into());
-
-        let mut pmeta = Mapping::new();
-        pmeta.insert("environment".into(), n.meta.environment.clone().into());
-        pmeta.insert("name".into(), Value::Mapping(namedata));
-
-        let mut params = n._params.clone();
-        params.insert("_reclass_".into(), Value::Mapping(pmeta));
-
         NodeInfo {
             reclass: n.meta,
             applications: n.applications.into(),
             classes: n.classes.into(),
-            parameters: params,
+            parameters: n._params,
         }
     }
 }
