@@ -16,6 +16,7 @@ use crate::node::{Node, NodeInfo, NodeInfoMeta};
 
 /// This struct holds configuration fields for various library behaviors
 #[pyclass]
+#[derive(Clone, Debug)]
 pub struct Reclass {
     /// Path to node definitions in inventory
     #[pyo3(get)]
@@ -38,6 +39,10 @@ impl Reclass {
             classes_path: classes_path.to_owned(),
             ignore_class_notfound,
         }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("{:#?}", self)
     }
 
     /// Returns the rendered data for the node with the provided name if it exists
