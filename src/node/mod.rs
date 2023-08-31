@@ -33,6 +33,7 @@ pub struct Node {
 
 const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
+/// Loads data from `<npath>.yml` or `<npath>.yaml`.
 fn load_file(npath: &Path) -> Result<(String, PathBuf)> {
     let mut ncontents: Result<(String, PathBuf)> = Err(anyhow!(format!(
         "Node `{}.ya?ml` not found",

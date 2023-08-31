@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde_yaml::{Mapping, Value};
 
+/// Contains metadata for a Reclass node's rendered data
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct NodeInfoMeta {
@@ -53,6 +54,9 @@ pub struct NodeInfo {
 }
 
 impl From<super::Node> for NodeInfo {
+    /// Creates a `NodeInfo` struct from a `Node`
+    ///
+    /// This function inserts the `_reclass_` meta parameter in the Node's `parameters`.
     fn from(n: super::Node) -> Self {
         //name:
         //  full: n1
@@ -85,6 +89,7 @@ impl From<super::Node> for NodeInfo {
     }
 }
 
+/// Converts a serde_yaml::Value into a PyObject
 fn as_py_obj(v: &Value, py: Python<'_>) -> PyResult<PyObject> {
     let obj = match v {
         Value::Null => Option::<()>::None.into_py(py),
@@ -114,6 +119,7 @@ fn as_py_obj(v: &Value, py: Python<'_>) -> PyResult<PyObject> {
     Ok(obj)
 }
 
+/// Converts a serde_yaml::Mapping into a PyDict
 fn as_py_dict(m: &Mapping, py: Python<'_>) -> PyResult<Py<PyDict>> {
     let dict = PyDict::new(py);
 
@@ -128,6 +134,10 @@ fn as_py_dict(m: &Mapping, py: Python<'_>) -> PyResult<Py<PyDict>> {
 
 #[pymethods]
 impl NodeInfo {
+    /// Returns the NodeInfo data as a PyDict
+    ///
+    /// This method generates a PyDict which should be structured identically to Python Reclass's
+    /// `nodeinfo` return value.
     fn as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
         dict.set_item("__reclass__", self.__reclass__(py)?)?;
@@ -138,11 +148,13 @@ impl NodeInfo {
         Ok(dict.into())
     }
 
+    /// Returns the NodeInfo `parameters` field as a PyDict
     #[getter]
     fn parameters(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         as_py_dict(&self.parameters, py)
     }
 
+    /// Returns the NodeInfo `meta` field as a PyDict
     #[getter]
     fn __reclass__(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
