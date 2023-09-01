@@ -28,6 +28,19 @@ pub struct Mapping {
     const_keys: HashSet<Value>,
 }
 
+impl std::fmt::Display for Mapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        for (i, (k, v)) in self.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", k, v)?;
+        }
+        write!(f, "}}")
+    }
+}
+
 impl Mapping {
     /// Creates a new mapping.
     #[inline]

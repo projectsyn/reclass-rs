@@ -31,6 +31,54 @@ pub enum Value {
     ValueList(Sequence),
 }
 
+impl std::fmt::Display for Value {
+    /// Pretty prints the `Value`
+    ///
+    /// Note that the pretty-printed format doesn't distinguish `String` and `Literal`, and
+    /// `Sequence` and `ValueList`. If you need a format where you can distinguish these types, use
+    /// the Debug formatter.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use reclass_rs::types::{Mapping, Value};
+    /// use std::str::FromStr;
+    ///
+    /// let input = r#"
+    /// foo: bar
+    /// baz: True
+    /// bar:
+    ///   qux: [1,2,3,4.5]
+    ///   zap: ~
+    /// "#;
+
+    /// let v = Value::from(Mapping::from_str(input).unwrap());
+    /// assert_eq!(
+    ///     v.to_string(),
+    ///     r#"{"foo": "bar", "baz": true, "bar": {"qux": [1, 2, 3, 4.5], "zap": Null}}"#
+    /// );
+    /// ```
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Null => write!(f, "Null"),
+            Self::Bool(b) => write!(f, "{}", b),
+            Self::Number(n) => write!(f, "{}", n),
+            Self::String(s) | Self::Literal(s) => write!(f, "\"{}\"", s),
+            Self::Sequence(seq) | Self::ValueList(seq) => {
+                write!(f, "[")?;
+                for (i, v) in seq.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, "]")
+            }
+            Self::Mapping(m) => write!(f, "{}", m),
+        }
+    }
+}
+
 impl Eq for Value {}
 
 impl Hash for Value {
