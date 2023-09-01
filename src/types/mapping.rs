@@ -181,6 +181,11 @@ impl Mapping {
         self.map.len()
     }
 
+    /// Checks if the map is empty
+    pub fn is_empty(&self) -> bool {
+        self.map.len() == 0
+    }
+
     /// Converts the `Mapping` into a `PyDict`.
     pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
