@@ -104,7 +104,7 @@ impl Mapping {
         } else {
             // k is marked constant and already set in the map, return error
             Err(anyhow!(format!(
-                "Inserting {:?}={:?}, key already in map and marked constant",
+                "Inserting {}={}, key already in map and marked constant",
                 n, v
             )))
         }
@@ -144,7 +144,7 @@ impl Mapping {
         if !self.const_keys.contains(k) {
             Ok(self.map.get_mut(k))
         } else {
-            Err(anyhow!(format!("Key {:?} is marked constant", k)))
+            Err(anyhow!(format!("Key {} is marked constant", k)))
         }
     }
 
@@ -155,7 +155,7 @@ impl Mapping {
         if !self.const_keys.contains(&k) {
             Ok(self.map.entry(k))
         } else {
-            Err(anyhow!(format!("Key {:?} is marked constant", k)))
+            Err(anyhow!(format!("Key {} is marked constant", k)))
         }
     }
 
