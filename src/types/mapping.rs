@@ -1,21 +1,31 @@
 // This implementation is inspired by `serde_yaml::Mapping`
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 use super::value::Value;
+use super::KeyPrefix;
 
 /// Represents a YAML mapping in a form suitable to manage Reclass parameters.
+///
+/// The map provides support for managing constant keys. Constant keys can't be overwritten
+/// anymore, and operations which would try to do so, or would allow users to do so (e.g. `get_mut`
+/// and `insert`) will return an Error when called for a key which is marked constant.
+///
+/// Existing map keys can be marked constant if `insert()` is called with the existing key marked
+/// as constant. Keys are marked constant by prefixing them with the constant prefix marker
+/// `KeyPrefix::Constant`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Mapping {
     /// Holds the mapping data.
     map: IndexMap<Value, Value>,
-    /// Holds the list of keys in the mapping which were marked as constant.
-    const_keys: Vec<Value>,
+    /// Holds the set of keys in the mapping which are marked as constant.
+    const_keys: HashSet<Value>,
 }
 
 impl Mapping {
@@ -30,7 +40,7 @@ impl Mapping {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             map: IndexMap::with_capacity(capacity),
-            const_keys: vec![],
+            const_keys: HashSet::default(),
         }
     }
 
@@ -59,10 +69,32 @@ impl Mapping {
     }
 
     /// Inserts key-value pair in the mapping. If the key already existed, the old value is
-    /// returned..
+    /// returned. If the key didn't exist, None is returned. If the key existed and was marked
+    /// constant, an error is returned.
+    ///
+    /// The function also processes the provided key and marks it as constant if it starts with the
+    /// constant key prefix marker (`KeyPrefix::Constant`).
     #[inline]
-    pub fn insert(&mut self, k: Value, v: Value) -> Option<Value> {
-        self.map.insert(k, v)
+    pub fn insert(&mut self, k: Value, v: Value) -> Result<Option<Value>> {
+        let (n, p) = k.strip_prefix();
+        // check if the key (stripped from any prefixes) is marked constant
+        if !self.const_keys.contains(&n) || !self.map.contains_key(&n) {
+            // either the key isn't marked constant, or isn't present in the map yet.
+            match p {
+                Some(KeyPrefix::Constant) => {
+                    self.const_keys.insert(n.clone());
+                    Ok(self.map.insert(n, v))
+                }
+                // if the key isn't marked constant, insert the original key.
+                _ => Ok(self.map.insert(k, v)),
+            }
+        } else {
+            // k is marked constant and already set in the map, return error
+            Err(anyhow!(format!(
+                "Inserting {:?}={:?}, key already in map and marked constant",
+                n, v
+            )))
+        }
     }
 
     /// Returns a double-ended iterator visiting all key-value pairs in order of
@@ -80,12 +112,6 @@ impl Mapping {
         &self.map
     }
 
-    /// Returns a mutable reference to the underlying `IndexMap`.
-    #[inline]
-    pub fn as_map_mut(&mut self) -> &mut IndexMap<Value, Value> {
-        &mut self.map
-    }
-
     /// Returns `true` if the mapping contains key `k`.
     #[inline]
     pub fn contains_key(&self, k: &Value) -> bool {
@@ -99,26 +125,40 @@ impl Mapping {
     }
 
     /// Returns a mutable reference to the value for key `k` if the key is present in the mapping.
+    /// Returns an error if called for a key which is marked constant.
     #[inline]
-    pub fn get_mut(&mut self, k: &Value) -> Option<&mut Value> {
-        self.map.get_mut(k)
+    pub fn get_mut(&mut self, k: &Value) -> Result<Option<&mut Value>> {
+        if !self.const_keys.contains(k) {
+            Ok(self.map.get_mut(k))
+        } else {
+            Err(anyhow!(format!("Key {:?} is marked constant", k)))
+        }
     }
 
     /// Returns the given key's entry in the map for insertion and/or in-place updates.
+    /// Returns an error if called for a key which is marked constant.
     #[inline]
-    pub fn entry(&mut self, k: Value) -> indexmap::map::Entry<Value, Value> {
-        self.map.entry(k)
+    pub fn entry(&mut self, k: Value) -> Result<indexmap::map::Entry<Value, Value>> {
+        if !self.const_keys.contains(&k) {
+            Ok(self.map.entry(k))
+        } else {
+            Err(anyhow!(format!("Key {:?} is marked constant", k)))
+        }
     }
 
-    /// Removes the entry for key `k` from the map and returns its value if the key was present in the map.
+    /// Removes the entry for key `k` from the map and returns its value if the key was present in
+    /// the map. Additionally, removes the key from the list of constant keys if it was marked
+    /// constant.
     #[inline]
     pub fn remove(&mut self, k: &Value) -> Option<Value> {
+        self.const_keys.remove(k);
         self.map.remove(k)
     }
 
     /// Removes and returns the key-value pair for `k` if the key is present in the map.
     #[inline]
     pub fn remove_entry(&mut self, k: &Value) -> Option<(Value, Value)> {
+        self.const_keys.remove(k);
         self.map.remove_entry(k)
     }
 
@@ -147,7 +187,9 @@ impl From<serde_yaml::Mapping> for Mapping {
     fn from(m: serde_yaml::Mapping) -> Self {
         let mut new = Self::with_capacity(m.len());
         for (k, v) in m {
-            new.insert(Value::from(k), Value::from(v));
+            // we can't have duplicate const keys when converting from a serde_yaml Mapping, so we
+            // can safely unwrap the Result.
+            new.insert(Value::from(k), Value::from(v)).unwrap();
         }
         new
     }
@@ -155,6 +197,8 @@ impl From<serde_yaml::Mapping> for Mapping {
 
 impl From<Mapping> for serde_yaml::Mapping {
     /// Converts a `Mapping` into a `serde_yaml::Mapping`.
+    ///
+    /// Note that information about constant keys is lost here.
     fn from(m: Mapping) -> Self {
         let mut new = Self::with_capacity(m.map.len());
         for (k, v) in m.map {
@@ -173,7 +217,6 @@ impl std::str::FromStr for Mapping {
     /// `serde_yaml::from_str`.
     #[inline]
     fn from_str(s: &str) -> Result<Self> {
-        // TODO(sg): handle const keys here
         let m = serde_yaml::from_str::<serde_yaml::Mapping>(s)?;
         Ok(Self::from(m))
     }
@@ -181,13 +224,21 @@ impl std::str::FromStr for Mapping {
 
 impl FromIterator<(Value, Value)> for Mapping {
     /// Creates a `Mapping` from an Iterator over `(Value, Value)`.
+    ///
+    /// New elements are inserted in the order in which they appear in the iterator. If the same
+    /// key occurs for multiple elements, the last value associated with the key wins.
+    ///
+    /// Note that this function will discard elements in the iterator if the element's key is
+    /// already in the map and marked as constant.
     #[inline]
     fn from_iter<I: IntoIterator<Item = (Value, Value)>>(iter: I) -> Self {
-        // TODO(sg): handle const keys here
-        Mapping {
-            map: IndexMap::from_iter(iter),
-            const_keys: vec![],
+        let mut new = Mapping::new();
+        for (k, v) in iter {
+            if let Err(e) = new.insert(k, v) {
+                eprintln!("Error inserting key-value pair: {}", e);
+            }
         }
+        new
     }
 }
 
@@ -249,12 +300,20 @@ mod mapping_tests {
     use super::*;
     use std::str::FromStr;
 
+    impl Mapping {
+        // we don't care about const_keys for most of the tests, so we use this method instead of
+        // insert() so we don't have to deal with the Result value.
+        fn insert_raw(&mut self, k: Value, v: Value) -> Option<Value> {
+            self.map.insert(k, v)
+        }
+    }
+
     fn create_map() -> Mapping {
         let mut m = Mapping::new();
-        m.insert("a".into(), 1.into());
-        m.insert("b".into(), "foo".into());
-        m.insert("c".into(), 3.14.into());
-        m.insert("d".into(), Value::Bool(true));
+        m.insert_raw("a".into(), 1.into());
+        m.insert_raw("b".into(), "foo".into());
+        m.insert_raw("c".into(), 3.14.into());
+        m.insert_raw("d".into(), Value::Bool(true));
         m
     }
 
@@ -271,8 +330,8 @@ mod mapping_tests {
         "#;
         let m = Mapping::from_str(input).unwrap();
         let mut expected = create_map();
-        expected.insert("e".into(), vec![1, 2, 3].into());
-        expected.insert(
+        expected.insert_raw("e".into(), vec![1, 2, 3].into());
+        expected.insert_raw(
             "f".into(),
             Mapping::from_iter(vec![("foo".into(), "bar".into())]).into(),
         );
@@ -294,7 +353,7 @@ mod mapping_tests {
     #[test]
     fn test_contains_key() {
         let mut m = create_map();
-        m.insert(3.14.into(), "3.14".into());
+        m.insert_raw(3.14.into(), "3.14".into());
 
         assert!(m.contains_key(&"a".into()));
         assert!(m.contains_key(&3.14.into()));
@@ -305,7 +364,7 @@ mod mapping_tests {
     #[test]
     fn test_get() {
         let mut m = create_map();
-        m.insert(3.14.into(), "3.14".into());
+        m.insert_raw(3.14.into(), "3.14".into());
 
         assert_eq!(m.get(&"a".into()), Some(&1.into()));
         assert_eq!(m.get(&3.14.into()), Some(&"3.14".into()));
@@ -317,11 +376,20 @@ mod mapping_tests {
         let mut m = create_map();
 
         assert_eq!(m.get(&"a".into()), Some(&1.into()));
-        let e = m.get_mut(&"a".into());
+        let e = m.get_mut(&"a".into()).unwrap();
         assert!(e.is_some());
         let e = e.unwrap();
         *e = 2.into();
         assert_eq!(m.get(&"a".into()), Some(&2.into()));
+    }
+
+    #[test]
+    fn test_get_mut_const_key() {
+        let mut m = create_map();
+        m.const_keys.insert("a".into());
+
+        assert_eq!(m.get(&"a".into()), Some(&1.into()));
+        assert!(m.get_mut(&"a".into()).is_err());
     }
 
     #[test]
@@ -330,6 +398,7 @@ mod mapping_tests {
 
         assert_eq!(m.get(&"a".into()), Some(&1.into()));
         m.entry("a".into())
+            .unwrap()
             .and_modify(|e| *e = 3.into())
             .or_insert(2.into());
 
@@ -342,10 +411,18 @@ mod mapping_tests {
 
         assert_eq!(m.get(&"e".into()), None);
         m.entry("e".into())
+            .unwrap()
             .and_modify(|e| *e = 3.into())
             .or_insert(2.into());
 
         assert_eq!(m.get(&"e".into()), Some(&2.into()));
+    }
+
+    #[test]
+    fn test_entry_error_const_key() {
+        let mut m = Mapping::new();
+        let _v = m.insert("=foo".into(), "foo".into());
+        assert!(m.entry("foo".into()).is_err());
     }
 
     #[test]
@@ -372,8 +449,8 @@ mod mapping_tests {
     #[test]
     fn test_as_py_dict() {
         let mut m = create_map();
-        m.insert("e".into(), vec![1, 2, 3].into());
-        m.insert(
+        m.insert_raw("e".into(), vec![1, 2, 3].into());
+        m.insert_raw(
             "f".into(),
             Mapping::from_iter(vec![("foo".into(), "bar".into())]).into(),
         );
@@ -425,5 +502,140 @@ mod mapping_tests {
                 (&"d".into(), &Value::Bool(true)),
             ]
         );
+    }
+
+    #[test]
+    fn test_from_str_const_keys() {
+        let input = r#"
+        foo: foo
+        =bar: bar
+        ~baz: baz
+        "#;
+        let m = Mapping::from_str(input).unwrap();
+        let mut expected = Mapping::new();
+        expected.insert_raw("foo".into(), "foo".into());
+        // Const prefix is consumed and stored in map's list of const keys
+        expected.insert_raw("bar".into(), "bar".into());
+        expected.const_keys.insert("bar".into());
+        // Override prefix is left alone
+        expected.insert_raw("~baz".into(), "baz".into());
+        assert_eq!(m, expected);
+    }
+
+    #[test]
+    fn test_insert_const_key() {
+        let mut m = Mapping::new();
+        m.insert("=foo".into(), "foo".into()).unwrap();
+        assert_eq!(m.len(), 1);
+        assert_eq!(m.const_keys.len(), 1);
+        assert!(m.contains_key(&"foo".into()));
+        assert!(!m.contains_key(&"=foo".into()));
+        assert!(m.const_keys.contains(&"foo".into()));
+        assert_eq!(m.get(&"foo".into()), Some(&"foo".into()));
+        assert_eq!(m.get(&"=foo".into()), None);
+    }
+
+    #[test]
+    fn test_overwrite_const_key() {
+        let mut m = Mapping::new();
+        m.insert("=foo".into(), "foo".into()).unwrap();
+        let v = m.insert("=foo".into(), "bar".into());
+        assert!(v.is_err());
+        assert!(m.contains_key(&"foo".into()));
+        assert!(m.const_keys.contains(&"foo".into()));
+        assert_eq!(m.get(&"foo".into()), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn test_overwrite_key_make_const() {
+        let mut m = Mapping::new();
+        m.insert("foo".into(), "foo".into()).unwrap();
+        assert!(m.const_keys.is_empty());
+
+        let v = m.insert("=foo".into(), "bar".into());
+        assert!(v.is_ok());
+        assert_eq!(m.len(), 1);
+        assert!(m.contains_key(&"foo".into()));
+        assert!(m.const_keys.contains(&"foo".into()));
+        assert_eq!(m.get(&"foo".into()), Some(&"bar".into()));
+
+        let v = m.insert("foo".into(), "baz".into());
+        assert!(v.is_err());
+        let v = m.insert("~foo".into(), "baz".into());
+        assert!(v.is_err());
+
+        assert_eq!(m.len(), 1);
+        assert!(m.contains_key(&"foo".into()));
+        assert!(m.const_keys.contains(&"foo".into()));
+        assert_eq!(m.get(&"foo".into()), Some(&"bar".into()));
+    }
+
+    #[test]
+    fn test_from_iter_duplicate_const() {
+        let items = vec![("=foo".into(), "foo".into()), ("=foo".into(), "bar".into())];
+        let m = Mapping::from_iter(items);
+        assert_eq!(m.len(), 1);
+        assert_eq!(m.get(&"foo".into()), Some(&"foo".into()));
+    }
+
+    #[test]
+    fn test_from_iter_duplicate_key() {
+        let items = vec![("foo".into(), "foo".into()), ("foo".into(), "bar".into())];
+        let m = Mapping::from_iter(items);
+        assert_eq!(m.len(), 1);
+        // last foo key wins
+        assert_eq!(m.get(&"foo".into()), Some(&"bar".into()));
+    }
+
+    #[test]
+    fn test_insert_remove_insert_const_key() {
+        let mut m = Mapping::new();
+        // Initialize map with constant key foo and regular key bar
+        m.insert("=foo".into(), "foo".into()).unwrap();
+        m.insert("bar".into(), "bar".into()).unwrap();
+
+        assert_eq!(m.len(), 2);
+        assert_eq!(m.const_keys.len(), 1);
+
+        // Remove constant key foo
+        let v = m.remove(&"foo".into());
+        assert_eq!(v, Some("foo".into()));
+
+        assert_eq!(m.len(), 1);
+        assert_eq!(m.const_keys.len(), 0);
+
+        // Insert foo again
+        m.insert("foo".into(), "baz".into()).unwrap();
+
+        assert_eq!(m.len(), 2);
+        assert_eq!(m.const_keys.len(), 0);
+        assert_eq!(m.get(&"foo".into()), Some(&"baz".into()));
+    }
+
+    #[test]
+    fn test_from_serde_yaml_const_keys() {
+        let input = r#"
+        foo: foo
+        bar:
+          =qux: qux
+          ~foo: foo
+        =baz: baz
+        "#;
+        let rawm: serde_yaml::Mapping = serde_yaml::from_str(input).unwrap();
+
+        let m = Mapping::from(rawm);
+
+        let mut bar = Mapping::new();
+        bar.insert_raw("qux".into(), "qux".into());
+        bar.const_keys.insert("qux".into());
+        bar.insert_raw("~foo".into(), "foo".into());
+
+        let mut expected = Mapping::new();
+        expected.insert_raw("foo".into(), "foo".into());
+        expected.insert_raw("bar".into(), bar.into());
+        expected.insert_raw("baz".into(), "baz".into());
+        expected.const_keys.insert("baz".into());
+
+        assert_eq!(m, expected);
     }
 }
