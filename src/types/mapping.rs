@@ -34,6 +34,9 @@ pub struct Mapping {
     map: IndexMap<Value, Value>,
     /// Holds the set of keys in the mapping which are marked as constant.
     const_keys: HashSet<Value>,
+    /// Holds the set of keys in the mapping which were marked as override, but for which no
+    /// previous value was overridden during insertion.
+    override_keys: HashSet<Value>,
 }
 
 impl std::fmt::Display for Mapping {
@@ -62,6 +65,7 @@ impl Mapping {
         Self {
             map: IndexMap::with_capacity(capacity),
             const_keys: HashSet::default(),
+            override_keys: HashSet::default(),
         }
     }
 
@@ -80,6 +84,7 @@ impl Mapping {
     pub fn shrink_to_fit(&mut self) {
         self.map.shrink_to_fit();
         self.const_keys.shrink_to_fit();
+        self.override_keys.shrink_to_fit();
     }
 
     /// Removes all data from the mapping.
@@ -87,6 +92,7 @@ impl Mapping {
     pub fn clear(&mut self) {
         self.map.clear();
         self.const_keys.clear();
+        self.override_keys.clear();
     }
 
     /// Inserts key-value pair in the mapping.
@@ -116,13 +122,20 @@ impl Mapping {
     pub fn insert(&mut self, k: Value, v: Value) -> Result<Option<Value>> {
         let (k, p) = k.strip_prefix();
 
-        // check if the key (stripped from any prefixes) is marked constant
         if !self.map.contains_key(&k) {
             // key isn't present in the map, insert it as base value
-            if matches!(p, Some(KeyPrefix::Constant)) {
-                // mark key as constant if it has the constant prefix
-                self.const_keys.insert(k.clone());
-            }
+            match p {
+                Some(KeyPrefix::Constant) => {
+                    // mark key as constant if it has the constant prefix
+                    self.const_keys.insert(k.clone());
+                }
+                Some(KeyPrefix::Override) => {
+                    // remember that `k` was marked as overriding if we don't have a value to
+                    // override in this map.
+                    self.override_keys.insert(k.clone());
+                }
+                None => {}
+            };
             Ok(self.map.insert(k, v))
         } else if self.const_keys.contains(&k) {
             // k is marked constant and already set in the map, return error
@@ -750,6 +763,7 @@ mod mapping_tests {
         bar.insert_raw("qux".into(), "qux".into());
         bar.const_keys.insert("qux".into());
         bar.insert_raw("foo".into(), "foo".into());
+        bar.override_keys.insert("foo".into());
 
         let mut expected = Mapping::new();
         expected.insert_raw("foo".into(), "foo".into());
