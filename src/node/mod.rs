@@ -98,8 +98,9 @@ impl Node {
 
         // Convert serde_yaml::Mapping into our own Mapping type
         let mut params: Mapping = n._params.clone().into();
-        // Inject `_reclass_` meta parameter into parameters
-        params.insert("_reclass_".into(), n.meta.as_reclass().into());
+        // Inject `_reclass_` meta parameter into parameters, return an error if someone has marked
+        // `_reclass_` or a subkey of it as constant.
+        params.insert("_reclass_".into(), n.meta.as_reclass().into())?;
         n.parameters = params;
 
         Ok(n)

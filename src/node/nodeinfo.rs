@@ -45,18 +45,24 @@ impl NodeInfoMeta {
 
     /// Generates a Mapping suitable to use as meta parameter `_reclass_`
     pub(crate) fn as_reclass(&self) -> Mapping {
-        let mut namedata = Mapping::new();
-        namedata.insert("full".into(), self.name.clone().into());
-        namedata.insert(
-            "parts".into(),
-            Value::Sequence(vec![self.name.clone().into()]),
-        );
-        namedata.insert("path".into(), self.name.clone().into());
-        namedata.insert("short".into(), self.name.clone().into());
+        let namedata: Vec<(Value, Value)> = vec![
+            ("full".into(), self.name.clone().into()),
+            (
+                "parts".into(),
+                Value::Sequence(vec![self.name.clone().into()]),
+            ),
+            ("path".into(), self.name.clone().into()),
+            ("short".into(), self.name.clone().into()),
+        ];
+        let namedata = Mapping::from_iter(namedata);
 
         let mut pmeta = Mapping::new();
-        pmeta.insert("environment".into(), self.environment.clone().into());
-        pmeta.insert("name".into(), Value::Mapping(namedata));
+        pmeta
+            .insert("environment".into(), self.environment.clone().into())
+            .unwrap();
+        pmeta
+            .insert("name".into(), Value::Mapping(namedata))
+            .unwrap();
 
         pmeta
     }

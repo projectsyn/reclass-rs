@@ -1,5 +1,6 @@
 // Inspired by `serde_yaml::Value`
 
+use anyhow::Result;
 use pyo3::prelude::*;
 use serde_yaml::Number;
 use std::hash::{Hash, Hasher};
@@ -277,20 +278,21 @@ impl Value {
     /// Sequence or a ValueList.
     ///
     /// Returns None for invalid keys, or keys which don't exist in the `Value`.
+    /// Returns an error when trying to access a constant key in a Mapping.
     #[inline]
-    pub fn get_mut(&mut self, k: &Value) -> Option<&mut Value> {
+    pub fn get_mut(&mut self, k: &Value) -> Result<Option<&mut Value>> {
         match self {
             Self::Mapping(m) => m.get_mut(k),
             Self::Sequence(s) | Self::ValueList(s) => {
                 if let Some(idx) = k.as_u64() {
                     let idx = idx as usize;
                     if idx < s.len() {
-                        return Some(&mut s[idx]);
+                        return Ok(Some(&mut s[idx]));
                     }
                 }
-                None
+                Ok(None)
             }
-            _ => None,
+            _ => Ok(None),
         }
     }
 
@@ -347,7 +349,6 @@ impl Value {
     /// cloned and returned.
     ///
     /// For non-String values, the value is unconditionally cloned and returned unmodified.
-    #[allow(unused)]
     pub(super) fn strip_prefix(&self) -> (Self, Option<KeyPrefix>) {
         match self {
             Self::String(s) => {
@@ -461,7 +462,7 @@ mod value_tests {
         assert_eq!(Value::Null.as_mapping_mut(), None);
         let mut m = Value::from(Mapping::new());
         let map = m.as_mapping_mut().unwrap();
-        map.insert("foo".into(), "bar".into());
+        map.insert("foo".into(), "bar".into()).unwrap();
         assert_eq!(
             m.as_mapping(),
             Some(&Mapping::from_iter(vec![("foo".into(), "bar".into())]))
@@ -536,10 +537,19 @@ mod value_tests {
         let mut m = Value::from(m);
 
         assert_eq!(m.get(&"a".into()), Some(&1.into()));
-        let a = m.get_mut(&"a".into()).unwrap();
+        let a = m.get_mut(&"a".into()).unwrap().unwrap();
         *a = "foo".into();
         assert_eq!(m.get(&"a".into()), Some(&"foo".into()));
-        assert_eq!(m.get_mut(&"b".into()), None);
+        assert_eq!(m.get_mut(&"b".into()).unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_mut_mapping_const_key() {
+        let m = Mapping::from_iter(vec![("=a".into(), 1.into())]);
+        let mut m = Value::from(m);
+
+        assert_eq!(m.get(&"a".into()), Some(&1.into()));
+        assert!(m.get_mut(&"a".into()).is_err());
     }
 
     #[test]
@@ -566,10 +576,10 @@ mod value_tests {
         let mut s = Value::from(s);
 
         assert_eq!(s.get(&0.into()), Some(&"a".into()));
-        let e0 = s.get_mut(&0.into()).unwrap();
+        let e0 = s.get_mut(&0.into()).unwrap().unwrap();
         *e0 = "foo".into();
         assert_eq!(s.get(&0.into()), Some(&"foo".into()));
-        assert_eq!(s.get_mut(&3.into()), None);
+        assert_eq!(s.get_mut(&3.into()).unwrap(), None);
     }
 
     #[test]
@@ -596,10 +606,10 @@ mod value_tests {
         let mut l = Value::ValueList(s);
 
         assert_eq!(l.get(&0.into()), Some(&"a".into()));
-        let e0 = l.get_mut(&0.into()).unwrap();
+        let e0 = l.get_mut(&0.into()).unwrap().unwrap();
         *e0 = "foo".into();
         assert_eq!(l.get(&0.into()), Some(&"foo".into()));
-        assert_eq!(l.get_mut(&3.into()), None);
+        assert_eq!(l.get_mut(&3.into()).unwrap(), None);
     }
 
     #[test]
@@ -615,13 +625,22 @@ mod value_tests {
 
     #[test]
     fn test_get_mut_other_types() {
-        assert_eq!(Value::Null.get_mut(&"a".into()), None);
-        assert_eq!(Value::Bool(true).get_mut(&"a".into()), None);
-        assert_eq!(Value::String("foo".into()).get_mut(&"a".into()), None);
+        assert_eq!(Value::Null.get_mut(&"a".into()).unwrap(), None);
+        assert_eq!(Value::Bool(true).get_mut(&"a".into()).unwrap(), None);
+        assert_eq!(
+            Value::String("foo".into()).get_mut(&"a".into()).unwrap(),
+            None
+        );
         // Strings can't be treated as sequences
-        assert_eq!(Value::String("foo".into()).get_mut(&0.into()), None);
-        assert_eq!(Value::Literal("foo".into()).get_mut(&"a".into()), None);
-        assert_eq!(Value::Number(1.into()).get_mut(&"a".into()), None);
+        assert_eq!(
+            Value::String("foo".into()).get_mut(&0.into()).unwrap(),
+            None
+        );
+        assert_eq!(
+            Value::Literal("foo".into()).get_mut(&"a".into()).unwrap(),
+            None
+        );
+        assert_eq!(Value::Number(1.into()).get_mut(&"a".into()).unwrap(), None);
     }
 
     #[test]
