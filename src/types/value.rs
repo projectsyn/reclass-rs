@@ -397,6 +397,7 @@ impl Value {
     /// cloned and returned.
     ///
     /// For non-String values, the value is unconditionally cloned and returned unmodified.
+    #[inline]
     pub(super) fn strip_prefix(&self) -> (Self, Option<KeyPrefix>) {
         match self {
             Self::String(s) => {
