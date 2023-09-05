@@ -1,6 +1,6 @@
 // Inspired by `serde_yaml::Value`
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use pyo3::prelude::*;
 use serde_yaml::Number;
 use std::hash::{Hash, Hasher};
@@ -345,7 +345,6 @@ impl Value {
     }
 
     /// Provides a nice string for each enum variant for debugging and pretty-printing.
-    #[allow(unused)]
     pub(crate) fn variant(&self) -> &str {
         match self {
             Self::Bool(_) => "Value::Bool",
@@ -414,10 +413,130 @@ impl Value {
             _ => (self.clone(), None),
         }
     }
+
+    /// Merges Value `other` into self, consuming `other`.
+    ///
+    /// Currently, this method treats both `Value::Literal(_)` and `Value::String(_)` as literal
+    /// strings. This will be changed once we implement rendering of Reclass references.
+    ///
+    /// This method makes use of `std::mem::replace()` to update self in-place.
+    ///
+    /// Note that this method will call [`Value::flatten()`] after merging two Mappings to ensure
+    /// that the resulting Value doesn't contain any `ValueList` elements.
+    fn merge(&mut self, other: Self) -> Result<()> {
+        if other.is_null() {
+            // Any value can be replaced by null,
+            let _prev = std::mem::replace(self, other);
+            return Ok(());
+        }
+
+        // If `other` is a ValueList, flatten it before trying to merge
+        let other = if other.is_value_list() {
+            other.flattened()?
+        } else if let Some(s) = other.as_str() {
+            // make strings into literals
+            // TODO(sg): Remove this when we have parameter interpolation
+            eprintln!("Transforming unparsed String to Literal");
+            Self::Literal(s.to_string())
+        } else {
+            other
+        };
+
+        // we assume that self is already interpolated
+        match self {
+            // anything can be merged over null
+            Self::Null => {
+                let _prev = std::mem::replace(self, other);
+            }
+            Self::Mapping(m) => match other {
+                // merge mapping and mapping
+                Self::Mapping(other) => {
+                    m.merge(&other)?;
+                    // Mapping::merge() can produce more ValueLists, so we call flatten here to
+                    // ensure that the final result of this method doesn't contain ValueLists.
+                    self.flatten()?;
+                }
+                _ => return Err(anyhow!("Can't merge {} over mapping", other.variant())),
+            },
+            Self::Sequence(s) => match other {
+                // merge sequence and sequence
+                Self::Sequence(mut other) => s.append(&mut other),
+                _ => return Err(anyhow!("Can't merge {} over sequence", other.variant())),
+            },
+            Self::String(_) | Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {
+                if other.is_mapping() || other.is_sequence() {
+                    return Err(anyhow!(
+                        "Can't merge {} over {}",
+                        other.variant(),
+                        self.variant()
+                    ));
+                }
+                let _prev = std::mem::replace(self, other);
+            }
+            Self::ValueList(_) => {
+                // NOTE(sg): We should never end up with nested ValueLists with our implementation
+                // of `Mapping::insert()`. If a user constructs a ValueList by hand, it's their job
+                // to ensure that they don't construct nested ValueLists.
+                unreachable!("Encountered ValueList as merge target, this shouldn't happen!");
+            }
+        };
+        Ok(())
+    }
+
+    /// Flattens the Value and returns the resulting Value.
+    ///
+    /// This method recursively flattens any `ValueList`s which are present in the value or its
+    /// children (for `Value::Mapping` and `Value::Sequence`).
+    ///
+    /// This method leaves the original Value unchanged. Use [`Value::flatten()`] if you want to
+    /// flatten a Value in-place.
+    pub fn flattened(&self) -> Result<Self> {
+        match self {
+            Self::ValueList(l) => {
+                let mut it = l.iter();
+                let mut base = it
+                    .next()
+                    .ok_or_else(|| anyhow!("Empty valuelist?"))?
+                    .clone();
+
+                for v in it {
+                    base.merge(v.clone())?;
+                }
+                Ok(base)
+            }
+            Self::Mapping(m) => {
+                let mut n = Mapping::new();
+                for (k, v) in m.iter() {
+                    n.insert(k.clone(), v.flattened()?)?;
+                }
+                Ok(Self::Mapping(n))
+            }
+            Self::Sequence(s) => {
+                let mut n = Vec::with_capacity(s.len());
+                for v in s {
+                    n.push(v.flattened()?);
+                }
+                Ok(Self::Sequence(n))
+            }
+            Self::String(s) => Ok(Self::Literal(s.clone())),
+            Self::Null | Self::Bool(_) | Self::Literal(_) | Self::Number(_) => Ok(self.clone()),
+        }
+    }
+
+    /// Flattens the Value in-place.
+    ///
+    /// See [`Value::flattened()`] for details.
+    pub fn flatten(&mut self) -> Result<()> {
+        let _prev = std::mem::replace(self, self.flattened()?);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod value_tests;
+
+#[cfg(test)]
+mod value_flattened_tests;
 
 #[cfg(test)]
 mod value_as_py_obj_tests;
