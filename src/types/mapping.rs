@@ -13,19 +13,30 @@ use super::KeyPrefix;
 
 /// Represents a YAML mapping in a form suitable to manage Reclass parameters.
 ///
-/// The map provides support for managing constant keys. Constant keys can't be overwritten
-/// anymore, and operations which would try to do so, or would allow users to do so (e.g. `get_mut`
-/// and `insert`) will return an Error when called for a key which is marked constant.
+/// The map supports keeping track of "value lists" (through `Value::ValueList`) which are
+/// essentially lists of layers for a single key produced through Reclass class includes.
+///
+/// Additionally, The map provides support for managing constant keys and overrides.
+///
+/// Constant keys can't be overwritten anymore, and operations which would try to do so, or would
+/// allow users to do so (e.g. `get_mut` and `insert`) will return an Error when called for a key
+/// which is marked constant.
 ///
 /// Existing map keys can be marked constant if `insert()` is called with the existing key marked
 /// as constant. Keys are marked constant by prefixing them with the constant prefix marker
 /// `KeyPrefix::Constant`.
+///
+/// Finally, Keys can be marked as overriding. This will cause `insert()` to drop any existing
+/// value for the key instead of tracking the old values as a `Value::ValueList`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Mapping {
     /// Holds the mapping data.
     map: IndexMap<Value, Value>,
     /// Holds the set of keys in the mapping which are marked as constant.
     const_keys: HashSet<Value>,
+    /// Holds the set of keys in the mapping which were marked as override, but for which no
+    /// previous value was overridden during insertion.
+    override_keys: HashSet<Value>,
 }
 
 impl std::fmt::Display for Mapping {
@@ -54,6 +65,7 @@ impl Mapping {
         Self {
             map: IndexMap::with_capacity(capacity),
             const_keys: HashSet::default(),
+            override_keys: HashSet::default(),
         }
     }
 
@@ -72,6 +84,7 @@ impl Mapping {
     pub fn shrink_to_fit(&mut self) {
         self.map.shrink_to_fit();
         self.const_keys.shrink_to_fit();
+        self.override_keys.shrink_to_fit();
     }
 
     /// Removes all data from the mapping.
@@ -79,34 +92,106 @@ impl Mapping {
     pub fn clear(&mut self) {
         self.map.clear();
         self.const_keys.clear();
+        self.override_keys.clear();
     }
 
-    /// Inserts key-value pair in the mapping. If the key already existed, the old value is
-    /// returned. If the key didn't exist, None is returned. If the key existed and was marked
-    /// constant, an error is returned.
+    /// Inserts key-value pair in the mapping.
     ///
-    /// The function also processes the provided key and marks it as constant if it starts with the
-    /// constant key prefix marker (`KeyPrefix::Constant`).
+    /// Any prefixes (`KeyPrefix` variants) are removed from the key before it's used to determine
+    /// whether a value already exists, or whether the key is marked as constant in the map.
+    ///
+    /// If the provided key already exists in the map and is already marked as constant, the
+    /// function returns an error.
+    ///
+    /// The function marks the key as constant in the map if it starts with the constant key prefix
+    /// marker (`KeyPrefix::Constant`).
+    ///
+    /// If the key isn't marked as overriding (with prefix `KeyPrefix::Override`) and it already
+    /// exists in the map, the new value is appended to the existing value(s) in a
+    /// `Value::ValueList`. If necessary, a new `ValueList` is created from the old and the new
+    /// value. If the provided value is a `ValueList` itself, it's consumed and appended to the
+    /// existing `ValueList`.
+    ///
+    /// If the key is marked as overriding, the existing value is replaced with the new value, and
+    /// the old Value is returned.
+    ///
+    /// Note that keys can't be marked constant and overriding. If a key has both markers, the
+    /// marker which is the first character of the key will be processed, and the other marker will
+    /// be treated as part of the actual key.
     #[inline]
     pub fn insert(&mut self, k: Value, v: Value) -> Result<Option<Value>> {
-        let (n, p) = k.strip_prefix();
-        // check if the key (stripped from any prefixes) is marked constant
-        if !self.const_keys.contains(&n) || !self.map.contains_key(&n) {
-            // either the key isn't marked constant, or isn't present in the map yet.
+        let (k, p) = k.strip_prefix();
+
+        if !self.map.contains_key(&k) {
+            // key isn't present in the map, insert it as base value
             match p {
                 Some(KeyPrefix::Constant) => {
-                    self.const_keys.insert(n.clone());
-                    Ok(self.map.insert(n, v))
+                    // mark key as constant if it has the constant prefix
+                    self.const_keys.insert(k.clone());
                 }
-                // if the key isn't marked constant, insert the original key.
-                _ => Ok(self.map.insert(k, v)),
-            }
-        } else {
+                Some(KeyPrefix::Override) => {
+                    // remember that `k` was marked as overriding if we don't have a value to
+                    // override in this map.
+                    self.override_keys.insert(k.clone());
+                }
+                None => {}
+            };
+            Ok(self.map.insert(k, v))
+        } else if self.const_keys.contains(&k) {
             // k is marked constant and already set in the map, return error
-            Err(anyhow!(format!(
-                "Inserting {}={}, key already in map and marked constant",
-                n, v
-            )))
+            Err(anyhow!(format!("Can't overwrite constant key {}", k)))
+        } else {
+            // here: we know the key is present, and not yet marked constant
+
+            // Return None if we append the new value to a ValueList
+            let mut res = None;
+
+            if matches!(p, Some(KeyPrefix::Override)) {
+                // Replace the current value of `k` with the new value.
+                // Remember the old value to be returned by the function.
+                res = self.map.insert(k.clone(), v);
+            } else {
+                // Append the new value to the ValueList for k
+
+                // Create new ValueList for `k` if necessary, and return the old value for `k` if
+                // we had to create a ValueList
+                let oldv = if !self.map.get(&k).unwrap().is_value_list() {
+                    // Replace current value in map with an empty ValueList, and store the old
+                    // value in `oldv`.
+                    self.map.insert(k.clone(), Value::ValueList(vec![]))
+                } else {
+                    // Store `None` in `oldv`, if we didn't have to create a new ValueList.
+                    None
+                };
+
+                // Get a mutable reference to the underlying Vec<Value> of the ValueList for `k`.
+                // At this point, we know that `k`'s value must be a ValueList, since we just
+                // created a ValueList, if the old value wasn't a ValueList already.
+                let elems = self.map.get_mut(&k).unwrap().as_value_list_mut().unwrap();
+
+                if let Some(oldv) = oldv {
+                    // If we created a new ValueList `oldv` holds the old value of `k`. We need to
+                    // insert that value into the ValueList before adding the new value. We know
+                    // the old value can't be a ValueList, so we can unconditionally add it as a
+                    // single element.
+                    elems.push(oldv);
+                }
+
+                // Append value(s) to insert to our ValueList
+                if let Value::ValueList(l) = v {
+                    elems.extend(l);
+                } else {
+                    elems.push(v);
+                }
+            }
+
+            // mark key as constant if it has the constant prefix
+            if matches!(p, Some(KeyPrefix::Constant)) {
+                self.const_keys.insert(k.clone());
+            }
+
+            // Return old value if we replaced it due to an override key
+            Ok(res)
         }
     }
 
@@ -244,10 +329,13 @@ impl FromIterator<(Value, Value)> for Mapping {
     /// Creates a `Mapping` from an Iterator over `(Value, Value)`.
     ///
     /// New elements are inserted in the order in which they appear in the iterator. If the same
-    /// key occurs for multiple elements, the last value associated with the key wins.
+    /// key occurs for multiple elements, the resulting map will contain a `ValueList` fo that key.
     ///
-    /// Note that this function will discard elements in the iterator if the element's key is
-    /// already in the map and marked as constant.
+    /// If a key is marked as overriding, any previously provided values for that key are dropped.
+    ///
+    /// If multiple elements in the iterator try to set the same key, and one element marks the key
+    /// as constant, an elements later in the iterator which try to set that key are skipped and a
+    /// diagnostic message is printed.
     #[inline]
     fn from_iter<I: IntoIterator<Item = (Value, Value)>>(iter: I) -> Self {
         let mut new = Mapping::new();
@@ -527,7 +615,7 @@ mod mapping_tests {
         let input = r#"
         foo: foo
         =bar: bar
-        ~baz: baz
+        baz: baz
         "#;
         let m = Mapping::from_str(input).unwrap();
         let mut expected = Mapping::new();
@@ -535,8 +623,8 @@ mod mapping_tests {
         // Const prefix is consumed and stored in map's list of const keys
         expected.insert_raw("bar".into(), "bar".into());
         expected.const_keys.insert("bar".into());
-        // Override prefix is left alone
-        expected.insert_raw("~baz".into(), "baz".into());
+        // Override prefix is consumed
+        expected.insert_raw("baz".into(), "baz".into());
         assert_eq!(m, expected);
     }
 
@@ -575,7 +663,10 @@ mod mapping_tests {
         assert_eq!(m.len(), 1);
         assert!(m.contains_key(&"foo".into()));
         assert!(m.const_keys.contains(&"foo".into()));
-        assert_eq!(m.get(&"foo".into()), Some(&"bar".into()));
+        assert_eq!(
+            m.get(&"foo".into()),
+            Some(&Value::ValueList(vec!["foo".into(), "bar".into()]))
+        );
 
         let v = m.insert("foo".into(), "baz".into());
         assert!(v.is_err());
@@ -585,7 +676,21 @@ mod mapping_tests {
         assert_eq!(m.len(), 1);
         assert!(m.contains_key(&"foo".into()));
         assert!(m.const_keys.contains(&"foo".into()));
-        assert_eq!(m.get(&"foo".into()), Some(&"bar".into()));
+        assert_eq!(
+            m.get(&"foo".into()),
+            Some(&Value::ValueList(vec!["foo".into(), "bar".into()]))
+        );
+    }
+
+    #[test]
+    fn test_overwrite_key_override() {
+        let mut m = Mapping::new();
+        m.insert("foo".into(), "foo".into()).unwrap();
+        assert!(m.const_keys.is_empty());
+
+        let v = m.insert("~foo".into(), "bar".into());
+        assert!(v.is_ok());
+        assert_eq!(m, Mapping::from_str("foo: bar").unwrap());
     }
 
     #[test]
@@ -601,8 +706,19 @@ mod mapping_tests {
         let items = vec![("foo".into(), "foo".into()), ("foo".into(), "bar".into())];
         let m = Mapping::from_iter(items);
         assert_eq!(m.len(), 1);
-        // last foo key wins
-        assert_eq!(m.get(&"foo".into()), Some(&"bar".into()));
+        // duplicate values for single key are stored in valuelist
+        assert_eq!(
+            m.get(&"foo".into()),
+            Some(&Value::ValueList(vec!["foo".into(), "bar".into()]))
+        );
+    }
+
+    #[test]
+    fn test_from_iter_override_key() {
+        let items = vec![("foo".into(), "foo".into()), ("~foo".into(), "bar".into())];
+        let m = Mapping::from_iter(items);
+        assert_eq!(m.len(), 1);
+        assert_eq!(m, Mapping::from_str("foo: bar").unwrap());
     }
 
     #[test]
@@ -646,7 +762,8 @@ mod mapping_tests {
         let mut bar = Mapping::new();
         bar.insert_raw("qux".into(), "qux".into());
         bar.const_keys.insert("qux".into());
-        bar.insert_raw("~foo".into(), "foo".into());
+        bar.insert_raw("foo".into(), "foo".into());
+        bar.override_keys.insert("foo".into());
 
         let mut expected = Mapping::new();
         expected.insert_raw("foo".into(), "foo".into());
