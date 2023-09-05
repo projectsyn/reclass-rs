@@ -239,3 +239,30 @@ fn test_flattened_nested_mapping_value_list_3() {
             .unwrap();
     assert_eq!(m, expected);
 }
+
+#[test]
+fn test_flatten_value_list() {
+    // smoke test for in-place flattening, see the various `test_flattened_` tests for more
+    // comprehensive tests of the actual flattening logic.
+    //
+    // Test input is copied from test_flattened_nested_mapping_value_list_3.
+    let mut base = Mapping::from_str("qux: {foo: {foo: foo}}").unwrap();
+    let m1 = Mapping::from_str("foo: [foo, bar, baz]").unwrap();
+    let m2 = Mapping::from_str("{foo: [qux], qux: {foo: {bar: bar}}}").unwrap();
+    let m3 = Mapping::from_str("qux: {foo: {foo: qux}}").unwrap();
+    let m4 = Mapping::from_str("qux: {foo: {bar: baz}}").unwrap();
+    base.merge(&m1).unwrap();
+    base.merge(&m2).unwrap();
+    base.merge(&m3).unwrap();
+    base.merge(&m4).unwrap();
+
+    let mut v = Value::Mapping(base);
+    v.flatten().unwrap();
+    assert!(v.is_mapping());
+
+    let m: serde_yaml::Mapping = v.as_mapping().unwrap().clone().into();
+    let expected =
+        serde_yaml::from_str("{foo: [foo, bar, baz, qux], qux: {foo: {foo: qux, bar: baz}}}")
+            .unwrap();
+    assert_eq!(m, expected);
+}
