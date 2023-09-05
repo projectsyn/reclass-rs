@@ -32,10 +32,13 @@ use super::KeyPrefix;
 pub struct Mapping {
     /// Holds the mapping data.
     map: IndexMap<Value, Value>,
-    /// Holds the set of keys in the mapping which are marked as constant.
+    /// Holds the set of keys in the mapping which are marked as constant. Key constantness is
+    /// propagated in [`Mapping::merge()`].
     const_keys: HashSet<Value>,
     /// Holds the set of keys in the mapping which were marked as override, but for which no
-    /// previous value was overridden during insertion.
+    /// previous value was overridden during insertion. We process overrides for such keys during
+    /// the next call to [`Mapping::merge()`] where the contents of this map are merged into
+    /// another map, i.e. a call to `merge()` where this map is `other`.
     override_keys: HashSet<Value>,
 }
 
@@ -120,8 +123,25 @@ impl Mapping {
     /// be treated as part of the actual key.
     #[inline]
     pub fn insert(&mut self, k: Value, v: Value) -> Result<Option<Value>> {
-        let (k, p) = k.strip_prefix();
+        self.insert_impl(k, v, false, false)
+    }
 
+    /// Inserts key-value pair in the mapping.
+    ///
+    /// See [`Mapping::insert()`] for the full semantics of insertion.
+    ///
+    /// In contrast to `Mapping::insert()` this method allows callers to force `k` to become
+    /// constant or be marked as overriding through the `force_const` and `force_override` flags
+    /// respectively.
+    #[inline]
+    fn insert_impl(
+        &mut self,
+        k: Value,
+        v: Value,
+        force_const: bool,
+        force_override: bool,
+    ) -> Result<Option<Value>> {
+        let (k, p) = k.strip_prefix();
         if !self.map.contains_key(&k) {
             // key isn't present in the map, insert it as base value
             match p {
@@ -136,6 +156,12 @@ impl Mapping {
                 }
                 None => {}
             };
+            if force_const {
+                self.const_keys.insert(k.clone());
+            }
+            if force_override {
+                self.override_keys.insert(k.clone());
+            }
             Ok(self.map.insert(k, v))
         } else if self.const_keys.contains(&k) {
             // k is marked constant and already set in the map, return error
@@ -146,9 +172,11 @@ impl Mapping {
             // Return None if we append the new value to a ValueList
             let mut res = None;
 
-            if matches!(p, Some(KeyPrefix::Override)) {
-                // Replace the current value of `k` with the new value.
-                // Remember the old value to be returned by the function.
+            if force_override || matches!(p, Some(KeyPrefix::Override)) {
+                // Replace the current value of `k` with the new value and remember the old value
+                // to be returned by the function.
+                // NOTE(sg): If we immediately process the override here, we don't need to update
+                // `override_keys`.
                 res = self.map.insert(k.clone(), v);
             } else {
                 // Append the new value to the ValueList for k
@@ -186,7 +214,7 @@ impl Mapping {
             }
 
             // mark key as constant if it has the constant prefix
-            if matches!(p, Some(KeyPrefix::Constant)) {
+            if force_const || matches!(p, Some(KeyPrefix::Constant)) {
                 self.const_keys.insert(k.clone());
             }
 
@@ -282,6 +310,33 @@ impl Mapping {
         }
 
         Ok(dict.into())
+    }
+
+    fn is_const(&self, k: &Value) -> bool {
+        self.const_keys.contains(k)
+    }
+
+    fn is_override(&self, k: &Value) -> bool {
+        self.override_keys.contains(k)
+    }
+
+    /// Merges Mapping `other` into this mapping.
+    ///
+    /// The function parses each key present in `other`
+    ///
+    /// This function will update the current map's constant key set with any keys that are marked
+    /// as constant in the `other` map.
+    pub fn merge(&mut self, other: &Self) -> Result<()> {
+        for (k, v) in other {
+            // ValueList merging is implemented in insert_impl
+            self.insert_impl(
+                k.clone(),
+                v.clone(),
+                other.is_const(k),
+                other.is_override(k),
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -772,5 +827,148 @@ mod mapping_tests {
         expected.const_keys.insert("baz".into());
 
         assert_eq!(m, expected);
+    }
+
+    #[test]
+    fn test_mapping_merge_simple() {
+        let base = r#"
+        foo: foo
+        "#;
+        let mut base = Mapping::from_str(base).unwrap();
+        let m = r#"
+        bar: bar
+        "#;
+        let m = Mapping::from_str(m).unwrap();
+
+        base.merge(&m).unwrap();
+
+        let expected = r#"
+        foo: foo
+        bar: bar
+        "#;
+        let e = Mapping::from_str(expected).unwrap();
+        assert_eq!(base, e);
+    }
+
+    #[test]
+    fn test_mapping_merge() {
+        let mut base = Mapping::from_str("foo: foo").unwrap();
+        let m = Mapping::from_str("foo: bar").unwrap();
+
+        base.merge(&m).unwrap();
+
+        let mut expected = Mapping::new();
+        expected.insert_raw(
+            "foo".into(),
+            Value::ValueList(vec!["foo".into(), "bar".into()]),
+        );
+        assert_eq!(base, expected);
+    }
+
+    #[test]
+    fn test_mapping_merge_nested() {
+        let base = r#"
+        foo:
+          foo: foo
+        bar:
+          bar: bar
+        "#;
+        let mut base = Mapping::from_str(base).unwrap();
+        let m = r#"
+        foo:
+          baz: baz
+        bar:
+          qux: qux
+        "#;
+        let m = Mapping::from_str(m).unwrap();
+
+        base.merge(&m).unwrap();
+
+        let mut expected = Mapping::new();
+        expected.insert_raw(
+            "foo".into(),
+            Value::ValueList(vec![
+                Mapping::from_str("foo: foo").unwrap().into(),
+                Mapping::from_str("baz: baz").unwrap().into(),
+            ]),
+        );
+        expected.insert_raw(
+            "bar".into(),
+            Value::ValueList(vec![
+                Mapping::from_str("bar: bar").unwrap().into(),
+                Mapping::from_str("qux: qux").unwrap().into(),
+            ]),
+        );
+
+        assert_eq!(base, expected);
+    }
+
+    #[test]
+    fn test_mapping_merge_const() {
+        let mut base = Mapping::from_str("foo: foo").unwrap();
+        let m = Mapping::from_str("=foo: bar").unwrap();
+
+        base.merge(&m).unwrap();
+
+        let mut expected = Mapping::new();
+        expected.insert_raw(
+            "foo".into(),
+            Value::ValueList(vec!["foo".into(), "bar".into()]),
+        );
+        expected.const_keys.insert("foo".into());
+        assert_eq!(base, expected);
+    }
+
+    #[test]
+    fn test_mapping_merge_override() {
+        let mut base = Mapping::from_str("foo: foo").unwrap();
+        let m = Mapping::from_str("~foo: bar").unwrap();
+
+        base.merge(&m).unwrap();
+
+        assert_eq!(base, Mapping::from_str("foo: bar").unwrap());
+    }
+
+    #[test]
+    fn test_mapping_merge_override_override() {
+        let mut base = Mapping::from_str("foo: foo").unwrap();
+        let mut m1 = Mapping::from_str("~foo: bar").unwrap();
+        // override prefixes are processed for each merge step. Keys with multiple override
+        // prefixes will end up triggering an override multiple times.
+        let m2 = Mapping::from_str("~~foo: baz").unwrap();
+
+        // here we consume the first override marker of `~~foo` in m2 which results in `~foo: baz`
+        // in the merged m1
+        m1.merge(&m2).unwrap();
+        assert_eq!(m1, Mapping::from_str("~foo: baz").unwrap());
+
+        // here we consume the remaining override marker of `~foo` in the merged m1 which results
+        // in `foo: baz` in the merged base
+        base.merge(&m1).unwrap();
+        assert_eq!(base, Mapping::from_str("foo: baz").unwrap());
+    }
+
+    #[test]
+    fn test_mapping_merge_const_override() {
+        let mut base = Mapping::from_str("foo: foo").unwrap();
+        // The initial parsing sees a constant key `~foo`
+        let m1 = Mapping::from_str("=~foo: bar").unwrap();
+
+        // The merge sees overriding key `foo`, and propagates the previously stored constantness
+        // of `~foo`. In the end we have mapping `{foo: bar}` where `foo` is marked constant.
+        base.merge(&m1).unwrap();
+        assert_eq!(base, Mapping::from_str("=foo: bar").unwrap());
+    }
+
+    #[test]
+    fn test_mapping_merge_override_const() {
+        let mut base = Mapping::from_str("foo: foo").unwrap();
+        // The initial parsing sees an overriding key `=foo`
+        let m1 = Mapping::from_str("~=foo: bar").unwrap();
+
+        // The merge sees a constant key `foo` which has the overriding flag set. In the end we
+        // have mapping `{foo: bar}` where `foo` is marked constant.
+        base.merge(&m1).unwrap();
+        assert_eq!(base, Mapping::from_str("=foo: bar").unwrap());
     }
 }
