@@ -28,6 +28,19 @@ pub struct Mapping {
     const_keys: HashSet<Value>,
 }
 
+impl std::fmt::Display for Mapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        for (i, (k, v)) in self.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}: {}", k, v)?;
+        }
+        write!(f, "}}")
+    }
+}
+
 impl Mapping {
     /// Creates a new mapping.
     #[inline]
@@ -91,7 +104,7 @@ impl Mapping {
         } else {
             // k is marked constant and already set in the map, return error
             Err(anyhow!(format!(
-                "Inserting {:?}={:?}, key already in map and marked constant",
+                "Inserting {}={}, key already in map and marked constant",
                 n, v
             )))
         }
@@ -131,7 +144,7 @@ impl Mapping {
         if !self.const_keys.contains(k) {
             Ok(self.map.get_mut(k))
         } else {
-            Err(anyhow!(format!("Key {:?} is marked constant", k)))
+            Err(anyhow!(format!("Key {} is marked constant", k)))
         }
     }
 
@@ -142,7 +155,7 @@ impl Mapping {
         if !self.const_keys.contains(&k) {
             Ok(self.map.entry(k))
         } else {
-            Err(anyhow!(format!("Key {:?} is marked constant", k)))
+            Err(anyhow!(format!("Key {} is marked constant", k)))
         }
     }
 
@@ -166,6 +179,11 @@ impl Mapping {
     #[inline]
     pub fn len(&self) -> usize {
         self.map.len()
+    }
+
+    /// Checks if the map is empty
+    pub fn is_empty(&self) -> bool {
+        self.map.len() == 0
     }
 
     /// Converts the `Mapping` into a `PyDict`.
