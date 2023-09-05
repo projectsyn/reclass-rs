@@ -586,4 +586,45 @@ mod node_tests {
 
         assert_eq!(params, expected);
     }
+
+    #[test]
+    fn test_render_n2() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        let mut n = Node::parse(&r, "n2").unwrap();
+        assert_eq!(n.classes, UniqueList::from(vec!["nested.cls1".to_owned()]));
+        assert_eq!(n.applications, RemovableList::from(vec![]));
+
+        n.render(&r).unwrap();
+
+        assert_eq!(
+            n.classes,
+            UniqueList::from(vec!["nested.cls2".to_owned(), "nested.cls1".to_owned()])
+        );
+
+        let expected = r#"
+        foo:
+          foo: nested.cls1
+          bar: n2
+        bar: bar
+        _reclass_:
+          environment: base
+          name:
+            short: n2
+            parts: ["n2"]
+            full: n2
+            path: n2
+        "#;
+        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
+        expected.flatten().unwrap();
+        let params: Value = n.parameters.into();
+
+        dbg!(&params);
+
+        assert_eq!(params, expected);
+    }
 }
