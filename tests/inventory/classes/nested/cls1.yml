@@ -1,0 +1,5 @@
+classes:
+  - .cls2
+parameters:
+  foo:
+    foo: nested.cls1

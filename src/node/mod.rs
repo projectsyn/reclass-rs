@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 // TODO(sg): Switch to serde_yaml's `apply_merge()` once it supports recursive merges, cf.
@@ -31,6 +31,7 @@ pub struct Node {
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,
+    /// Information about the node, empty (default value) for Node objects parsed from classes.
     #[serde(skip)]
     meta: NodeInfoMeta,
 }
@@ -155,6 +156,50 @@ impl Node {
         absclass.push_str(cls);
 
         Ok(absclass)
+    }
+
+    /// Looks up and parses `Node` from provided `class` string relative to own location.
+    ///
+    /// If the current Node's location is empty, relative class references inherently turn into
+    /// absolute references, since relative references can't escape the `r.classes_path` base
+    /// directory.
+    ///
+    /// If the class is not prefixed with one or more dots, it's looked up relative to
+    /// `r.classes_path`.
+    ///
+    /// The method extracts the the relative file path for the class in `r.classes_dir` from
+    /// `r.classes`.
+    fn read_class(&self, r: &Reclass, class: &str) -> Result<Option<Self>> {
+        let cls = self.abs_class_name(class)?;
+
+        // Lookup path for provided class in r.classes, handling ignore_class_notfound
+        let Some(cpath) = r.classes.get(&cls) else {
+            if r.ignore_class_notfound {
+                return Ok(None);
+            }
+            return Err(anyhow!("Class {cls} not found"));
+        };
+
+        // Extract the directory in which the new class is stored to use for the new class's
+        // `own_loc`.
+        let class_loc = if let Some(parent) = cpath.parent() {
+            PathBuf::from(parent)
+        } else {
+            PathBuf::new()
+        };
+
+        // Render inventory path of class based from `r.classes_path`.
+        let mut invpath = PathBuf::from(&r.classes_path);
+        invpath.push(cpath);
+
+        // Load file contents and create Node
+        let mut meta = NodeInfoMeta::default();
+        let ccontents = std::fs::read_to_string(invpath.canonicalize()?)?;
+        meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
+        Ok(Some(
+            Node::from_str(meta, Some(class_loc), &ccontents)
+                .with_context(|| format!("Deserializing {cls}"))?,
+        ))
     }
 }
 
@@ -377,5 +422,42 @@ mod node_tests {
         c.own_loc = Some(cpath);
         let p = c.abs_class_name(".....foo.bar").unwrap();
         assert_eq!(p, "foo.bar");
+    }
+
+    #[test]
+    fn test_read_class() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        );
+        let n = Node::parse(&r, "n1").unwrap();
+        let c = n.read_class(&r, "cls1").unwrap().unwrap();
+        let expected = r#"
+        foo:
+          foo: cls1
+          bar: cls1
+          baz: cls1
+        "#;
+        let expected = Mapping::from_str(expected).unwrap();
+        assert_eq!(c.parameters, expected);
+    }
+
+    #[test]
+    fn test_read_class_relative() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        );
+        let n = Node::parse(&r, "n1").unwrap();
+        let c1 = n.read_class(&r, "nested.cls1").unwrap().unwrap();
+        let c2 = c1.read_class(&r, ".cls2").unwrap().unwrap();
+        let expected = r#"
+        foo:
+          foo: nested.cls2
+        "#;
+        let expected = Mapping::from_str(expected).unwrap();
+        assert_eq!(c2.parameters, expected);
     }
 }

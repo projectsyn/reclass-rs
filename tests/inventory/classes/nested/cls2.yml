@@ -1,0 +1,3 @@
+parameters:
+  foo:
+    foo: nested.cls2
