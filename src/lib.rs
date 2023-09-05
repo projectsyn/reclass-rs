@@ -122,8 +122,11 @@ impl Reclass {
 
     /// Returns the rendered data for the node with the provided name if it exists
     pub fn nodeinfo(&self, nodename: &str) -> PyResult<NodeInfo> {
-        let n = Node::parse(self, nodename)
+        let mut n = Node::parse(self, nodename)
             .map_err(|e| PyValueError::new_err(format!("Error while parsing {nodename}: {e}")))?;
+        n.render(self)
+            .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))?;
+
         Ok(n.into())
     }
 }
