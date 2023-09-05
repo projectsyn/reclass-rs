@@ -1,1 +1,5 @@
-parameters: {}
+parameters:
+  foo:
+    foo: cls1
+    bar: cls1
+    baz: cls1
