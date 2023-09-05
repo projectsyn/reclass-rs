@@ -305,7 +305,6 @@ mod node_tests {
         )
         .unwrap();
         let n = Node::parse(&r, "n1").unwrap();
-        println!("{:#?}", n.meta);
         assert_eq!(
             n.classes,
             UniqueList::from(vec!["cls1".to_owned(), "cls2".to_owned()])
