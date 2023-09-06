@@ -714,4 +714,7 @@ mod value_tests;
 mod value_flattened_tests;
 
 #[cfg(test)]
+mod value_interpolate_tests;
+
+#[cfg(test)]
 mod value_as_py_obj_tests;
