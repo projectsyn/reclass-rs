@@ -34,9 +34,13 @@ pub enum Value {
 impl std::fmt::Display for Value {
     /// Pretty prints the `Value`
     ///
-    /// Note that the pretty-printed format doesn't distinguish `String` and `Literal`, and
-    /// `Sequence` and `ValueList`. If you need a format where you can distinguish these types, use
-    /// the Debug formatter.
+    /// The pretty-printed format doesn't distinguish `String` and `Literal`, and `Sequence` and
+    /// `ValueList`. If you need a format where you can distinguish these types, use the Debug
+    /// formatter.
+    ///
+    /// Note that this formatter isn't suitable for generating strings which are suitable for
+    /// reference interpolation parameter lookups. Use `Value::raw_string()` if you need a
+    /// formatter which generates strings which are compatible with Python's `str()`.
     ///
     /// # Example
     ///
@@ -101,6 +105,43 @@ impl Hash for Value {
 impl Default for Value {
     fn default() -> Self {
         Self::Null
+    }
+}
+
+impl From<Value> for serde_json::Value {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Null => Self::Null,
+            Value::Bool(b) => Self::Bool(b),
+            Value::Number(n) => {
+                if n.is_nan() || n.is_infinite() {
+                    // Render NaN and -+inf as strings, since JSON's number type doesn't support
+                    // those values.
+                    return Self::String(n.to_string());
+                }
+                let jn = if n.is_i64() {
+                    serde_json::Number::from_f64(n.as_i64().unwrap() as f64).unwrap()
+                } else if n.is_u64() {
+                    serde_json::Number::from_f64(n.as_u64().unwrap() as f64).unwrap()
+                } else if n.is_f64() {
+                    serde_json::Number::from_f64(n.as_f64().unwrap()).unwrap()
+                } else {
+                    unreachable!("Serializing Number to JSON: {} is neither NaN, inf, or representable as i64, u64, or f64?", n);
+                };
+                serde_json::Value::Number(jn)
+            }
+            Value::String(s) => Self::String(s),
+            Value::Literal(s) => Self::String(s),
+            Value::Sequence(s) => {
+                let mut seq: Vec<Self> = Vec::with_capacity(s.len());
+                for v in s {
+                    seq.push(Self::from(v));
+                }
+                Self::Array(seq)
+            }
+            Value::Mapping(m) => Self::Object(serde_json::Map::<String, Self>::from(m)),
+            Value::ValueList(_) => todo!(),
+        }
     }
 }
 
@@ -411,6 +452,46 @@ impl Value {
                 }
             }
             _ => (self.clone(), None),
+        }
+    }
+
+    /// Renders the value as a string which is suitable for doing value lookups during parameter
+    /// interpolation. Returns an error when called on ValueLists or Strings.
+    ///
+    /// Notably, this implementation won't quote Literal values, and will try to emit
+    /// strings which match Python's `str()` for other types.
+    ///
+    #[inline]
+    pub(crate) fn raw_string(&self) -> Result<String> {
+        match self {
+            Value::Literal(s) => Ok(s.clone()),
+            // We serialize Null as `None` to be compatible with Python's str()
+            Value::Null => Ok("None".to_string()),
+            // We need custom formatting for bool instead of `format!("{b}")`, so that this
+            // function returns strings which match Python's `str()` implementation.
+            Value::Bool(b) => match b {
+                true => Ok("True".to_owned()),
+                false => Ok("False".to_owned()),
+            },
+            // NOTE(sg): We render maps and sequences as JSON to mimic python reclass's behavior of
+            // just using `str(obj)`.
+            // This doesn't result in 100% identical output (e.g. double quotes instead of single
+            // quotes), but works similar enough in the resulting YAML. Serializing to YAML doesn't
+            // work cleanly for embedded references in multiline strings which contain YAML, as the
+            // indentation will break.
+            Value::Mapping(m) => {
+                let m = serde_json::Map::<String, serde_json::Value>::from(m.clone());
+                serde_json::to_string(&m).map_err(|e| anyhow!(e))
+            }
+            Value::Sequence(_) => {
+                let v = serde_json::Value::from(self.clone());
+                serde_json::to_string(&v).map_err(|e| anyhow!(e))
+            }
+            Value::Number(n) => Ok(n.to_string()),
+            _ => Err(anyhow!(format!(
+                "Value::raw_string isn't implemented for {}",
+                self.variant()
+            ))),
         }
     }
 

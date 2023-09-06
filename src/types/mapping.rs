@@ -366,6 +366,25 @@ impl From<Mapping> for serde_yaml::Mapping {
     }
 }
 
+impl From<Mapping> for serde_json::Map<String, serde_json::Value> {
+    fn from(m: Mapping) -> Self {
+        let mut new = Self::with_capacity(m.map.len());
+        for (k, v) in m.map {
+            // JSON keys must be strings, we convert some Value variants to string here
+            let k = match k {
+                Value::String(s) | Value::Literal(s) => s,
+                Value::Bool(b) => format!("{b}"),
+                Value::Number(n) => format!("{n}"),
+                Value::Null => "null".to_owned(),
+                _ => panic!("Can't serialize {} as JSON key", v.variant()),
+            };
+            new.insert(k, serde_json::Value::from(v));
+        }
+
+        new
+    }
+}
+
 impl std::str::FromStr for Mapping {
     type Err = anyhow::Error;
 
