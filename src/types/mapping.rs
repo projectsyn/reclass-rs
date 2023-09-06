@@ -338,6 +338,20 @@ impl Mapping {
         }
         Ok(())
     }
+
+    /// Returns a new Mapping with any Reclass references in the mapping interpolated.
+    /// The method looks up reference values in parameter `root`. After interpolation of each
+    /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
+    /// Mapping. Mapping keys are inserted into the new mapping unchanged.
+    pub(super) fn interpolate(&self, root: &Self) -> Result<Self> {
+        let mut res = Self::new();
+        for (k, v) in self.iter() {
+            let mut v = v.interpolate(root)?;
+            v.flatten()?;
+            res.insert(k.clone(), v)?;
+        }
+        Ok(res)
+    }
 }
 
 impl From<serde_yaml::Mapping> for Mapping {

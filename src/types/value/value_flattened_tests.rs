@@ -25,17 +25,22 @@ macro_rules! test_flattened_simple {
 test_flattened_simple! {
     Bool,true,Value::Bool(true),
     Number,5.into(),Value::Number(5.into()),
-    // String is flattened into Literal
-    String,"foo".into(),Value::Literal("foo".into()),
     Literal,"foo".into(),Value::Literal("foo".into()),
     Sequence,vec![Value::Bool(true), 3.14.into()],Value::Sequence(vec![Value::Bool(true), 3.14.into()]),
     Mapping,Mapping::from_str("{foo: true, bar: 3.14}").unwrap(),Value::Mapping(Mapping::from_str("{foo: true, bar: 3.14}").unwrap())
 }
 
 #[test]
+#[should_panic(expected = "Can't flatten unparsed String, did you mean to call `rendered()`?")]
+fn test_flattened_string() {
+    let v = Value::String("foo".into());
+    v.flattened().unwrap();
+}
+
+#[test]
 fn test_flattened_nested_mapping() {
     let m = Value::Mapping(Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}").unwrap());
-    let f = m.flattened().unwrap();
+    let f = m.rendered(&Mapping::new()).unwrap();
     let mut foo = Mapping::new();
     foo.insert("foo".into(), Value::Literal("foo".to_string()))
         .unwrap();
@@ -176,13 +181,33 @@ fn test_flattened_sequence_over_simple_value_error() {
 
 #[test]
 fn test_flattened_nested_mapping_value_list() {
+    // preprocess the valuelist entries by calling interpolate() on each entry to ensure we've
+    // transformed all `Value::String()` to `Value::Literal()`.
     let v = Value::ValueList(vec![
-        Mapping::from_str("foo: {foo: {foo: foo}}").unwrap().into(),
-        Mapping::from_str("foo: {foo: {foo: bar}}").unwrap().into(),
-        Mapping::from_str("foo: {foo: {bar: bar}}").unwrap().into(),
-        Mapping::from_str("foo: {bar: {bar: bar}}").unwrap().into(),
+        Mapping::from_str("foo: {foo: {foo: foo}}")
+            .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
+            .into(),
+        Mapping::from_str("foo: {foo: {foo: bar}}")
+            .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
+            .into(),
+        Mapping::from_str("foo: {foo: {bar: bar}}")
+            .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
+            .into(),
+        Mapping::from_str("foo: {bar: {bar: bar}}")
+            .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
+            .into(),
     ]);
-    let f = v.flattened().unwrap();
+    // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
+    // anymore without interpolating them first.
+    let f = v.rendered(&Mapping::new()).unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected =
@@ -192,24 +217,38 @@ fn test_flattened_nested_mapping_value_list() {
 
 #[test]
 fn test_flattened_nested_mapping_value_list_2() {
+    // preprocess the valuelist entries by calling interpolate() on each entry to ensure we've
+    // transformed all `Value::String()` to `Value::Literal()`.
     let v = Value::ValueList(vec![
         Mapping::from_str("qux: {foo: {foo: {foo: foo}}}")
+            .unwrap()
+            .interpolate(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("qux: {foo: {foo: {foo: bar}}}")
             .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
             .into(),
         Mapping::from_str("qux: {foo: {foo: {bar: bar}}}")
+            .unwrap()
+            .interpolate(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("qux: {foo: {bar: {bar: bar}}}")
             .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
             .into(),
         Mapping::from_str("qux: {bar: {bar: {bar: bar}}}")
             .unwrap()
+            .interpolate(&Mapping::new())
+            .unwrap()
             .into(),
     ]);
-    let f = v.flattened().unwrap();
+    // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
+    // anymore without interpolating them first.
+    let f = v.rendered(&Mapping::new()).unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected = serde_yaml::from_str(
@@ -231,7 +270,11 @@ fn test_flattened_nested_mapping_value_list_3() {
     base.merge(&m3).unwrap();
     base.merge(&m4).unwrap();
 
-    let f = Value::Mapping(dbg!(base)).flattened().unwrap();
+    // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
+    // anymore without interpolating them first.
+    let f = Value::Mapping(dbg!(base))
+        .rendered(&Mapping::new())
+        .unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected =
@@ -257,7 +300,7 @@ fn test_flatten_value_list() {
     base.merge(&m4).unwrap();
 
     let mut v = Value::Mapping(base);
-    v.flatten().unwrap();
+    v.render(&Mapping::new()).unwrap();
     assert!(v.is_mapping());
 
     let m: serde_yaml::Mapping = v.as_mapping().unwrap().clone().into();

@@ -250,16 +250,19 @@ impl Node {
         self.merge_into(root)
     }
 
-    fn flatten_parameters(&mut self) -> Result<()> {
-        let p = std::mem::replace(&mut self.parameters, Mapping::new());
-        let f = Value::Mapping(p).flattened()?;
+    /// Renders the Node's parameters by interpolating Reclass references and flattening
+    /// ValueLists.
+    fn render_parameters(&mut self) -> Result<()> {
+        let p = std::mem::take(&mut self.parameters);
+        let mut f = Value::Mapping(p);
+        f.render_with_self()?;
         match f {
             Value::Mapping(m) => {
                 self.parameters = m;
                 Ok(())
             }
             _ => Err(anyhow!(
-                "Flattened parameters are not a Mapping but instead a {}",
+                "Rendered parameters are not a Mapping but a {}",
                 f.variant()
             )),
         }
@@ -286,7 +289,7 @@ impl Node {
         let mut root = Node::default();
         base.render_impl(r, &mut seen, &mut root)?;
         self.render_impl(r, &mut seen, &mut base)?;
-        self.flatten_parameters()
+        self.render_parameters()
     }
 }
 
@@ -580,7 +583,7 @@ mod node_tests {
             path: n1
         "#;
         let mut expected: Value = Mapping::from_str(expected).unwrap().into();
-        expected.flatten().unwrap();
+        expected.render(&Mapping::new()).unwrap();
         let params: Value = n.parameters.into();
 
         assert_eq!(params, expected);
@@ -619,7 +622,7 @@ mod node_tests {
             path: n2
         "#;
         let mut expected: Value = Mapping::from_str(expected).unwrap().into();
-        expected.flatten().unwrap();
+        expected.render(&Mapping::new()).unwrap();
         let params: Value = n.parameters.into();
 
         dbg!(&params);
