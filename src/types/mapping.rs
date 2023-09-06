@@ -165,7 +165,7 @@ impl Mapping {
             Ok(self.map.insert(k, v))
         } else if self.const_keys.contains(&k) {
             // k is marked constant and already set in the map, return error
-            Err(anyhow!(format!("Can't overwrite constant key {}", k)))
+            Err(anyhow!("Can't overwrite constant key {k}"))
         } else {
             // here: we know the key is present, and not yet marked constant
 
@@ -257,7 +257,7 @@ impl Mapping {
         if !self.const_keys.contains(k) {
             Ok(self.map.get_mut(k))
         } else {
-            Err(anyhow!(format!("Key {} is marked constant", k)))
+            Err(anyhow!("Key {k} is marked constant"))
         }
     }
 
@@ -268,7 +268,7 @@ impl Mapping {
         if !self.const_keys.contains(&k) {
             Ok(self.map.entry(k))
         } else {
-            Err(anyhow!(format!("Key {} is marked constant", k)))
+            Err(anyhow!("Key {k} is marked constant"))
         }
     }
 
