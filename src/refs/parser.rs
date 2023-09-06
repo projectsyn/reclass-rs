@@ -9,7 +9,7 @@ use nom::{
     IResult,
 };
 
-use super::token::Token;
+use super::Token;
 
 /// Merges adjacent literal tokens into a single literal token to reduce the number of tokens in
 /// parsed references.

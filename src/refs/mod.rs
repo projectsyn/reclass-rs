@@ -1,9 +1,59 @@
 mod parser;
-mod token;
 
 use nom::error::{convert_error, VerboseError};
 
-pub use self::token::Token;
+#[derive(Debug, PartialEq, Eq)]
+/// Represents a parsed Reclass reference
+pub enum Token {
+    /// A parsed input string which doesn't contain any Reclass references
+    Literal(String),
+    /// A parsed reference
+    Ref(Vec<Token>),
+    /// A parsed input string which is composed of one or more references, potentially with
+    /// interspersed non-reference sections.
+    Combined(Vec<Token>),
+}
+
+impl Token {
+    #[cfg(test)]
+    pub fn literal_from_str(l: &str) -> Self {
+        Self::Literal(l.to_string())
+    }
+
+    /// Returns true if the Token is a `Token::Ref`
+    pub fn is_ref(&self) -> bool {
+        matches!(self, Self::Ref(_))
+    }
+
+    /// Returns true if the Token is a `Token::Literal`
+    pub fn is_literal(&self) -> bool {
+        matches!(self, Self::Literal(_))
+    }
+}
+
+impl std::fmt::Display for Token {
+    /// Returns the string representation of the Token.
+    ///
+    /// `format!("{}", parse_ref(<input string>))` should result in the original input string.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fn flatten(ts: &[Token]) -> String {
+            ts.iter().fold(String::new(), |mut st, t| {
+                st.push_str(&format!("{t}"));
+                st
+            })
+        }
+        match self {
+            Token::Literal(s) => {
+                write!(f, "{}", s.clone().replace('\\', r"\\").replace('$', r"\$"))
+            }
+            Token::Ref(ts) => {
+                let refcontent = flatten(ts);
+                write!(f, "${{{refcontent}}}")
+            }
+            Token::Combined(ts) => write!(f, "{}", flatten(ts)),
+        }
+    }
+}
 
 #[derive(Debug)]
 /// Wraps errors generated when trying to parse a string which may contain Reclass references
@@ -59,108 +109,8 @@ pub fn parse_ref(input: &str) -> Result<Token, ParseError> {
 }
 
 #[cfg(test)]
-mod test_refs {
-    use super::*;
+mod token_tests;
 
-    #[test]
-    fn test_parse_no_ref() {
-        let input = "foo-bar-baz";
-        let res = parse_ref(input).unwrap();
-        assert_eq!(res, Token::literal_from_str("foo-bar-baz"))
-    }
+#[cfg(test)]
+mod parse_ref_tests;
 
-    #[test]
-    fn test_parse_escaped_ref() {
-        let input = r"foo-bar-\${baz}";
-        let res = parse_ref(input).unwrap();
-        assert_eq!(res, Token::literal_from_str("foo-bar-${baz}"))
-    }
-
-    #[test]
-    fn test_parse_ref() {
-        let input = "foo-${bar:baz}";
-        let res = parse_ref(input).unwrap();
-        assert_eq!(
-            res,
-            Token::Combined(vec![
-                Token::Literal("foo-".to_owned()),
-                Token::Ref(vec![Token::Literal("bar:baz".to_owned())])
-            ])
-        )
-    }
-
-    #[test]
-    fn test_parse_nested() {
-        let tstr = "${foo:${bar}}";
-        assert_eq!(
-            parse_ref(tstr).unwrap(),
-            Token::Ref(vec![
-                Token::Literal("foo:".into()),
-                Token::Ref(vec![Token::Literal("bar".into())])
-            ])
-        );
-    }
-
-    #[test]
-    fn test_parse_nested_deep() {
-        let tstr = "${foo:${bar:${foo:baz}}}";
-        assert_eq!(
-            parse_ref(tstr).unwrap(),
-            Token::Ref(vec![
-                Token::Literal("foo:".into()),
-                Token::Ref(vec![
-                    Token::Literal("bar:".into()),
-                    Token::Ref(vec![Token::Literal("foo:baz".into()),])
-                ])
-            ])
-        );
-    }
-
-    #[test]
-    fn test_parse_ref_error_1() {
-        let input = "foo-${bar";
-        let res = parse_ref(input);
-        assert!(res.is_err());
-        let e = res.unwrap_err();
-        println!("{}", e);
-    }
-
-    #[test]
-    fn test_parse_ref_error_2() {
-        let input = "foo-${bar}${}";
-        let res = parse_ref(input);
-        assert!(res.is_err());
-        let e = res.unwrap_err();
-        println!("{}", e);
-    }
-
-    #[test]
-    fn test_parse_ref_error_3() {
-        let input = "${foo-${bar}";
-        let res = parse_ref(input);
-        assert!(res.is_err());
-        let e = res.unwrap_err();
-        println!("{}", e);
-    }
-
-    #[test]
-    fn test_parse_ref_format() {
-        let input = r"foo-${foo:${bar}}-${baz}-\${bar}-\\${qux}";
-        let res = parse_ref(&input).unwrap();
-        assert_eq!(
-            res,
-            Token::Combined(vec![
-                Token::literal_from_str("foo-"),
-                Token::Ref(vec![
-                    Token::literal_from_str("foo:"),
-                    Token::Ref(vec![Token::literal_from_str("bar")])
-                ]),
-                Token::literal_from_str("-"),
-                Token::Ref(vec![Token::literal_from_str("baz")]),
-                Token::literal_from_str(r"-${bar}-\"),
-                Token::Ref(vec![Token::literal_from_str("qux")]),
-            ])
-        );
-        assert_eq!(format!("{}", res), input);
-    }
-}
