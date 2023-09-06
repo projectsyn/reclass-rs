@@ -1,5 +1,6 @@
 mod parser;
 
+use anyhow::{anyhow, Result};
 use nom::error::{convert_error, VerboseError};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -15,6 +16,18 @@ pub enum Token {
 }
 
 impl Token {
+    /// Parses an arbitrary string into a `Token`. Returns None, if the string doesn't contain any
+    /// opening reference markers.
+    pub fn parse(s: &str) -> Result<Option<Self>> {
+        if !s.contains("${") {
+            // return None for strings which don't contain any references
+            return Ok(None);
+        }
+
+        let token = parse_ref(s).map_err(|e| anyhow!("Error while parsing ref: {}", e.summary))?;
+        Ok(Some(token))
+    }
+
     #[cfg(test)]
     pub fn literal_from_str(l: &str) -> Self {
         Self::Literal(l.to_string())
@@ -76,14 +89,16 @@ impl<'a> std::fmt::Display for ParseError<'a> {
     }
 }
 
-#[allow(unused)]
 /// Parses the provided input string and emits a `Token` which represents any Reclass references
 /// that were found in the input string.
 ///
 /// The function currently doesn't allow customizing the Reclass reference start and end markers,
 /// or the escape character. The default Reclass reference format `${...}` and the default escape
 /// character '\' are recognized by the parser.
-pub fn parse_ref(input: &str) -> Result<Token, ParseError> {
+///
+/// Users should use `Token::parse()` which converts the internal `ParseError` into a format
+/// suitable to be handled with `anyhow::Result`.
+fn parse_ref(input: &str) -> Result<Token, ParseError> {
     use self::parser::parse_ref;
     let (uncons, token) = parse_ref(input).map_err(|e| match e {
         nom::Err::Error(e) | nom::Err::Failure(e) => ParseError {
