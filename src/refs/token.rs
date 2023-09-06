@@ -29,7 +29,7 @@ impl Token {
 impl std::fmt::Display for Token {
     /// Returns the string representation of the Token.
     ///
-    /// format!("{}", parse_ref(<input string>)) should result in the original input string.
+    /// `format!("{}", parse_ref(<input string>))` should result in the original input string.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fn flatten(ts: &[Token]) -> String {
             ts.iter().fold(String::new(), |mut st, t| {
