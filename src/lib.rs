@@ -1,8 +1,8 @@
 #![deny(clippy::suspicious)]
-#![warn(clippy::single_match_else)]
 #![warn(clippy::explicit_into_iter_loop)]
-#![warn(clippy::semicolon_if_nothing_returned)]
 #![warn(clippy::redundant_closure_for_method_calls)]
+#![warn(clippy::semicolon_if_nothing_returned)]
+#![warn(clippy::single_match_else)]
 #![warn(let_underscore_drop)]
 
 mod list;
