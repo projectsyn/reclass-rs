@@ -349,9 +349,10 @@ impl Value {
             Self::Mapping(m) => m.get(k),
             Self::Sequence(s) | Self::ValueList(s) => {
                 if let Some(idx) = k.as_u64() {
-                    let idx = idx as usize;
-                    if idx < s.len() {
-                        return Some(&s[idx]);
+                    if let Ok(idx) = usize::try_from(idx) {
+                        if idx < s.len() {
+                            return Some(&s[idx]);
+                        }
                     }
                 }
                 None
@@ -375,7 +376,7 @@ impl Value {
             Self::Mapping(m) => m.get_mut(k),
             Self::Sequence(s) | Self::ValueList(s) => {
                 if let Some(idx) = k.as_u64() {
-                    let idx = idx as usize;
+                    let idx = usize::try_from(idx)?;
                     if idx < s.len() {
                         return Ok(Some(&mut s[idx]));
                     }
