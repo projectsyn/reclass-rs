@@ -93,11 +93,9 @@ impl Hash for Value {
             Self::Null => {}
             Self::Bool(v) => v.hash(state),
             Self::Number(v) => v.hash(state),
-            Self::String(v) => v.hash(state),
-            Self::Sequence(v) => v.hash(state),
+            Self::Literal(v) | Self::String(v) => v.hash(state),
             Self::Mapping(v) => v.hash(state),
-            Self::ValueList(v) => v.hash(state),
-            Self::Literal(v) => v.hash(state),
+            Self::Sequence(v) | Self::ValueList(v) => v.hash(state),
         }
     }
 }
@@ -136,8 +134,7 @@ impl From<Value> for serde_json::Value {
                 };
                 serde_json::Value::Number(jn)
             }
-            Value::String(s) => Self::String(s),
-            Value::Literal(s) => Self::String(s),
+            Value::Literal(s) | Value::String(s) => Self::String(s),
             Value::Sequence(s) => {
                 let mut seq: Vec<Self> = Vec::with_capacity(s.len());
                 for v in s {
@@ -274,8 +271,7 @@ impl Value {
     #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::String(s) => Some(s),
-            Self::Literal(s) => Some(s),
+            Self::Literal(s) | Self::String(s) => Some(s),
             _ => None,
         }
     }
