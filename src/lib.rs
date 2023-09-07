@@ -3,6 +3,7 @@
 #![warn(clippy::redundant_closure_for_method_calls)]
 #![warn(clippy::semicolon_if_nothing_returned)]
 #![warn(clippy::single_match_else)]
+#![warn(clippy::uninlined_format_args)]
 #![warn(let_underscore_drop)]
 
 mod list;
