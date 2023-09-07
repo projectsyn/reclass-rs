@@ -1,10 +1,11 @@
 #![deny(clippy::suspicious)]
-#![warn(clippy::explicit_into_iter_loop)]
-#![warn(clippy::redundant_closure_for_method_calls)]
-#![warn(clippy::semicolon_if_nothing_returned)]
-#![warn(clippy::single_match_else)]
-#![warn(clippy::uninlined_format_args)]
+#![warn(clippy::pedantic)]
 #![warn(let_underscore_drop)]
+// Allows need to be after warn/deny
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::similar_names)]
 
 mod list;
 mod node;
