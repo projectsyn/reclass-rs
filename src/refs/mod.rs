@@ -200,7 +200,7 @@ fn interpolate_token_slice(tokens: &[Token], params: &Mapping) -> Result<String>
     // Additionally, we repeatedly call `Value::interpolate()` on the resolved value for each
     // element, as long as that Value is a `Value::String`.
     let mut res = String::new();
-    for t in tokens.iter() {
+    for t in tokens {
         let mut v = t.resolve(params)?;
         while v.is_string() {
             v = v.interpolate(params)?;

@@ -418,7 +418,7 @@ impl Value {
             }
             Value::Sequence(s) => {
                 let mut pyseq = vec![];
-                for v in s.iter() {
+                for v in s {
                     pyseq.push(v.as_py_obj(py)?);
                 }
                 pyseq.into_py(py)
@@ -520,7 +520,7 @@ impl Value {
             Self::Sequence(s) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
-                for it in s.iter() {
+                for it in s {
                     let e = it.interpolate(root)?;
                     seq.push(e);
                 }
@@ -630,7 +630,7 @@ impl Value {
             Self::ValueList(l) => {
                 // NOTE(sg): Empty ValueLists get flattened to Value::Null
                 let mut base = Value::Null;
-                for v in l.iter() {
+                for v in l {
                     base.merge(v.clone())?;
                 }
                 Ok(base)
@@ -638,7 +638,7 @@ impl Value {
             // Flatten Mapping by flattening each value and inserting it into a new Mapping.
             Self::Mapping(m) => {
                 let mut n = Mapping::new();
-                for (k, v) in m.iter() {
+                for (k, v) in m {
                     n.insert(k.clone(), v.flattened()?)?;
                 }
                 Ok(Self::Mapping(n))

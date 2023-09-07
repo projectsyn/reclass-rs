@@ -303,7 +303,7 @@ impl Mapping {
     pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
 
-        for (k, v) in self.iter() {
+        for (k, v) in self {
             let pyk = k.as_py_obj(py)?;
             let pyv = v.as_py_obj(py)?;
             dict.set_item(pyk, pyv)?;
@@ -345,7 +345,7 @@ impl Mapping {
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
     pub(super) fn interpolate(&self, root: &Self) -> Result<Self> {
         let mut res = Self::new();
-        for (k, v) in self.iter() {
+        for (k, v) in self {
             let mut v = v.interpolate(root)?;
             v.flatten()?;
             res.insert(k.clone(), v)?;
