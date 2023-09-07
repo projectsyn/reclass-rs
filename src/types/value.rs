@@ -463,20 +463,20 @@ impl Value {
     ///
     /// For non-String values, the value is unconditionally cloned and returned unmodified.
     #[inline]
-    pub(super) fn strip_prefix(&self) -> (Self, Option<KeyPrefix>) {
+    pub(super) fn strip_prefix(self) -> (Self, Option<KeyPrefix>) {
         match self {
             Self::String(s) => {
                 if s.is_empty() {
-                    return (self.clone(), None);
+                    return (Self::String(s), None);
                 }
                 let p = KeyPrefix::from(s.chars().next().unwrap());
                 if p.is_some() {
                     (Self::String(s[1..].to_string()), p)
                 } else {
-                    (self.clone(), None)
+                    (Self::String(s), None)
                 }
             }
-            _ => (self.clone(), None),
+            _ => (self, None),
         }
     }
 
