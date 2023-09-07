@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use yaml_merge_keys::merge_keys_serde;
 
 use crate::list::{List, RemovableList, UniqueList};
+use crate::refs::Token;
 use crate::types::{Mapping, Value};
 use crate::{Reclass, SUPPORTED_YAML_EXTS};
 
@@ -222,13 +223,32 @@ impl Node {
     /// Recursively loads classes and merges loaded data into self
     fn render_impl(&mut self, r: &Reclass, seen: &mut Vec<String>, root: &mut Node) -> Result<()> {
         for cls in self.classes.items_iter() {
-            if seen.contains(cls) {
+            let cls = if cls.contains("${") {
+                // Resolve any potential references if the class name contains an opening reference
+                // symbol.
+                let clstoken = Token::parse(&cls.clone())?;
+                if let Some(clstoken) = clstoken {
+                    // If we got a token, render it, and convert it into a string with
+                    // `raw_string()` to ensure no spurious quotes are injected.
+                    clstoken.render(&root.parameters)?.raw_string()?
+                } else {
+                    // If Token::parse() returns None, the class name can't contain any references,
+                    // just convert cls into an owned String.
+                    cls.to_string()
+                }
+            } else {
+                // If the class name doesn't contain any opening reference symbols, it can't
+                // contain any references, just convert cls into an owned String.
+                cls.to_string()
+            };
+
+            // Check if we've seen the class already after resolving any references in the class
+            // name.
+            if seen.contains(&cls) {
                 continue;
             }
 
-            // TODO(sg): parse and render references in class names
-            let cls = cls.to_string();
-
+            // Load class, respecting the `ignore_class_notfound` option
             let maybec = self.read_class(r, &cls);
             let Ok(Some(mut c)) = maybec else {
                 if let Ok(None) = maybec {
@@ -659,6 +679,45 @@ mod node_tests {
             parts: ["n3"]
             full: n3
             path: n3
+        "#;
+        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
+        expected.render(&Mapping::new()).unwrap();
+
+        assert_eq!(params, expected);
+    }
+
+    #[test]
+    fn test_render_n4() {
+        // Test case to cover class name with references
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+
+        let mut n = Node::parse(&r, "n4").unwrap();
+        n.render(&r).unwrap();
+        assert_eq!(
+            n.classes,
+            UniqueList::from(vec!["cls8".into(), "${qux}".into(), "cls7".into()])
+        );
+        assert_eq!(n.applications, RemovableList::from(vec![]));
+
+        let params: Value = n.parameters.into();
+        let expected = r#"
+        foo:
+          foo: cls1
+          bar: cls1
+          baz: cls1
+        qux: cls1
+        _reclass_:
+          environment: base
+          name:
+            short: n4
+            parts: ["n4"]
+            full: n4
+            path: n4
         "#;
         let mut expected: Value = Mapping::from_str(expected).unwrap().into();
         expected.render(&Mapping::new()).unwrap();
