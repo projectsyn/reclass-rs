@@ -1,6 +1,6 @@
 // Inspired by `serde_yaml::Value`
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use pyo3::prelude::*;
 use serde_yaml::Number;
 use std::hash::{Hash, Hasher};
@@ -345,7 +345,6 @@ impl Value {
     }
 
     /// Provides a nice string for each enum variant for debugging and pretty-printing.
-    #[allow(unused)]
     pub(crate) fn variant(&self) -> &str {
         match self {
             Self::Bool(_) => "Value::Bool",
@@ -414,393 +413,130 @@ impl Value {
             _ => (self.clone(), None),
         }
     }
-}
 
-#[cfg(test)]
-mod value_tests {
-    use super::*;
-    use paste::paste;
+    /// Merges Value `other` into self, consuming `other`.
+    ///
+    /// Currently, this method treats both `Value::Literal(_)` and `Value::String(_)` as literal
+    /// strings. This will be changed once we implement rendering of Reclass references.
+    ///
+    /// This method makes use of `std::mem::replace()` to update self in-place.
+    ///
+    /// Note that this method will call [`Value::flatten()`] after merging two Mappings to ensure
+    /// that the resulting Value doesn't contain any `ValueList` elements.
+    fn merge(&mut self, other: Self) -> Result<()> {
+        if other.is_null() {
+            // Any value can be replaced by null,
+            let _prev = std::mem::replace(self, other);
+            return Ok(());
+        }
 
-    #[test]
-    fn test_is_null() {
-        assert!(Value::Null.is_null());
-        assert!(!Value::Bool(true).is_null());
+        // If `other` is a ValueList, flatten it before trying to merge
+        let other = if other.is_value_list() {
+            other.flattened()?
+        } else if let Some(s) = other.as_str() {
+            // make strings into literals
+            // TODO(sg): Remove this when we have parameter interpolation
+            eprintln!("Transforming unparsed String to Literal");
+            Self::Literal(s.to_string())
+        } else {
+            other
+        };
+
+        // we assume that self is already interpolated
+        match self {
+            // anything can be merged over null
+            Self::Null => {
+                let _prev = std::mem::replace(self, other);
+            }
+            Self::Mapping(m) => match other {
+                // merge mapping and mapping
+                Self::Mapping(other) => {
+                    m.merge(&other)?;
+                    // Mapping::merge() can produce more ValueLists, so we call flatten here to
+                    // ensure that the final result of this method doesn't contain ValueLists.
+                    self.flatten()?;
+                }
+                _ => return Err(anyhow!("Can't merge {} over mapping", other.variant())),
+            },
+            Self::Sequence(s) => match other {
+                // merge sequence and sequence
+                Self::Sequence(mut other) => s.append(&mut other),
+                _ => return Err(anyhow!("Can't merge {} over sequence", other.variant())),
+            },
+            Self::String(_) | Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {
+                if other.is_mapping() || other.is_sequence() {
+                    return Err(anyhow!(
+                        "Can't merge {} over {}",
+                        other.variant(),
+                        self.variant()
+                    ));
+                }
+                let _prev = std::mem::replace(self, other);
+            }
+            Self::ValueList(_) => {
+                // NOTE(sg): We should never end up with nested ValueLists with our implementation
+                // of `Mapping::insert()`. If a user constructs a ValueList by hand, it's their job
+                // to ensure that they don't construct nested ValueLists.
+                unreachable!("Encountered ValueList as merge target, this shouldn't happen!");
+            }
+        };
+        Ok(())
     }
 
-    #[test]
-    fn test_is_bool() {
-        assert!(!Value::Null.is_bool());
-        assert!(Value::Bool(true).is_bool());
-    }
+    /// Flattens the Value and returns the resulting Value.
+    ///
+    /// This method recursively flattens any `ValueList`s which are present in the value or its
+    /// children (for `Value::Mapping` and `Value::Sequence`).
+    ///
+    /// This method leaves the original Value unchanged. Use [`Value::flatten()`] if you want to
+    /// flatten a Value in-place.
+    pub fn flattened(&self) -> Result<Self> {
+        match self {
+            Self::ValueList(l) => {
+                let mut it = l.iter();
+                let mut base = it
+                    .next()
+                    .ok_or_else(|| anyhow!("Empty valuelist?"))?
+                    .clone();
 
-    #[test]
-    fn test_as_bool() {
-        let b = Value::Bool(true);
-        assert_eq!(b.as_bool(), Some(true));
-        assert_eq!(Value::Null.as_bool(), None);
-    }
-
-    macro_rules! test_number {
-        ($($ty:ident $val:expr)*) => {
-            $(
-                paste! {
-                #[test]
-                fn [<test_is_ $ty>]() {
-                    assert!(!Value::Null.[<is_ $ty>]());
-                    let n: $ty = $val;
-                    let n = Value::Number(n.into());
-                    assert!(n.[<is_ $ty>]());
+                for v in it {
+                    base.merge(v.clone())?;
                 }
-
-                #[test]
-                fn [<test_as_ $ty>]() {
-                    assert_eq!(Value::Null.[<as_ $ty>](), None);
-                    let n: $ty = $val;
-                    let n = Value::Number(n.into());
-                    assert_eq!(n.[<as_ $ty>](), Some($val));
+                Ok(base)
+            }
+            Self::Mapping(m) => {
+                let mut n = Mapping::new();
+                for (k, v) in m.iter() {
+                    n.insert(k.clone(), v.flattened()?)?;
                 }
+                Ok(Self::Mapping(n))
+            }
+            Self::Sequence(s) => {
+                let mut n = Vec::with_capacity(s.len());
+                for v in s {
+                    n.push(v.flattened()?);
                 }
-            )*
+                Ok(Self::Sequence(n))
+            }
+            Self::String(s) => Ok(Self::Literal(s.clone())),
+            Self::Null | Self::Bool(_) | Self::Literal(_) | Self::Number(_) => Ok(self.clone()),
         }
     }
-    test_number! { u64 5 i64 -3 f64 3.14 }
 
-    #[test]
-    fn test_is_string() {
-        assert!(!Value::Null.is_string());
-        let s = Value::from("foo");
-        assert!(s.is_string());
-        assert!(!s.is_literal());
-    }
-
-    #[test]
-    fn test_is_literal() {
-        assert!(!Value::Null.is_literal());
-        let s = Value::Literal("foo".into());
-        assert!(s.is_literal());
-        assert!(!s.is_string());
-    }
-
-    #[test]
-    fn test_as_str() {
-        assert_eq!(Value::Null.as_str(), None);
-
-        let s = Value::Literal("foo".into());
-        assert_eq!(s.as_str(), Some("foo"));
-
-        let s = Value::from("foo");
-        assert_eq!(s.as_str(), Some("foo"));
-    }
-
-    #[test]
-    fn test_is_mapping() {
-        assert!(!Value::Null.is_mapping());
-        let m = Value::from(Mapping::new());
-        assert!(m.is_mapping());
-    }
-
-    #[test]
-    fn test_as_mapping() {
-        assert_eq!(Value::Null.as_mapping(), None);
-        let m = Value::from(Mapping::new());
-        assert_eq!(m.as_mapping(), Some(&Mapping::new()));
-    }
-
-    #[test]
-    fn test_as_mapping_mut() {
-        assert_eq!(Value::Null.as_mapping_mut(), None);
-        let mut m = Value::from(Mapping::new());
-        let map = m.as_mapping_mut().unwrap();
-        map.insert("foo".into(), "bar".into()).unwrap();
-        assert_eq!(
-            m.as_mapping(),
-            Some(&Mapping::from_iter(vec![("foo".into(), "bar".into())]))
-        );
-    }
-
-    #[test]
-    fn test_is_sequence() {
-        assert!(!Value::Null.is_sequence());
-        let s = Value::from(Sequence::new());
-        assert!(s.is_sequence());
-    }
-
-    #[test]
-    fn test_as_sequence() {
-        assert_eq!(Value::Null.as_sequence(), None);
-        let s = Value::from(Sequence::new());
-        assert_eq!(s.as_sequence(), Some(&Sequence::new()));
-    }
-
-    #[test]
-    fn test_as_sequence_mut() {
-        assert_eq!(Value::Null.as_sequence_mut(), None);
-        let mut s = Value::from(Sequence::new());
-        let seq = s.as_sequence_mut().unwrap();
-        seq.push("foo".into());
-        assert_eq!(
-            s.as_sequence(),
-            Some(&Sequence::from_iter(vec!["foo".into()]))
-        );
-    }
-
-    #[test]
-    fn test_is_value_list() {
-        assert!(!Value::Null.is_value_list());
-        let l = Value::ValueList(Sequence::new());
-        assert!(l.is_value_list());
-    }
-
-    #[test]
-    fn test_as_value_list() {
-        assert_eq!(Value::Null.as_value_list(), None);
-        let l = Value::ValueList(Sequence::new());
-        assert_eq!(l.as_value_list(), Some(&Sequence::new()));
-    }
-
-    #[test]
-    fn test_as_value_list_mut() {
-        assert_eq!(Value::Null.as_value_list_mut(), None);
-        let mut l = Value::ValueList(Sequence::new());
-        let seq = l.as_value_list_mut().unwrap();
-        seq.push("foo".into());
-        assert_eq!(
-            l.as_value_list(),
-            Some(&Sequence::from_iter(vec!["foo".into()]))
-        );
-    }
-
-    #[test]
-    fn test_get_mapping() {
-        let m = Mapping::from_iter(vec![("a".into(), 1.into()), (2.into(), "foo".into())]);
-        let m = Value::from(m);
-
-        assert_eq!(m.get(&"a".into()), Some(&1.into()));
-        assert_eq!(m.get(&2.into()), Some(&"foo".into()));
-        assert_eq!(m.get(&"b".into()), None);
-    }
-
-    #[test]
-    fn test_get_mut_mapping() {
-        let m = Mapping::from_iter(vec![("a".into(), 1.into())]);
-        let mut m = Value::from(m);
-
-        assert_eq!(m.get(&"a".into()), Some(&1.into()));
-        let a = m.get_mut(&"a".into()).unwrap().unwrap();
-        *a = "foo".into();
-        assert_eq!(m.get(&"a".into()), Some(&"foo".into()));
-        assert_eq!(m.get_mut(&"b".into()).unwrap(), None);
-    }
-
-    #[test]
-    fn test_get_mut_mapping_const_key() {
-        let m = Mapping::from_iter(vec![("=a".into(), 1.into())]);
-        let mut m = Value::from(m);
-
-        assert_eq!(m.get(&"a".into()), Some(&1.into()));
-        assert!(m.get_mut(&"a".into()).is_err());
-    }
-
-    #[test]
-    fn test_get_sequence() {
-        let s = Sequence::from_iter(vec!["a".into(), 2.into(), 3.14.into()]);
-        let s = Value::from(s);
-
-        // non-u64 and out of bounds accesses return None
-        assert_eq!(s.get(&(-1).into()), None);
-        assert_eq!(s.get(&3.14.into()), None);
-        assert_eq!(s.get(&3.into()), None);
-
-        // non-number accesses return None
-        assert_eq!(s.get(&"foo".into()), None);
-
-        assert_eq!(s.get(&0.into()), Some(&"a".into()));
-        assert_eq!(s.get(&1.into()), Some(&2.into()));
-        assert_eq!(s.get(&2.into()), Some(&3.14.into()));
-    }
-
-    #[test]
-    fn test_get_mut_sequence() {
-        let s = Sequence::from_iter(vec!["a".into(), 2.into(), 3.14.into()]);
-        let mut s = Value::from(s);
-
-        assert_eq!(s.get(&0.into()), Some(&"a".into()));
-        let e0 = s.get_mut(&0.into()).unwrap().unwrap();
-        *e0 = "foo".into();
-        assert_eq!(s.get(&0.into()), Some(&"foo".into()));
-        assert_eq!(s.get_mut(&3.into()).unwrap(), None);
-    }
-
-    #[test]
-    fn test_get_valuelist() {
-        let s = Sequence::from_iter(vec!["a".into(), 2.into(), 3.14.into()]);
-        let l = Value::ValueList(s);
-
-        // non-u64 and out of bounds accesses return None
-        assert_eq!(l.get(&(-1).into()), None);
-        assert_eq!(l.get(&3.14.into()), None);
-        assert_eq!(l.get(&3.into()), None);
-
-        // non-number accesses return None
-        assert_eq!(l.get(&"foo".into()), None);
-
-        assert_eq!(l.get(&0.into()), Some(&"a".into()));
-        assert_eq!(l.get(&1.into()), Some(&2.into()));
-        assert_eq!(l.get(&2.into()), Some(&3.14.into()));
-    }
-
-    #[test]
-    fn test_get_mut_valuelist() {
-        let s = Sequence::from_iter(vec!["a".into(), 2.into(), 3.14.into()]);
-        let mut l = Value::ValueList(s);
-
-        assert_eq!(l.get(&0.into()), Some(&"a".into()));
-        let e0 = l.get_mut(&0.into()).unwrap().unwrap();
-        *e0 = "foo".into();
-        assert_eq!(l.get(&0.into()), Some(&"foo".into()));
-        assert_eq!(l.get_mut(&3.into()).unwrap(), None);
-    }
-
-    #[test]
-    fn test_get_other_types() {
-        assert_eq!(Value::Null.get(&"a".into()), None);
-        assert_eq!(Value::Bool(true).get(&"a".into()), None);
-        assert_eq!(Value::String("foo".into()).get(&"a".into()), None);
-        // Strings can't be treated as sequences
-        assert_eq!(Value::String("foo".into()).get(&0.into()), None);
-        assert_eq!(Value::Literal("foo".into()).get(&"a".into()), None);
-        assert_eq!(Value::Number(1.into()).get(&"a".into()), None);
-    }
-
-    #[test]
-    fn test_get_mut_other_types() {
-        assert_eq!(Value::Null.get_mut(&"a".into()).unwrap(), None);
-        assert_eq!(Value::Bool(true).get_mut(&"a".into()).unwrap(), None);
-        assert_eq!(
-            Value::String("foo".into()).get_mut(&"a".into()).unwrap(),
-            None
-        );
-        // Strings can't be treated as sequences
-        assert_eq!(
-            Value::String("foo".into()).get_mut(&0.into()).unwrap(),
-            None
-        );
-        assert_eq!(
-            Value::Literal("foo".into()).get_mut(&"a".into()).unwrap(),
-            None
-        );
-        assert_eq!(Value::Number(1.into()).get_mut(&"a".into()).unwrap(), None);
-    }
-
-    #[test]
-    fn test_strip_prefix() {
-        let k1 = Value::from("=foo");
-        let k2 = Value::from("~foo");
-        let k3 = Value::from("foo");
-        let k4 = Value::from(3);
-        assert_eq!(
-            k1.strip_prefix(),
-            (Value::from("foo"), Some(KeyPrefix::Constant))
-        );
-        assert_eq!(
-            k2.strip_prefix(),
-            (Value::from("foo"), Some(KeyPrefix::Override))
-        );
-        assert_eq!(k3.strip_prefix(), (Value::from("foo"), None));
-        assert_eq!(k4.strip_prefix(), (Value::from(3), None));
+    /// Flattens the Value in-place.
+    ///
+    /// See [`Value::flattened()`] for details.
+    pub fn flatten(&mut self) -> Result<()> {
+        let _prev = std::mem::replace(self, self.flattened()?);
+        Ok(())
     }
 }
 
 #[cfg(test)]
-mod value_as_py_obj_tests {
-    use super::*;
-    #[test]
-    fn test_as_py_obj_null() {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
-            let pyv = Value::Null.as_py_obj(py).unwrap();
-            let v = pyv.as_ref(py);
-            assert!(v.is_none());
-        });
-    }
+mod value_tests;
 
-    #[test]
-    fn test_as_py_obj_bool() {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
-            let pyb = Value::Bool(true).as_py_obj(py).unwrap();
-            let b = pyb.as_ref(py);
-            assert!(b.is_instance_of::<pyo3::types::PyBool>());
-            assert!(b.downcast_exact::<pyo3::types::PyBool>().unwrap().is_true());
-        });
-    }
+#[cfg(test)]
+mod value_flattened_tests;
 
-    #[test]
-    fn test_as_py_obj_int() {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
-            let nums: Vec<Value> = vec![5.into(), (-2i64).into()];
-            for n in nums {
-                let pyn = n.as_py_obj(py).unwrap();
-                let n = pyn.as_ref(py);
-                assert!(n.is_instance_of::<pyo3::types::PyInt>());
-                assert!(n
-                    .downcast_exact::<pyo3::types::PyInt>()
-                    .unwrap()
-                    .eq(n.into_py(py))
-                    .unwrap());
-            }
-        });
-    }
-
-    #[test]
-    fn test_as_py_obj_float() {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
-            let n: Value = 3.14.into();
-            let pyn = n.as_py_obj(py).unwrap();
-            let n = pyn.as_ref(py);
-            assert!(n.is_instance_of::<pyo3::types::PyFloat>());
-            assert!(n
-                .downcast_exact::<pyo3::types::PyFloat>()
-                .unwrap()
-                .eq(3.14.into_py(py))
-                .unwrap());
-        });
-    }
-
-    #[test]
-    fn test_as_py_obj_sequence() {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
-            let s: Value = vec![1, 2, 3].into();
-            let pys = s.as_py_obj(py).unwrap();
-            let s = pys.as_ref(py);
-            assert!(s.is_instance_of::<pyo3::types::PyList>());
-            assert!(s
-                .downcast_exact::<pyo3::types::PyList>()
-                .unwrap()
-                .eq(pyo3::types::PyList::new(py, vec![1, 2, 3]))
-                .unwrap());
-        });
-    }
-
-    #[test]
-    fn test_as_py_obj_string() {
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
-            let pys = std::convert::Into::<Value>::into("hello, world")
-                .as_py_obj(py)
-                .unwrap();
-            let s = pys.as_ref(py);
-            assert!(s.is_instance_of::<pyo3::types::PyString>());
-            assert_eq!(
-                s.downcast_exact::<pyo3::types::PyString>()
-                    .unwrap()
-                    .to_str()
-                    .unwrap(),
-                "hello, world"
-            );
-        });
-    }
-}
+#[cfg(test)]
+mod value_as_py_obj_tests;
