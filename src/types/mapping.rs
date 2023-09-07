@@ -58,12 +58,14 @@ impl std::fmt::Display for Mapping {
 impl Mapping {
     /// Creates a new mapping.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Creates a new mapping with the given initial capacity.
     #[inline]
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             map: IndexMap::with_capacity(capacity),
@@ -226,6 +228,7 @@ impl Mapping {
     /// Returns a double-ended iterator visiting all key-value pairs in order of
     /// insertion. Iterator element type is `(&'a Value, &'a Value)`.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> Iter {
         Iter {
             iter: self.map.iter(),
@@ -234,18 +237,21 @@ impl Mapping {
 
     /// Returns a reference to the underlying `IndexMap`.
     #[inline]
+    #[must_use]
     pub fn as_map(&self) -> &IndexMap<Value, Value> {
         &self.map
     }
 
     /// Returns `true` if the mapping contains key `k`.
     #[inline]
+    #[must_use]
     pub fn contains_key(&self, k: &Value) -> bool {
         self.map.contains_key(k)
     }
 
     /// Returns a reference to the value for key `k` if the key is present in the mapping.
     #[inline]
+    #[must_use]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         self.map.get(k)
     }
@@ -290,11 +296,13 @@ impl Mapping {
 
     /// Returns the number of key-value pairs in the map.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
     /// Checks if the map is empty
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.map.len() == 0
     }
@@ -312,10 +320,14 @@ impl Mapping {
         Ok(dict.into())
     }
 
+    /// Checks if the provided key is marked as constant.
+    #[must_use]
     fn is_const(&self, k: &Value) -> bool {
         self.const_keys.contains(k)
     }
 
+    /// Checks if the provided key is marked as overriding.
+    #[must_use]
     fn is_override(&self, k: &Value) -> bool {
         self.override_keys.contains(k)
     }

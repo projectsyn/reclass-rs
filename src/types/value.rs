@@ -149,18 +149,21 @@ impl From<Value> for serde_json::Value {
 impl Value {
     /// Checks if the `Value` is `Null`.
     #[inline]
+    #[must_use]
     pub fn is_null(&self) -> bool {
         matches!(self, Self::Null)
     }
 
     /// Checks if the `Value` is a boolean.
     #[inline]
+    #[must_use]
     pub fn is_bool(&self) -> bool {
         matches!(self, Self::Bool(_))
     }
 
     /// If the `Value` is a Boolean, return the associated bool. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Bool(b) => Some(*b),
@@ -173,6 +176,7 @@ impl Value {
     /// For any value for which `is_i64` returns true, `as_i64` is guaranteed to return the
     /// integer value.
     #[inline]
+    #[must_use]
     pub fn is_i64(&self) -> bool {
         match self {
             Self::Number(n) => n.is_i64(),
@@ -182,6 +186,7 @@ impl Value {
 
     /// If the `Value` is an integer, represent it as i64 if possible. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_i64(&self) -> Option<i64> {
         match self {
             Self::Number(n) => n.as_i64(),
@@ -194,6 +199,7 @@ impl Value {
     /// For any value for which `is_u64` returns true, `as_u64` is guaranteed to return the
     /// integer value.
     #[inline]
+    #[must_use]
     pub fn is_u64(&self) -> bool {
         match self {
             Self::Number(n) => n.is_u64(),
@@ -203,6 +209,7 @@ impl Value {
 
     /// If the `Value` is an integer, represent it as u64 if possible. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_u64(&self) -> Option<u64> {
         match self {
             Self::Number(n) => n.as_u64(),
@@ -219,6 +226,7 @@ impl Value {
     /// returns true if and only if both `is_i64` and `is_u64` return false, but since serde_yaml
     /// doesn't guarantee this behavior in the future, this may change.
     #[inline]
+    #[must_use]
     pub fn is_f64(&self) -> bool {
         match self {
             Self::Number(n) => n.is_f64(),
@@ -228,6 +236,7 @@ impl Value {
 
     /// If the `Value` is a number, represent it as f64 if possible. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             Self::Number(n) => n.as_f64(),
@@ -240,6 +249,7 @@ impl Value {
     /// For any value for which `is_string()` returns true, `as_str` is guaranteed to return the
     /// string slice.
     #[inline]
+    #[must_use]
     pub fn is_string(&self) -> bool {
         matches!(self, Self::String(_))
     }
@@ -249,12 +259,14 @@ impl Value {
     /// For any value for which `is_literal()` returns true, `as_str` is guaranteed to return the
     /// string slice.
     #[inline]
+    #[must_use]
     pub fn is_literal(&self) -> bool {
         matches!(self, Self::Literal(_))
     }
 
     /// If the `Value` is a String or Literal, return the associated `str`. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::String(s) => Some(s),
@@ -265,12 +277,14 @@ impl Value {
 
     /// Checks if the `Value` is a Mapping.
     #[inline]
+    #[must_use]
     pub fn is_mapping(&self) -> bool {
         matches!(self, Self::Mapping(_))
     }
 
     /// If the value is a Mapping, return a reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_mapping(&self) -> Option<&Mapping> {
         match self {
             Self::Mapping(m) => Some(m),
@@ -280,6 +294,7 @@ impl Value {
 
     /// If the value is a Mapping, return a mutable reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_mapping_mut(&mut self) -> Option<&mut Mapping> {
         match self {
             Self::Mapping(m) => Some(m),
@@ -289,12 +304,14 @@ impl Value {
 
     /// Checks if the `Value` is a Sequence.
     #[inline]
+    #[must_use]
     pub fn is_sequence(&self) -> bool {
         matches!(self, Self::Sequence(_))
     }
 
     /// If the value is a Sequence, return a reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_sequence(&self) -> Option<&Sequence> {
         match self {
             Self::Sequence(s) => Some(s),
@@ -304,6 +321,7 @@ impl Value {
 
     /// If the value is a Sequence, return a mutable reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_sequence_mut(&mut self) -> Option<&mut Sequence> {
         match self {
             Self::Sequence(s) => Some(s),
@@ -313,12 +331,14 @@ impl Value {
 
     /// Checks if the `Value` is a ValueList.
     #[inline]
+    #[must_use]
     pub fn is_value_list(&self) -> bool {
         matches!(self, Self::ValueList(_))
     }
 
     /// If the value is a ValueList, return a reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_value_list(&self) -> Option<&Sequence> {
         match self {
             Self::ValueList(l) => Some(l),
@@ -328,6 +348,7 @@ impl Value {
 
     /// If the value is a ValueList, return a mutable reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_value_list_mut(&mut self) -> Option<&mut Sequence> {
         match self {
             Self::ValueList(l) => Some(l),
@@ -344,6 +365,7 @@ impl Value {
     ///
     /// Returns None for invalid keys, or keys which don't exist in the `Value`.
     #[inline]
+    #[must_use]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         match self {
             Self::Mapping(m) => m.get(k),
