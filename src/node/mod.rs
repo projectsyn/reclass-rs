@@ -629,4 +629,40 @@ mod node_tests {
 
         assert_eq!(params, expected);
     }
+
+    #[test]
+    fn test_render_n3() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        let mut n = Node::parse(&r, "n3").unwrap();
+        n.render(&r).unwrap();
+        let params: Value = n.parameters.into();
+
+        let expected = r#"
+        cluster:
+          name: c-test-cluster-1234
+        openshift:
+          infraID: c-test-cluster-1234-xlk3f
+          clusterID: 2888efd2-8a1b-4846-82ec-3a99506e2c70
+          baseDomain: c-test-cluster-1234.example.org
+          appsDomain: apps.c-test-cluster-1234.example.org
+          apiURL: api.c-test-cluster-1234.example.org
+          ssh_key: ""
+        _reclass_:
+          environment: base
+          name:
+            short: n3
+            parts: ["n3"]
+            full: n3
+            path: n3
+        "#;
+        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
+        expected.render(&Mapping::new()).unwrap();
+
+        assert_eq!(params, expected);
+    }
 }
