@@ -121,8 +121,13 @@ impl From<Value> for serde_json::Value {
                     return Self::String(n.to_string());
                 }
                 let jn = if n.is_i64() {
+                    // While the lint is enabled generally, we don't care if we lose some precision
+                    // here. If this turns out to be a real problem, we can enable serde_json's
+                    // arbitrary precision numbers feature.
+                    #[allow(clippy::cast_precision_loss)]
                     serde_json::Number::from_f64(n.as_i64().unwrap() as f64).unwrap()
                 } else if n.is_u64() {
+                    #[allow(clippy::cast_precision_loss)]
                     serde_json::Number::from_f64(n.as_u64().unwrap() as f64).unwrap()
                 } else if n.is_f64() {
                     serde_json::Number::from_f64(n.as_f64().unwrap()).unwrap()
