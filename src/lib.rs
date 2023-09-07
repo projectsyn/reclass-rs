@@ -7,6 +7,7 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
 
+mod inventory;
 mod list;
 mod node;
 mod refs;
@@ -19,6 +20,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
+use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
 
 const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
@@ -161,6 +163,12 @@ impl Reclass {
         self.render_node(nodename)
             .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))
     }
+
+    /// Returns the rendered data for the full inventory.
+    pub fn inventory(&self) -> PyResult<Inventory> {
+        Inventory::render(self)
+            .map_err(|e| PyValueError::new_err(format!("Error while rendering inventory: {e}")))
+    }
 }
 
 impl Default for Reclass {
@@ -176,6 +184,8 @@ fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register the NodeInfoMeta and NodeInfo classes
     m.add_class::<NodeInfoMeta>()?;
     m.add_class::<NodeInfo>()?;
+    // Register the Inventory class
+    m.add_class::<Inventory>()?;
     Ok(())
 }
 
