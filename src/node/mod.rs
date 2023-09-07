@@ -90,7 +90,7 @@ impl Node {
         let p = merge_keys_serde(serde_yaml::Value::from(n._params))?
             .as_mapping()
             .unwrap()
-            .to_owned();
+            .clone();
         n._params = p;
 
         // Convert serde_yaml::Mapping into our own Mapping type
