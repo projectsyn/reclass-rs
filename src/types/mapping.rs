@@ -300,6 +300,7 @@ impl Mapping {
     }
 
     /// Checks if the map is empty
+    #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.map.len() == 0
@@ -319,12 +320,14 @@ impl Mapping {
     }
 
     /// Checks if the provided key is marked as constant.
+    #[inline]
     #[must_use]
     fn is_const(&self, k: &Value) -> bool {
         self.const_keys.contains(k)
     }
 
     /// Checks if the provided key is marked as overriding.
+    #[inline]
     #[must_use]
     fn is_override(&self, k: &Value) -> bool {
         self.override_keys.contains(k)
