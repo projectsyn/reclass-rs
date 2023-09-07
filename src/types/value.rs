@@ -425,12 +425,15 @@ impl Value {
     }
 
     /// Converts the `Value` into a `PyObject`.
+    #[allow(clippy::missing_panics_doc)]
     pub fn as_py_obj(&self, py: Python<'_>) -> PyResult<PyObject> {
         let obj = match self {
             Value::Literal(s) | Value::String(s) => s.into_py(py),
             Value::Bool(b) => b.into_py(py),
             Value::Number(n) => {
                 if n.is_i64() {
+                    // NOTE(sg): We allow the missing panics doc because we already checked that
+                    // `as_i64()` can't panic here.
                     n.as_i64().unwrap().into_py(py)
                 } else if n.is_u64() {
                     n.as_u64().unwrap().into_py(py)
