@@ -49,7 +49,7 @@ impl std::fmt::Display for Mapping {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}: {}", k, v)?;
+            write!(f, "{k}: {v}")?;
         }
         write!(f, "}}")
     }
@@ -396,7 +396,7 @@ impl FromIterator<(Value, Value)> for Mapping {
         let mut new = Mapping::new();
         for (k, v) in iter {
             if let Err(e) = new.insert(k, v) {
-                eprintln!("Error inserting key-value pair: {}", e);
+                eprintln!("Error inserting key-value pair: {e}");
             }
         }
         new

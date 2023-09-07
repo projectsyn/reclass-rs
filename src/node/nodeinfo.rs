@@ -71,7 +71,7 @@ impl NodeInfoMeta {
 #[pymethods]
 impl NodeInfoMeta {
     fn __repr__(&self) -> String {
-        format!("{:#?}", self)
+        format!("{self:#?}")
     }
 }
 
@@ -103,7 +103,7 @@ impl From<super::Node> for NodeInfo {
 #[pymethods]
 impl NodeInfo {
     fn __repr__(&self) -> String {
-        format!("{:#?}", self)
+        format!("{self:#?}")
     }
 
     /// Returns the NodeInfo `parameters` field as a PyDict
