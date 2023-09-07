@@ -185,13 +185,13 @@ impl Mapping {
 
                 // Create new ValueList for `k` if necessary, and return the old value for `k` if
                 // we had to create a ValueList
-                let oldv = if !self.map.get(&k).unwrap().is_value_list() {
-                    // Replace current value in map with an empty ValueList, and store the old
-                    // value in `oldv`.
-                    self.map.insert(k.clone(), Value::ValueList(vec![]))
-                } else {
-                    // Store `None` in `oldv`, if we didn't have to create a new ValueList.
+                let oldv = if self.map.get(&k).unwrap().is_value_list() {
+                    // Store `None` in `oldv`, if k is already a ValueList.
                     None
+                } else {
+                    // If k isn't a ValueList yet, replace current value in map with an empty
+                    // ValueList, and store the old value in `oldv`.
+                    self.map.insert(k.clone(), Value::ValueList(vec![]))
                 };
 
                 // Get a mutable reference to the underlying Vec<Value> of the ValueList for `k`.
@@ -260,22 +260,20 @@ impl Mapping {
     /// Returns an error if called for a key which is marked constant.
     #[inline]
     pub fn get_mut(&mut self, k: &Value) -> Result<Option<&mut Value>> {
-        if !self.const_keys.contains(k) {
-            Ok(self.map.get_mut(k))
-        } else {
-            Err(anyhow!("Key {k} is marked constant"))
+        if self.const_keys.contains(k) {
+            return Err(anyhow!("Key {k} is marked constant"));
         }
+        Ok(self.map.get_mut(k))
     }
 
     /// Returns the given key's entry in the map for insertion and/or in-place updates.
     /// Returns an error if called for a key which is marked constant.
     #[inline]
     pub fn entry(&mut self, k: Value) -> Result<indexmap::map::Entry<Value, Value>> {
-        if !self.const_keys.contains(&k) {
-            Ok(self.map.entry(k))
-        } else {
-            Err(anyhow!("Key {k} is marked constant"))
+        if self.const_keys.contains(&k) {
+            return Err(anyhow!("Key {k} is marked constant"));
         }
+        Ok(self.map.entry(k))
     }
 
     /// Removes the entry for key `k` from the map and returns its value if the key was present in
