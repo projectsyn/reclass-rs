@@ -95,6 +95,13 @@ impl Reclass {
         }
         Ok(())
     }
+
+    /// Renders a single Node and returns the corresponding `NodeInfo` struct.
+    fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
+        let mut n = Node::parse(self, nodename)?;
+        n.render(self)?;
+        Ok(NodeInfo::from(n))
+    }
 }
 
 #[pymethods]
@@ -121,14 +128,10 @@ impl Reclass {
         format!("{self:#?}")
     }
 
-    /// Returns the rendered data for the node with the provided name if it exists
+    /// Returns the rendered data for the node with the provided name if it exists.
     pub fn nodeinfo(&self, nodename: &str) -> PyResult<NodeInfo> {
-        let mut n = Node::parse(self, nodename)
-            .map_err(|e| PyValueError::new_err(format!("Error while parsing {nodename}: {e}")))?;
-        n.render(self)
-            .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))?;
-
-        Ok(n.into())
+        self.render_node(nodename)
+            .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))
     }
 }
 
