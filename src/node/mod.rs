@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 // TODO(sg): Switch to serde_yaml's `apply_merge()` once it supports recursive merges, cf.
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
@@ -8,7 +8,7 @@ use yaml_merge_keys::merge_keys_serde;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::Token;
 use crate::types::{Mapping, Value};
-use crate::{Reclass, SUPPORTED_YAML_EXTS};
+use crate::Reclass;
 
 mod nodeinfo;
 
@@ -37,33 +37,19 @@ pub struct Node {
     meta: NodeInfoMeta,
 }
 
-/// Loads data from `<npath>.yml` or `<npath>.yaml`.
-fn load_file(npath: &Path) -> Result<(String, PathBuf)> {
-    let mut ncontents: Result<(String, PathBuf)> =
-        Err(anyhow!("Node `{}.ya?ml` not found", npath.display()));
-    // Try both `.yml` and `.yaml` for both nodes and classes. Prefer `.yml` if both exist.
-    for ext in SUPPORTED_YAML_EXTS {
-        let np = npath.with_extension(ext);
-        if let Ok(contents) = std::fs::read_to_string(&np) {
-            ncontents = Ok((contents, np));
-            break;
-        }
-    }
-    ncontents
-}
-
 impl Node {
     /// Parse node from file with basename `name` in `r.nodes_path`.
     ///
-    /// The heavy lifting is done in `load_file` and `Node::from_str`.
+    /// The heavy lifting is done in `Reclass.discover_nodes()` and `Node::from_str`.
     pub fn parse(r: &Reclass, name: &str) -> Result<Self> {
         let mut meta = NodeInfoMeta::new(name, name, "", "base");
 
-        let mut npath = PathBuf::from(&r.nodes_path);
-        npath.push(name);
-        let (ncontents, fname) = load_file(&npath)?;
+        let npath = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
+        let mut invpath = PathBuf::from(&r.nodes_path);
+        invpath.push(npath);
+        let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
-        meta.uri = format!("yaml_fs://{}", std::fs::canonicalize(fname)?.display());
+        meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
 
         Node::from_str(meta, None, &ncontents)
     }
@@ -344,6 +330,18 @@ mod node_tests {
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
         assert_eq!(n.parameters, expected.into());
+    }
+
+    #[test]
+    #[should_panic(expected = "Unknown node n0")]
+    fn test_parse_error() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        Node::parse(&r, "n0").unwrap();
     }
 
     #[test]
