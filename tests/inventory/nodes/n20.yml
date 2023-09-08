@@ -1,0 +1,7 @@
+classes:
+  - foo-indirect
+parameters:
+  foo:
+    bar: barer
+  ~bardict: notadict
+  bar: ['a']

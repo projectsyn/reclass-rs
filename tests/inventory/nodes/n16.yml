@@ -1,0 +1,5 @@
+classes:
+  - config
+  - ${tenant}.${cluster}
+parameters:
+  target: n12

@@ -1,0 +1,12 @@
+parameters:
+  config_foo:
+    bar: bar
+    baz: [a, b]
+
+  embedded:
+    cfg1: |-
+      qux: quxxing
+      foo: ${config_foo}
+    cfg2: |-
+      qux: quxxer
+      foo: ${config_foo}

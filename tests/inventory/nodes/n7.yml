@@ -1,0 +1,7 @@
+classes:
+  - cls9
+
+parameters:
+  target: n3
+  ~foolist:
+    - bar

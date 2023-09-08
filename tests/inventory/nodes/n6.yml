@@ -1,0 +1,11 @@
+classes:
+  - cls9
+  - cls11
+
+parameters:
+  foo: baz
+  float: 4.20
+  int: 69
+  bool: true
+  "null": ~
+  target: n2

@@ -1,0 +1,4 @@
+parameters:
+  foo: fooing
+
+  some: syn-${_instance}

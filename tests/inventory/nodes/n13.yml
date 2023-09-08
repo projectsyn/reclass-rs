@@ -1,0 +1,10 @@
+applications:
+  - a
+  - b
+
+classes:
+  - cls9
+  - app2
+
+parameters:
+  target: n9

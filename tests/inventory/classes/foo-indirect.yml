@@ -1,0 +1,11 @@
+class:
+  - cls10
+parameters:
+  foodict:
+    bar: bar
+    baz: baz
+    qux: qux
+  bardict:
+    foo: foo
+  foo: ${foodict}
+  bar: ~

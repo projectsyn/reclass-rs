@@ -1,0 +1,7 @@
+classes:
+  - cls9
+  - cls10
+
+parameters:
+  foo: bar
+  target: n1
