@@ -7,7 +7,7 @@ use yaml_merge_keys::merge_keys_serde;
 
 use crate::list::{List, RemovableList, UniqueList};
 use crate::types::Mapping;
-use crate::Reclass;
+use crate::{Reclass, SUPPORTED_YAML_EXTS};
 
 mod nodeinfo;
 
@@ -34,8 +34,6 @@ pub struct Node {
     #[serde(skip)]
     meta: NodeInfoMeta,
 }
-
-const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
 /// Loads data from `<npath>.yml` or `<npath>.yaml`.
 fn load_file(npath: &Path) -> Result<(String, PathBuf)> {
@@ -170,7 +168,8 @@ mod node_tests {
             "./tests/inventory/nodes",
             "./tests/inventory/classes",
             false,
-        );
+        )
+        .unwrap();
         let n = Node::parse(&r, "n1").unwrap();
         println!("{:#?}", n.meta);
         assert_eq!(
