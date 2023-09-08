@@ -79,13 +79,19 @@ impl NodeInfoMeta {
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct NodeInfo {
+    /// Reclass metadata for the node.
     #[pyo3(get, name = "__reclass__")]
     pub reclass: NodeInfoMeta,
+    /// Applications included by the node.
     #[pyo3(get)]
     pub applications: Vec<String>,
+    /// Classes included by the node.
     #[pyo3(get)]
     pub classes: Vec<String>,
+    /// Exports defined for the node.
+    /// Note that the exports functionality is not yet implemented.
     pub exports: Mapping,
+    /// Parameters defined for the node.
     pub parameters: Mapping,
 }
 
