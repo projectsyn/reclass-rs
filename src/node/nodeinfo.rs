@@ -85,6 +85,7 @@ pub struct NodeInfo {
     pub applications: Vec<String>,
     #[pyo3(get)]
     pub classes: Vec<String>,
+    pub exports: Mapping,
     pub parameters: Mapping,
 }
 
@@ -96,6 +97,8 @@ impl From<super::Node> for NodeInfo {
             applications: n.applications.into(),
             classes: n.classes.into(),
             parameters: n.parameters,
+            // NOTE(sg): Python reclass's exports functionality is not implemented yet.
+            exports: Mapping::new(),
         }
     }
 }
@@ -112,6 +115,14 @@ impl NodeInfo {
         self.parameters.as_py_dict(py)
     }
 
+    /// Returns the NodeInfo `exports` field as a PyDict
+    #[getter]
+    fn exports(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        #[cfg(debug_assertions)]
+        eprintln!("reclass_rs doesn't support exports yet!");
+        self.exports.as_py_dict(py)
+    }
+
     /// Returns the NodeInfo data as a PyDict
     ///
     /// This method generates a PyDict which should be structured identically to Python Reclass's
@@ -122,6 +133,7 @@ impl NodeInfo {
         dict.set_item("applications", self.applications.clone().into_py(py))?;
         dict.set_item("classes", self.classes.clone().into_py(py))?;
         dict.set_item("environment", self.reclass.environment.clone().into_py(py))?;
+        dict.set_item("exports", self.exports(py)?)?;
         dict.set_item("parameters", self.parameters(py)?)?;
         Ok(dict.into())
     }
