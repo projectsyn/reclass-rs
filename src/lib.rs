@@ -16,6 +16,8 @@ pub mod types;
 use anyhow::{anyhow, Result};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyType;
+use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
@@ -192,6 +194,19 @@ impl Reclass {
     pub fn inventory(&self) -> PyResult<Inventory> {
         Inventory::render(self)
             .map_err(|e| PyValueError::new_err(format!("Error while rendering inventory: {e}")))
+    }
+
+    /// Configures the number of threads to use when rendering the full inventory. Calling the
+    /// method with `count=0` will configure the thread pool to have one thread per logical core of
+    /// the system.
+    ///
+    /// Note that this method should only be called once and will print a diagnostic message if
+    /// called again.
+    #[classmethod]
+    pub fn set_thread_count(_cls: &PyType, count: usize) {
+        if let Err(e) = ThreadPoolBuilder::new().num_threads(count).build_global() {
+            eprintln!("While initializing global thread pool: {e}");
+        }
     }
 }
 
