@@ -39,7 +39,7 @@ pub fn parse_ref(input: &str) -> Result<Token, ParseError> {
         nom::Err::Error(e) | nom::Err::Failure(e) => ParseError {
             input,
             nom_err: Some(e),
-            summary: format!("Error parsing reference '{}'", input),
+            summary: format!("Error parsing reference '{input}'"),
         },
         nom::Err::Incomplete(needed) => ParseError {
             input,

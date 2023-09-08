@@ -1,8 +1,9 @@
 #![deny(clippy::suspicious)]
-#![warn(clippy::single_match_else)]
 #![warn(clippy::explicit_into_iter_loop)]
-#![warn(clippy::semicolon_if_nothing_returned)]
 #![warn(clippy::redundant_closure_for_method_calls)]
+#![warn(clippy::semicolon_if_nothing_returned)]
+#![warn(clippy::single_match_else)]
+#![warn(clippy::uninlined_format_args)]
 #![warn(let_underscore_drop)]
 
 mod list;
@@ -43,14 +44,13 @@ impl Reclass {
     }
 
     fn __repr__(&self) -> String {
-        format!("{:#?}", self)
+        format!("{self:#?}")
     }
 
     /// Returns the rendered data for the node with the provided name if it exists
     pub fn nodeinfo(&self, nodename: &str) -> PyResult<NodeInfo> {
-        let n = Node::parse(self, nodename).map_err(|e| {
-            PyValueError::new_err(format!("Error while processing {}: {}", nodename, e))
-        })?;
+        let n = Node::parse(self, nodename)
+            .map_err(|e| PyValueError::new_err(format!("Error while parsing {nodename}: {e}")))?;
         Ok(n.into())
     }
 }

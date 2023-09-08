@@ -22,7 +22,7 @@ fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
             // corresponding Rust feature is stabilized.
             if let Token::Literal(t) = res.pop().unwrap() {
                 if let Token::Literal(tok) = tok {
-                    res.push(Token::Literal(format!("{}{}", t, tok)));
+                    res.push(Token::Literal(format!("{t}{tok}")));
                 } else {
                     unreachable!("Literal token isn't a literal?");
                 }

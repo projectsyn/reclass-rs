@@ -61,20 +61,20 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Null => write!(f, "Null"),
-            Self::Bool(b) => write!(f, "{}", b),
-            Self::Number(n) => write!(f, "{}", n),
-            Self::String(s) | Self::Literal(s) => write!(f, "\"{}\"", s),
+            Self::Bool(b) => write!(f, "{b}"),
+            Self::Number(n) => write!(f, "{n}"),
+            Self::String(s) | Self::Literal(s) => write!(f, "\"{s}\""),
             Self::Sequence(seq) | Self::ValueList(seq) => {
                 write!(f, "[")?;
                 for (i, v) in seq.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", v)?;
+                    write!(f, "{v}")?;
                 }
                 write!(f, "]")
             }
-            Self::Mapping(m) => write!(f, "{}", m),
+            Self::Mapping(m) => write!(f, "{m}"),
         }
     }
 }

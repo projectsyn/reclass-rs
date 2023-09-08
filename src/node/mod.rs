@@ -39,10 +39,8 @@ const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
 /// Loads data from `<npath>.yml` or `<npath>.yaml`.
 fn load_file(npath: &Path) -> Result<(String, PathBuf)> {
-    let mut ncontents: Result<(String, PathBuf)> = Err(anyhow!(format!(
-        "Node `{}.ya?ml` not found",
-        npath.display()
-    )));
+    let mut ncontents: Result<(String, PathBuf)> =
+        Err(anyhow!("Node `{}.ya?ml` not found", npath.display()));
     // Try both `.yml` and `.yaml` for both nodes and classes. Prefer `.yml` if both exist.
     for ext in SUPPORTED_YAML_EXTS {
         let np = npath.with_extension(ext);
