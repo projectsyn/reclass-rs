@@ -1,6 +1,5 @@
 import reclass_rs
 
-import platform
 from pathlib import Path
 
 
@@ -10,12 +9,7 @@ def test_nodeinfo_n1():
     )
     n = r.nodeinfo("n1")
     npath = Path("./tests/inventory/nodes/n1.yml").resolve()
-    unc_infix = ""
-    if platform.system() == "Windows":
-        # On Windows, Rust's std::fs::canonicalize uses UNC paths, so the path is prefixed with
-        # `\\?\`. Python's pathlib doesn't do that when resolving paths.
-        unc_infix = "\\\\?\\"
-    assert n.__reclass__.uri == f"yaml_fs://{unc_infix}{npath}"
+    assert n.__reclass__.uri == f"yaml_fs://{npath}"
     assert n.applications == ["app1", "app2"]
     assert n.classes == ["cls1", "cls2"]
     assert n.parameters == {
