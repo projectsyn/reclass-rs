@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 // TODO(sg): Switch to serde_yaml's `apply_merge()` once it supports recursive merges, cf.
@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use yaml_merge_keys::merge_keys_serde;
 
 use crate::list::{List, RemovableList, UniqueList};
-use crate::types::Mapping;
-use crate::Reclass;
+use crate::types::{Mapping, Value};
+use crate::{Reclass, SUPPORTED_YAML_EXTS};
 
 mod nodeinfo;
 
@@ -31,11 +31,10 @@ pub struct Node {
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,
+    /// Information about the node, empty (default value) for Node objects parsed from classes.
     #[serde(skip)]
     meta: NodeInfoMeta,
 }
-
-const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
 /// Loads data from `<npath>.yml` or `<npath>.yaml`.
 fn load_file(npath: &Path) -> Result<(String, PathBuf)> {
@@ -95,11 +94,7 @@ impl Node {
         n._params = p;
 
         // Convert serde_yaml::Mapping into our own Mapping type
-        let mut params: Mapping = n._params.clone().into();
-        // Inject `_reclass_` meta parameter into parameters, return an error if someone has marked
-        // `_reclass_` or a subkey of it as constant.
-        params.insert("_reclass_".into(), n.meta.as_reclass().into())?;
-        n.parameters = params;
+        n.parameters = n._params.clone().into();
 
         Ok(n)
     }
@@ -158,11 +153,148 @@ impl Node {
 
         Ok(absclass)
     }
+
+    /// Looks up and parses `Node` from provided `class` string relative to own location.
+    ///
+    /// If the current Node's location is empty, relative class references inherently turn into
+    /// absolute references, since relative references can't escape the `r.classes_path` base
+    /// directory.
+    ///
+    /// If the class is not prefixed with one or more dots, it's looked up relative to
+    /// `r.classes_path`.
+    ///
+    /// The method extracts the the relative file path for the class in `r.classes_dir` from
+    /// `r.classes`.
+    fn read_class(&self, r: &Reclass, class: &str) -> Result<Option<Self>> {
+        let cls = self.abs_class_name(class)?;
+
+        // Lookup path for provided class in r.classes, handling ignore_class_notfound
+        let Some(cpath) = r.classes.get(&cls) else {
+            if r.ignore_class_notfound {
+                return Ok(None);
+            }
+            return Err(anyhow!("Class {cls} not found"));
+        };
+
+        // Extract the directory in which the new class is stored to use for the new class's
+        // `own_loc`.
+        let class_loc = if let Some(parent) = cpath.parent() {
+            PathBuf::from(parent)
+        } else {
+            PathBuf::new()
+        };
+
+        // Render inventory path of class based from `r.classes_path`.
+        let mut invpath = PathBuf::from(&r.classes_path);
+        invpath.push(cpath);
+
+        // Load file contents and create Node
+        let mut meta = NodeInfoMeta::default();
+        let ccontents = std::fs::read_to_string(invpath.canonicalize()?)?;
+        meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
+        Ok(Some(
+            Node::from_str(meta, Some(class_loc), &ccontents)
+                .with_context(|| format!("Deserializing {cls}"))?,
+        ))
+    }
+
+    /// Merges self into other, then updates self with merged values from other
+    fn merge_into(&mut self, other: &mut Self) -> Result<()> {
+        // We use std::mem::take() here so we can merge self.applications into other.applications
+        // without having to call `clone()` twice. This doesn't destroy `self.applications` because
+        // we update `self.applications` with the result of the merge immediately afterwards.
+        let self_apps = std::mem::take(&mut self.applications);
+        other.applications.merge(self_apps);
+        self.applications = other.applications.clone();
+
+        // We use std::mem::take() here so we can merge self.classes into other.classes without
+        // having to call `clone()` twice. This doesn't destroy `self.classes` because we update
+        // `self.classes` with the result of the merge immediately afterwards.
+        let self_classes = std::mem::take(&mut self.classes);
+        other.classes.merge(self_classes);
+        self.classes = other.classes.clone();
+
+        other.parameters.merge(&self.parameters)?;
+        self.parameters = other.parameters.clone();
+        Ok(())
+    }
+
+    /// Recursively loads classes and merges loaded data into self
+    fn render_impl(&mut self, r: &Reclass, seen: &mut Vec<String>, root: &mut Node) -> Result<()> {
+        for cls in self.classes.items_iter() {
+            if seen.contains(cls) {
+                continue;
+            }
+
+            // TODO(sg): parse and render references in class names
+            let cls = cls.to_string();
+
+            let maybec = self.read_class(r, &cls);
+            let Ok(Some(mut c)) = maybec else {
+                if let Ok(None) = maybec {
+                    eprintln!("ignore missing class {cls}");
+                    continue;
+                }
+                return Err(maybec.unwrap_err());
+            };
+
+            // render class so we pick up further classes included in it
+            c.render_impl(r, seen, root)?;
+            // NOTE(sg): we don't need to merge here, since we've already mergeed into root as part
+            // of the recursive call to `render_impl()`
+
+            seen.push(cls.to_string());
+        }
+
+        // merge root into self, then update self with merged values
+        self.merge_into(root)
+    }
+
+    fn flatten_parameters(&mut self) -> Result<()> {
+        let p = std::mem::replace(&mut self.parameters, Mapping::new());
+        let f = Value::Mapping(p).flattened()?;
+        match f {
+            Value::Mapping(m) => {
+                self.parameters = m;
+                Ok(())
+            }
+            _ => Err(anyhow!(
+                "Flattened parameters are not a Mapping but instead a {}",
+                f.variant()
+            )),
+        }
+    }
+
+    /// Load included classes (recursively), and merge parameters.
+    ///
+    /// Note that this method doesn't flatten overwritten parameters.
+    pub fn render(&mut self, r: &Reclass) -> Result<()> {
+        let mut base = Node {
+            // NOTE(sg): We initialize a base node with our classes to start the class rendering
+            // process.  This roughly corresponds to Python reclass's
+            // `_get_class_mappings_entity()`.
+            classes: self.classes.clone(),
+            ..Default::default()
+        };
+        // NOTE(sg): We merge the `_reclass_` meta parameter into the base node before starting
+        // class loading. This roughly corresponds to Python reclass's
+        // `_get_automatic_parameters()`.
+        base.parameters
+            .insert("_reclass_".into(), self.meta.as_reclass().into())?;
+
+        let mut seen = vec![];
+        let mut root = Node::default();
+        base.render_impl(r, &mut seen, &mut root)?;
+        self.render_impl(r, &mut seen, &mut base)?;
+        self.flatten_parameters()
+    }
 }
 
 #[cfg(test)]
 mod node_tests {
     use super::*;
+    use crate::types::Value;
+    use std::str::FromStr;
 
     #[test]
     fn test_parse() {
@@ -170,9 +302,9 @@ mod node_tests {
             "./tests/inventory/nodes",
             "./tests/inventory/classes",
             false,
-        );
+        )
+        .unwrap();
         let n = Node::parse(&r, "n1").unwrap();
-        println!("{:#?}", n.meta);
         assert_eq!(
             n.classes,
             UniqueList::from(vec!["cls1".to_owned(), "cls2".to_owned()])
@@ -186,13 +318,6 @@ mod node_tests {
           foo: foo
         bar:
           foo: foo
-        _reclass_:
-          environment: base
-          name:
-            short: n1
-            parts: ["n1"]
-            full: n1
-            path: n1
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
         assert_eq!(n.parameters, expected.into());
@@ -378,5 +503,127 @@ mod node_tests {
         c.own_loc = Some(cpath);
         let p = c.abs_class_name(".....foo.bar").unwrap();
         assert_eq!(p, "foo.bar");
+    }
+
+    #[test]
+    fn test_read_class() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        let n = Node::parse(&r, "n1").unwrap();
+        let c = n.read_class(&r, "cls1").unwrap().unwrap();
+        let expected = r#"
+        foo:
+          foo: cls1
+          bar: cls1
+          baz: cls1
+        "#;
+        let expected = Mapping::from_str(expected).unwrap();
+        assert_eq!(c.parameters, expected);
+    }
+
+    #[test]
+    fn test_read_class_relative() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        let n = Node::parse(&r, "n1").unwrap();
+        let c1 = n.read_class(&r, "nested.cls1").unwrap().unwrap();
+        let c2 = c1.read_class(&r, ".cls2").unwrap().unwrap();
+        let expected = r#"
+        foo:
+          foo: nested.cls2
+        "#;
+        let expected = Mapping::from_str(expected).unwrap();
+        assert_eq!(c2.parameters, expected);
+    }
+
+    #[test]
+    fn test_render_n1() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        let mut n = Node::parse(&r, "n1").unwrap();
+        assert_eq!(
+            n.classes,
+            UniqueList::from(vec!["cls1".to_owned(), "cls2".to_owned()])
+        );
+        assert_eq!(
+            n.applications,
+            RemovableList::from(vec!["app1".to_owned(), "app2".to_owned()])
+        );
+
+        n.render(&r).unwrap();
+
+        let expected = r#"
+        foo:
+          foo: foo
+          bar: cls2
+          baz: cls1
+        bar:
+          foo: foo
+        _reclass_:
+          environment: base
+          name:
+            short: n1
+            parts: ["n1"]
+            full: n1
+            path: n1
+        "#;
+        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
+        expected.flatten().unwrap();
+        let params: Value = n.parameters.into();
+
+        assert_eq!(params, expected);
+    }
+
+    #[test]
+    fn test_render_n2() {
+        let r = Reclass::new(
+            "./tests/inventory/nodes",
+            "./tests/inventory/classes",
+            false,
+        )
+        .unwrap();
+        let mut n = Node::parse(&r, "n2").unwrap();
+        assert_eq!(n.classes, UniqueList::from(vec!["nested.cls1".to_owned()]));
+        assert_eq!(n.applications, RemovableList::from(vec![]));
+
+        n.render(&r).unwrap();
+
+        assert_eq!(
+            n.classes,
+            UniqueList::from(vec!["nested.cls2".to_owned(), "nested.cls1".to_owned()])
+        );
+
+        let expected = r#"
+        foo:
+          foo: nested.cls1
+          bar: n2
+        bar: bar
+        _reclass_:
+          environment: base
+          name:
+            short: n2
+            parts: ["n2"]
+            full: n2
+            path: n2
+        "#;
+        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
+        expected.flatten().unwrap();
+        let params: Value = n.parameters.into();
+
+        dbg!(&params);
+
+        assert_eq!(params, expected);
     }
 }
