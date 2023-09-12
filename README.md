@@ -1,5 +1,39 @@
 # reclass-rs: A Reclass implementation in Rust
 
+Reclass is a library which defines a syntax and directory structure for recursively merging YAML data sources.
+
+This repository contains a Rust implementation of Reclass which is based on the [Reclass fork](https://github.com/kapicorp/reclass) maintained by [kapicorp](https://github.com/kapicorp/).
+The Reclass implementation provided in this repository can be used both from other Rust programs and in Python programs.
+The `reclass-rs` Python module is implemented directly in Rust with [PyO3](https://pyo3.rs/latest/).
+
+Please note that this implementation doesn't yet support all the features and extensions which are availble in Kapitan Reclass.
+However, for features which are implemented, we aim to be compatbile with Kapitan Reclass.
+
+The implementation currently supports the following features of Kapicorp Reclass:
+
+* The Reclass options `nodes_path` and `classes_path`
+* The Reclass option `ignore_class_notfound`
+* Escaped parameter references
+* Merging referenced lists and dictionaries
+* Constant parameters
+* Nested references
+* References in class names
+* Loading classes with relative names
+
+The following Kapicorp Reclass features aren't supported:
+
+* Loading Reclass configuration options from `reclass-config.yaml`
+* Ignoring overwritten missing references
+* Inventory Queries
+* The Reclass option `ignore_class_notfound_regexp`
+* The Reclass option `componse_node_name`
+* The Reclass option `allow_none_override` can't be set to `False`
+* The Reclass `yaml_git` and `mixed` storage types
+* Any Reclass option which is not mentioned explicitly here or above
+
+Documentation for the original Reclass can be found at https://reclass.pantsfullofunix.net/.
+Documentation on Reclass extensions introduced in the Kapicorp Reclass fork can be found at https://github.com/kapicorp/reclass/blob/develop/README-extensions.rst.
+
 ## Prerequisites
 
 * Python >= 3.8
