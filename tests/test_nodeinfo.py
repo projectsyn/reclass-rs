@@ -72,3 +72,25 @@ def test_nodeinfo_n3():
             "ssh_key": "",
         },
     }
+
+
+def test_nodeinfo_n4():
+    r = reclass_rs.Reclass(
+        nodes_path="./tests/inventory/nodes", classes_path="./tests/inventory/classes"
+    )
+    n = r.nodeinfo("n4")
+    assert n.applications == []
+    assert n.classes == ["cls8", "${qux}", "cls7"]
+    assert n.parameters == {
+        "_reclass_": {
+            "environment": "base",
+            "name": {
+                "full": "n4",
+                "parts": ["n4"],
+                "path": "n4",
+                "short": "n4",
+            },
+        },
+        "qux": "cls1",
+        "foo": {"foo": "cls1", "bar": "cls1", "baz": "cls1"},
+    }

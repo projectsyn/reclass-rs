@@ -1,0 +1,3 @@
+classes:
+  - cls7
+  - ${qux}
