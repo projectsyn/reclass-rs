@@ -58,12 +58,14 @@ impl std::fmt::Display for Mapping {
 impl Mapping {
     /// Creates a new mapping.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Creates a new mapping with the given initial capacity.
     #[inline]
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             map: IndexMap::with_capacity(capacity),
@@ -183,13 +185,13 @@ impl Mapping {
 
                 // Create new ValueList for `k` if necessary, and return the old value for `k` if
                 // we had to create a ValueList
-                let oldv = if !self.map.get(&k).unwrap().is_value_list() {
-                    // Replace current value in map with an empty ValueList, and store the old
-                    // value in `oldv`.
-                    self.map.insert(k.clone(), Value::ValueList(vec![]))
-                } else {
-                    // Store `None` in `oldv`, if we didn't have to create a new ValueList.
+                let oldv = if self.map.get(&k).unwrap().is_value_list() {
+                    // Store `None` in `oldv`, if k is already a ValueList.
                     None
+                } else {
+                    // If k isn't a ValueList yet, replace current value in map with an empty
+                    // ValueList, and store the old value in `oldv`.
+                    self.map.insert(k.clone(), Value::ValueList(vec![]))
                 };
 
                 // Get a mutable reference to the underlying Vec<Value> of the ValueList for `k`.
@@ -226,6 +228,7 @@ impl Mapping {
     /// Returns a double-ended iterator visiting all key-value pairs in order of
     /// insertion. Iterator element type is `(&'a Value, &'a Value)`.
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> Iter {
         Iter {
             iter: self.map.iter(),
@@ -234,18 +237,21 @@ impl Mapping {
 
     /// Returns a reference to the underlying `IndexMap`.
     #[inline]
+    #[must_use]
     pub fn as_map(&self) -> &IndexMap<Value, Value> {
         &self.map
     }
 
     /// Returns `true` if the mapping contains key `k`.
     #[inline]
+    #[must_use]
     pub fn contains_key(&self, k: &Value) -> bool {
         self.map.contains_key(k)
     }
 
     /// Returns a reference to the value for key `k` if the key is present in the mapping.
     #[inline]
+    #[must_use]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         self.map.get(k)
     }
@@ -254,22 +260,20 @@ impl Mapping {
     /// Returns an error if called for a key which is marked constant.
     #[inline]
     pub fn get_mut(&mut self, k: &Value) -> Result<Option<&mut Value>> {
-        if !self.const_keys.contains(k) {
-            Ok(self.map.get_mut(k))
-        } else {
-            Err(anyhow!("Key {k} is marked constant"))
+        if self.const_keys.contains(k) {
+            return Err(anyhow!("Key {k} is marked constant"));
         }
+        Ok(self.map.get_mut(k))
     }
 
     /// Returns the given key's entry in the map for insertion and/or in-place updates.
     /// Returns an error if called for a key which is marked constant.
     #[inline]
     pub fn entry(&mut self, k: Value) -> Result<indexmap::map::Entry<Value, Value>> {
-        if !self.const_keys.contains(&k) {
-            Ok(self.map.entry(k))
-        } else {
-            Err(anyhow!("Key {k} is marked constant"))
+        if self.const_keys.contains(&k) {
+            return Err(anyhow!("Key {k} is marked constant"));
         }
+        Ok(self.map.entry(k))
     }
 
     /// Removes the entry for key `k` from the map and returns its value if the key was present in
@@ -290,11 +294,14 @@ impl Mapping {
 
     /// Returns the number of key-value pairs in the map.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
     /// Checks if the map is empty
+    #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.map.len() == 0
     }
@@ -303,7 +310,7 @@ impl Mapping {
     pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let dict = PyDict::new(py);
 
-        for (k, v) in self.iter() {
+        for (k, v) in self {
             let pyk = k.as_py_obj(py)?;
             let pyv = v.as_py_obj(py)?;
             dict.set_item(pyk, pyv)?;
@@ -312,10 +319,16 @@ impl Mapping {
         Ok(dict.into())
     }
 
+    /// Checks if the provided key is marked as constant.
+    #[inline]
+    #[must_use]
     fn is_const(&self, k: &Value) -> bool {
         self.const_keys.contains(k)
     }
 
+    /// Checks if the provided key is marked as overriding.
+    #[inline]
+    #[must_use]
     fn is_override(&self, k: &Value) -> bool {
         self.override_keys.contains(k)
     }
@@ -345,7 +358,7 @@ impl Mapping {
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
     pub(super) fn interpolate(&self, root: &Self) -> Result<Self> {
         let mut res = Self::new();
-        for (k, v) in self.iter() {
+        for (k, v) in self {
             let mut v = v.interpolate(root)?;
             v.flatten()?;
             res.insert(k.clone(), v)?;

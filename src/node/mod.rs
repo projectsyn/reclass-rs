@@ -24,7 +24,7 @@ pub struct Node {
     pub classes: UniqueList,
     /// Reclass parameters for this node as parsed from YAML
     #[serde(default, rename = "parameters")]
-    _params: serde_yaml::Mapping,
+    params: serde_yaml::Mapping,
     /// Reclass parameters for this node converted into our own mapping type
     #[serde(skip)]
     parameters: Mapping,
@@ -86,15 +86,15 @@ impl Node {
         classes.shrink_to_fit();
         n.classes = classes;
 
-        // Resolve YAML merge keys in `_params`
-        let p = merge_keys_serde(serde_yaml::Value::from(n._params))?
+        // Resolve YAML merge keys in `params`
+        let p = merge_keys_serde(serde_yaml::Value::from(n.params))?
             .as_mapping()
             .unwrap()
-            .to_owned();
-        n._params = p;
+            .clone();
+        n.params = p;
 
         // Convert serde_yaml::Mapping into our own Mapping type
-        n.parameters = n._params.clone().into();
+        n.parameters = n.params.clone().into();
 
         Ok(n)
     }
@@ -356,7 +356,7 @@ mod node_tests {
         );
         let mut params = serde_yaml::Mapping::new();
         params.insert(serde_yaml::Value::from("foo"), serde_yaml::Value::from(foo));
-        assert_eq!(n._params, params);
+        assert_eq!(n.params, params);
     }
 
     #[test]
@@ -376,7 +376,7 @@ mod node_tests {
           bar: bar
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
-        assert_eq!(n._params, expected);
+        assert_eq!(n.params, expected);
     }
 
     #[test]
@@ -398,7 +398,7 @@ mod node_tests {
             bar: bar
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
-        assert_eq!(n._params, expected);
+        assert_eq!(n.params, expected);
     }
 
     #[test]
@@ -426,7 +426,7 @@ mod node_tests {
           - a: a
         "#;
         let expected: serde_yaml::Mapping = serde_yaml::from_str(expected).unwrap();
-        assert_eq!(n._params, expected);
+        assert_eq!(n.params, expected);
     }
 
     #[test]

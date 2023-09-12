@@ -164,11 +164,7 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         context(
             "content",
             map(many1(tuple((ref_not_open, text))), |strings| {
-                strings
-                    .iter()
-                    .map(|((), s)| s.clone())
-                    .collect::<Vec<String>>()
-                    .join("")
+                strings.iter().map(|((), s)| s.clone()).collect::<String>()
             }),
         )(input)
     }

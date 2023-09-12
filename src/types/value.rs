@@ -93,11 +93,9 @@ impl Hash for Value {
             Self::Null => {}
             Self::Bool(v) => v.hash(state),
             Self::Number(v) => v.hash(state),
-            Self::String(v) => v.hash(state),
-            Self::Sequence(v) => v.hash(state),
+            Self::Literal(v) | Self::String(v) => v.hash(state),
             Self::Mapping(v) => v.hash(state),
-            Self::ValueList(v) => v.hash(state),
-            Self::Literal(v) => v.hash(state),
+            Self::Sequence(v) | Self::ValueList(v) => v.hash(state),
         }
     }
 }
@@ -121,8 +119,13 @@ impl From<Value> for serde_json::Value {
                     return Self::String(n.to_string());
                 }
                 let jn = if n.is_i64() {
+                    // While the lint is enabled generally, we don't care if we lose some precision
+                    // here. If this turns out to be a real problem, we can enable serde_json's
+                    // arbitrary precision numbers feature.
+                    #[allow(clippy::cast_precision_loss)]
                     serde_json::Number::from_f64(n.as_i64().unwrap() as f64).unwrap()
                 } else if n.is_u64() {
+                    #[allow(clippy::cast_precision_loss)]
                     serde_json::Number::from_f64(n.as_u64().unwrap() as f64).unwrap()
                 } else if n.is_f64() {
                     serde_json::Number::from_f64(n.as_f64().unwrap()).unwrap()
@@ -131,8 +134,7 @@ impl From<Value> for serde_json::Value {
                 };
                 serde_json::Value::Number(jn)
             }
-            Value::String(s) => Self::String(s),
-            Value::Literal(s) => Self::String(s),
+            Value::Literal(s) | Value::String(s) => Self::String(s),
             Value::Sequence(s) => {
                 let mut seq: Vec<Self> = Vec::with_capacity(s.len());
                 for v in s {
@@ -149,18 +151,21 @@ impl From<Value> for serde_json::Value {
 impl Value {
     /// Checks if the `Value` is `Null`.
     #[inline]
+    #[must_use]
     pub fn is_null(&self) -> bool {
         matches!(self, Self::Null)
     }
 
     /// Checks if the `Value` is a boolean.
     #[inline]
+    #[must_use]
     pub fn is_bool(&self) -> bool {
         matches!(self, Self::Bool(_))
     }
 
     /// If the `Value` is a Boolean, return the associated bool. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Self::Bool(b) => Some(*b),
@@ -173,6 +178,7 @@ impl Value {
     /// For any value for which `is_i64` returns true, `as_i64` is guaranteed to return the
     /// integer value.
     #[inline]
+    #[must_use]
     pub fn is_i64(&self) -> bool {
         match self {
             Self::Number(n) => n.is_i64(),
@@ -182,6 +188,7 @@ impl Value {
 
     /// If the `Value` is an integer, represent it as i64 if possible. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_i64(&self) -> Option<i64> {
         match self {
             Self::Number(n) => n.as_i64(),
@@ -194,6 +201,7 @@ impl Value {
     /// For any value for which `is_u64` returns true, `as_u64` is guaranteed to return the
     /// integer value.
     #[inline]
+    #[must_use]
     pub fn is_u64(&self) -> bool {
         match self {
             Self::Number(n) => n.is_u64(),
@@ -203,6 +211,7 @@ impl Value {
 
     /// If the `Value` is an integer, represent it as u64 if possible. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_u64(&self) -> Option<u64> {
         match self {
             Self::Number(n) => n.as_u64(),
@@ -219,6 +228,7 @@ impl Value {
     /// returns true if and only if both `is_i64` and `is_u64` return false, but since serde_yaml
     /// doesn't guarantee this behavior in the future, this may change.
     #[inline]
+    #[must_use]
     pub fn is_f64(&self) -> bool {
         match self {
             Self::Number(n) => n.is_f64(),
@@ -228,6 +238,7 @@ impl Value {
 
     /// If the `Value` is a number, represent it as f64 if possible. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             Self::Number(n) => n.as_f64(),
@@ -240,6 +251,7 @@ impl Value {
     /// For any value for which `is_string()` returns true, `as_str` is guaranteed to return the
     /// string slice.
     #[inline]
+    #[must_use]
     pub fn is_string(&self) -> bool {
         matches!(self, Self::String(_))
     }
@@ -249,28 +261,31 @@ impl Value {
     /// For any value for which `is_literal()` returns true, `as_str` is guaranteed to return the
     /// string slice.
     #[inline]
+    #[must_use]
     pub fn is_literal(&self) -> bool {
         matches!(self, Self::Literal(_))
     }
 
     /// If the `Value` is a String or Literal, return the associated `str`. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::String(s) => Some(s),
-            Self::Literal(s) => Some(s),
+            Self::Literal(s) | Self::String(s) => Some(s),
             _ => None,
         }
     }
 
     /// Checks if the `Value` is a Mapping.
     #[inline]
+    #[must_use]
     pub fn is_mapping(&self) -> bool {
         matches!(self, Self::Mapping(_))
     }
 
     /// If the value is a Mapping, return a reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_mapping(&self) -> Option<&Mapping> {
         match self {
             Self::Mapping(m) => Some(m),
@@ -280,6 +295,7 @@ impl Value {
 
     /// If the value is a Mapping, return a mutable reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_mapping_mut(&mut self) -> Option<&mut Mapping> {
         match self {
             Self::Mapping(m) => Some(m),
@@ -289,12 +305,14 @@ impl Value {
 
     /// Checks if the `Value` is a Sequence.
     #[inline]
+    #[must_use]
     pub fn is_sequence(&self) -> bool {
         matches!(self, Self::Sequence(_))
     }
 
     /// If the value is a Sequence, return a reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_sequence(&self) -> Option<&Sequence> {
         match self {
             Self::Sequence(s) => Some(s),
@@ -304,6 +322,7 @@ impl Value {
 
     /// If the value is a Sequence, return a mutable reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_sequence_mut(&mut self) -> Option<&mut Sequence> {
         match self {
             Self::Sequence(s) => Some(s),
@@ -313,12 +332,14 @@ impl Value {
 
     /// Checks if the `Value` is a ValueList.
     #[inline]
+    #[must_use]
     pub fn is_value_list(&self) -> bool {
         matches!(self, Self::ValueList(_))
     }
 
     /// If the value is a ValueList, return a reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_value_list(&self) -> Option<&Sequence> {
         match self {
             Self::ValueList(l) => Some(l),
@@ -328,6 +349,7 @@ impl Value {
 
     /// If the value is a ValueList, return a mutable reference to it. Returns None otherwise.
     #[inline]
+    #[must_use]
     pub fn as_value_list_mut(&mut self) -> Option<&mut Sequence> {
         match self {
             Self::ValueList(l) => Some(l),
@@ -344,14 +366,16 @@ impl Value {
     ///
     /// Returns None for invalid keys, or keys which don't exist in the `Value`.
     #[inline]
+    #[must_use]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         match self {
             Self::Mapping(m) => m.get(k),
             Self::Sequence(s) | Self::ValueList(s) => {
                 if let Some(idx) = k.as_u64() {
-                    let idx = idx as usize;
-                    if idx < s.len() {
-                        return Some(&s[idx]);
+                    if let Ok(idx) = usize::try_from(idx) {
+                        if idx < s.len() {
+                            return Some(&s[idx]);
+                        }
                     }
                 }
                 None
@@ -375,7 +399,7 @@ impl Value {
             Self::Mapping(m) => m.get_mut(k),
             Self::Sequence(s) | Self::ValueList(s) => {
                 if let Some(idx) = k.as_u64() {
-                    let idx = idx as usize;
+                    let idx = usize::try_from(idx)?;
                     if idx < s.len() {
                         return Ok(Some(&mut s[idx]));
                     }
@@ -401,12 +425,15 @@ impl Value {
     }
 
     /// Converts the `Value` into a `PyObject`.
+    #[allow(clippy::missing_panics_doc)]
     pub fn as_py_obj(&self, py: Python<'_>) -> PyResult<PyObject> {
         let obj = match self {
             Value::Literal(s) | Value::String(s) => s.into_py(py),
             Value::Bool(b) => b.into_py(py),
             Value::Number(n) => {
                 if n.is_i64() {
+                    // NOTE(sg): We allow the missing panics doc because we already checked that
+                    // `as_i64()` can't panic here.
                     n.as_i64().unwrap().into_py(py)
                 } else if n.is_u64() {
                     n.as_u64().unwrap().into_py(py)
@@ -418,7 +445,7 @@ impl Value {
             }
             Value::Sequence(s) => {
                 let mut pyseq = vec![];
-                for v in s.iter() {
+                for v in s {
                     pyseq.push(v.as_py_obj(py)?);
                 }
                 pyseq.into_py(py)
@@ -439,20 +466,20 @@ impl Value {
     ///
     /// For non-String values, the value is unconditionally cloned and returned unmodified.
     #[inline]
-    pub(super) fn strip_prefix(&self) -> (Self, Option<KeyPrefix>) {
+    pub(super) fn strip_prefix(self) -> (Self, Option<KeyPrefix>) {
         match self {
             Self::String(s) => {
                 if s.is_empty() {
-                    return (self.clone(), None);
+                    return (Self::String(s), None);
                 }
                 let p = KeyPrefix::from(s.chars().next().unwrap());
                 if p.is_some() {
                     (Self::String(s[1..].to_string()), p)
                 } else {
-                    (self.clone(), None)
+                    (Self::String(s), None)
                 }
             }
-            _ => (self.clone(), None),
+            _ => (self, None),
         }
     }
 
@@ -520,7 +547,7 @@ impl Value {
             Self::Sequence(s) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
-                for it in s.iter() {
+                for it in s {
                     let e = it.interpolate(root)?;
                     seq.push(e);
                 }
@@ -630,7 +657,7 @@ impl Value {
             Self::ValueList(l) => {
                 // NOTE(sg): Empty ValueLists get flattened to Value::Null
                 let mut base = Value::Null;
-                for v in l.iter() {
+                for v in l {
                     base.merge(v.clone())?;
                 }
                 Ok(base)
@@ -638,7 +665,7 @@ impl Value {
             // Flatten Mapping by flattening each value and inserting it into a new Mapping.
             Self::Mapping(m) => {
                 let mut n = Mapping::new();
-                for (k, v) in m.iter() {
+                for (k, v) in m {
                     n.insert(k.clone(), v.flattened()?)?;
                 }
                 Ok(Self::Mapping(n))

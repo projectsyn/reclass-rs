@@ -52,8 +52,7 @@ impl From<Value> for serde_yaml::Value {
             Value::Null => Self::Null,
             Value::Bool(b) => Self::Bool(b),
             Value::Number(n) => Self::Number(n),
-            Value::String(s) => Self::String(s),
-            Value::Literal(s) => Self::String(s),
+            Value::Literal(s) | Value::String(s) => Self::String(s),
             Value::Sequence(s) | Value::ValueList(s) => {
                 let mut seq: Vec<serde_yaml::Value> = Vec::with_capacity(s.len());
                 for v in s {
