@@ -17,4 +17,4 @@ def test_import_raises():
     with pytest.raises(ValueError) as exc:
         r = reclass_rs.Reclass("./foo", "./bar")
 
-    assert "Error while discovering classes" in str(exc.value)
+    assert "Error while discovering nodes" in str(exc.value)
