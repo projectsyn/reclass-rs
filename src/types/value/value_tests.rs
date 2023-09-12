@@ -1,5 +1,6 @@
 use super::*;
 use paste::paste;
+use std::str::FromStr;
 
 #[test]
 fn test_is_null() {
@@ -288,4 +289,80 @@ fn test_strip_prefix() {
     );
     assert_eq!(k3.strip_prefix(), (Value::from("foo"), None));
     assert_eq!(k4.strip_prefix(), (Value::from(3), None));
+}
+
+#[test]
+fn test_raw_string_literal() {
+    assert_eq!(
+        Value::Literal("foo".into()).raw_string().unwrap(),
+        "foo".to_string()
+    );
+}
+
+#[test]
+fn test_raw_string_null() {
+    assert_eq!(Value::Null.raw_string().unwrap(), "None".to_string());
+}
+
+#[test]
+fn test_raw_string_number() {
+    assert_eq!(
+        Value::Number(5.into()).raw_string().unwrap(),
+        "5".to_string()
+    );
+    assert_eq!(
+        Value::Number((-1).into()).raw_string().unwrap(),
+        "-1".to_string()
+    );
+    assert_eq!(
+        Value::Number(3.14.into()).raw_string().unwrap(),
+        "3.14".to_string()
+    );
+    assert_eq!(
+        Value::Number(serde_yaml::Number::from(f64::INFINITY))
+            .raw_string()
+            .unwrap(),
+        ".inf".to_string()
+    );
+    assert_eq!(
+        Value::Number(serde_yaml::Number::from(f64::NEG_INFINITY))
+            .raw_string()
+            .unwrap(),
+        "-.inf".to_string()
+    );
+    assert_eq!(
+        Value::Number(serde_yaml::Number::from(f64::NAN))
+            .raw_string()
+            .unwrap(),
+        ".nan".to_string()
+    );
+}
+
+#[test]
+fn test_raw_string_mapping() {
+    let mut m = Value::Mapping(Mapping::from_str("{foo: foo, bar: true, baz: 1.23}").unwrap());
+    // turn string values into literals by calling flatten
+    m.render(&Mapping::new()).unwrap();
+    let mstr = m.raw_string().unwrap();
+    // NOTE(sg): serde_json output is sorted by keys
+    assert_eq!(mstr, r#"{"bar":true,"baz":1.23,"foo":"foo"}"#);
+}
+
+#[test]
+fn test_raw_string_sequence() {
+    let v = Value::Sequence(vec!["foo".into(), 3.14.into(), Value::Bool(true)]);
+    let vstr = v.raw_string().unwrap();
+    assert_eq!(vstr, r#"["foo",3.14,true]"#);
+}
+
+#[test]
+fn test_raw_string_mapping_nonstring_keys() {
+    // raw_string() will turn boolean, number, and null values used as keys into strings when
+    // serializing the Mapping as JSON.
+    let m = Mapping::from_str("{true: foo, 3.14: true, ~: 1.23}").unwrap();
+    // turn string values into literals by calling interpolate
+    let m = Value::Mapping(m).rendered(&Mapping::new()).unwrap();
+    let mstr = m.raw_string().unwrap();
+    // NOTE(sg): serde_json output is sorted by keys
+    assert_eq!(mstr, r#"{"3.14":true,"null":1.23,"true":"foo"}"#);
 }

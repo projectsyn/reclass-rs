@@ -43,3 +43,32 @@ def test_nodeinfo_n2():
         "foo": {"foo": "nested.cls1", "bar": "n2"},
         "bar": "bar",
     }
+
+
+def test_nodeinfo_n3():
+    r = reclass_rs.Reclass(
+        nodes_path="./tests/inventory/nodes", classes_path="./tests/inventory/classes"
+    )
+    n = r.nodeinfo("n3")
+    assert n.applications == []
+    assert n.classes == ["cls4", "cls5", "cls6", "cls3"]
+    assert n.parameters == {
+        "_reclass_": {
+            "environment": "base",
+            "name": {
+                "full": "n3",
+                "parts": ["n3"],
+                "path": "n3",
+                "short": "n3",
+            },
+        },
+        "cluster": {"name": "c-test-cluster-1234"},
+        "openshift": {
+            "infraID": "c-test-cluster-1234-xlk3f",
+            "clusterID": "2888efd2-8a1b-4846-82ec-3a99506e2c70",
+            "baseDomain": "c-test-cluster-1234.example.org",
+            "appsDomain": "apps.c-test-cluster-1234.example.org",
+            "apiURL": "api.c-test-cluster-1234.example.org",
+            "ssh_key": "",
+        },
+    }

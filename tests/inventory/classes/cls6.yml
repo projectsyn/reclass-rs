@@ -1,0 +1,6 @@
+parameters:
+  openshift:
+    infraID: c-test-cluster-1234-xlk3f
+    clusterID: 2888efd2-8a1b-4846-82ec-3a99506e2c70
+    baseDomain: c-test-cluster-1234.example.org
+    appsDomain: apps.${openshift:baseDomain}

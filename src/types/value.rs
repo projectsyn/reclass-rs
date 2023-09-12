@@ -8,6 +8,7 @@ use std::mem;
 
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
+use crate::refs::Token;
 
 /// Represents a YAML value in a form suitable for processing Reclass parameters.
 #[derive(Clone, Debug, PartialEq)]
@@ -34,9 +35,13 @@ pub enum Value {
 impl std::fmt::Display for Value {
     /// Pretty prints the `Value`
     ///
-    /// Note that the pretty-printed format doesn't distinguish `String` and `Literal`, and
-    /// `Sequence` and `ValueList`. If you need a format where you can distinguish these types, use
-    /// the Debug formatter.
+    /// The pretty-printed format doesn't distinguish `String` and `Literal`, and `Sequence` and
+    /// `ValueList`. If you need a format where you can distinguish these types, use the Debug
+    /// formatter.
+    ///
+    /// Note that this formatter isn't suitable for generating strings which are suitable for
+    /// reference interpolation parameter lookups. Use `Value::raw_string()` if you need a
+    /// formatter which generates strings which are compatible with Python's `str()`.
     ///
     /// # Example
     ///
@@ -101,6 +106,43 @@ impl Hash for Value {
 impl Default for Value {
     fn default() -> Self {
         Self::Null
+    }
+}
+
+impl From<Value> for serde_json::Value {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Null => Self::Null,
+            Value::Bool(b) => Self::Bool(b),
+            Value::Number(n) => {
+                if n.is_nan() || n.is_infinite() {
+                    // Render NaN and -+inf as strings, since JSON's number type doesn't support
+                    // those values.
+                    return Self::String(n.to_string());
+                }
+                let jn = if n.is_i64() {
+                    serde_json::Number::from_f64(n.as_i64().unwrap() as f64).unwrap()
+                } else if n.is_u64() {
+                    serde_json::Number::from_f64(n.as_u64().unwrap() as f64).unwrap()
+                } else if n.is_f64() {
+                    serde_json::Number::from_f64(n.as_f64().unwrap()).unwrap()
+                } else {
+                    unreachable!("Serializing Number to JSON: {} is neither NaN, inf, or representable as i64, u64, or f64?", n);
+                };
+                serde_json::Value::Number(jn)
+            }
+            Value::String(s) => Self::String(s),
+            Value::Literal(s) => Self::String(s),
+            Value::Sequence(s) => {
+                let mut seq: Vec<Self> = Vec::with_capacity(s.len());
+                for v in s {
+                    seq.push(Self::from(v));
+                }
+                Self::Array(seq)
+            }
+            Value::Mapping(m) => Self::Object(serde_json::Map::<String, Self>::from(m)),
+            Value::ValueList(_) => todo!(),
+        }
     }
 }
 
@@ -414,10 +456,103 @@ impl Value {
         }
     }
 
+    /// Renders the value as a string which is suitable for doing value lookups during parameter
+    /// interpolation. Returns an error when called on ValueLists or Strings.
+    ///
+    /// Notably, this implementation won't quote Literal values, and will try to emit
+    /// strings which match Python's `str()` for other types.
+    ///
+    #[inline]
+    pub(crate) fn raw_string(&self) -> Result<String> {
+        match self {
+            Value::Literal(s) => Ok(s.clone()),
+            // We serialize Null as `None` to be compatible with Python's str()
+            Value::Null => Ok("None".to_string()),
+            // We need custom formatting for bool instead of `format!("{b}")`, so that this
+            // function returns strings which match Python's `str()` implementation.
+            Value::Bool(b) => match b {
+                true => Ok("True".to_owned()),
+                false => Ok("False".to_owned()),
+            },
+            // NOTE(sg): We render maps and sequences as JSON to mimic python reclass's behavior of
+            // just using `str(obj)`.
+            // This doesn't result in 100% identical output (e.g. double quotes instead of single
+            // quotes), but works similar enough in the resulting YAML. Serializing to YAML doesn't
+            // work cleanly for embedded references in multiline strings which contain YAML, as the
+            // indentation will break.
+            Value::Mapping(m) => {
+                let m = serde_json::Map::<String, serde_json::Value>::from(m.clone());
+                serde_json::to_string(&m).map_err(|e| anyhow!(e))
+            }
+            Value::Sequence(_) => {
+                let v = serde_json::Value::from(self.clone());
+                serde_json::to_string(&v).map_err(|e| anyhow!(e))
+            }
+            Value::Number(n) => Ok(n.to_string()),
+            _ => Err(anyhow!(
+                "Value::raw_string isn't implemented for {}",
+                self.variant()
+            )),
+        }
+    }
+
+    /// Parses and interpolates any Reclass references present in the value.  The returned value
+    /// will never be a `Value::String`.
+    ///
+    /// Note that users should prefer calling `Value::rendered()` or one of its in-place variants
+    /// over this method.
+    pub(crate) fn interpolate(&self, root: &Mapping) -> Result<Self> {
+        Ok(match self {
+            Self::String(s) => {
+                // String interpolation parses any Reclass references in the String and resolves
+                // them. The result of `Token::render()` can be an arbitrary Value, except for
+                // `Value::String()`, since `render()` will recursively call `interpolate()`.
+                if let Some(token) = Token::parse(s)? {
+                    token.render(root)?
+                } else {
+                    // If Token::parse() returns None, we can be sure that there's no references
+                    // int the String, and just return the string as a `Value::Literal`.
+                    Self::Literal(s.clone())
+                }
+            }
+            // Mappings are interpolated by calling `Mapping::interpolate()`.
+            Self::Mapping(m) => Self::Mapping(m.interpolate(root)?),
+            Self::Sequence(s) => {
+                // Sequences are interpolated by calling interpolate() for each element.
+                let mut seq = vec![];
+                for it in s.iter() {
+                    let e = it.interpolate(root)?;
+                    seq.push(e);
+                }
+                Self::Sequence(seq)
+            }
+            Self::ValueList(l) => {
+                // iteratively interpolate each element of the ValueList, by starting with a base
+                // Value::Null, and merging each interpolated element over that base value. This
+                // correctly handles cases where an intermediate layer of a ValueList is a
+                // reference to a Mapping.
+                // NOTE(sg): Empty ValueLists are interpolated as Value::Null.
+                let mut r = Value::Null;
+                for v in l {
+                    r.merge(v.interpolate(root)?)?;
+                }
+                // Depending on the structure of the ValueList, we may end up with a final
+                // interpolated Value which contains more ValueLists due to mapping merges. Such
+                // ValueLists can themselves contain further references. To handle this case, we
+                // call `interpolate()` again to resolve those references. This recursion stops
+                // once `Token::render()` doesn't produce new `Value::String()`.
+                r.interpolate(root)?
+            }
+            _ => self.clone(),
+        })
+    }
+
     /// Merges Value `other` into self, consuming `other`.
     ///
-    /// Currently, this method treats both `Value::Literal(_)` and `Value::String(_)` as literal
-    /// strings. This will be changed once we implement rendering of Reclass references.
+    /// This method assumes that it's called from [`Value::flatten()`], and will raise an error
+    /// when called on a [`Value::ValueList`]. Additionally, the method assumes
+    /// [`Value::interpolate()`] has already been called, and will raise an error when called on a
+    /// [`Value::String`].
     ///
     /// This method makes use of `std::mem::replace()` to update self in-place.
     ///
@@ -433,11 +568,6 @@ impl Value {
         // If `other` is a ValueList, flatten it before trying to merge
         let other = if other.is_value_list() {
             other.flattened()?
-        } else if let Some(s) = other.as_str() {
-            // make strings into literals
-            // TODO(sg): Remove this when we have parameter interpolation
-            eprintln!("Transforming unparsed String to Literal");
-            Self::Literal(s.to_string())
         } else {
             other
         };
@@ -450,12 +580,7 @@ impl Value {
             }
             Self::Mapping(m) => match other {
                 // merge mapping and mapping
-                Self::Mapping(other) => {
-                    m.merge(&other)?;
-                    // Mapping::merge() can produce more ValueLists, so we call flatten here to
-                    // ensure that the final result of this method doesn't contain ValueLists.
-                    self.flatten()?;
-                }
+                Self::Mapping(other) => m.merge(&other)?,
                 _ => return Err(anyhow!("Can't merge {} over mapping", other.variant())),
             },
             Self::Sequence(s) => match other {
@@ -463,15 +588,20 @@ impl Value {
                 Self::Sequence(mut other) => s.append(&mut other),
                 _ => return Err(anyhow!("Can't merge {} over sequence", other.variant())),
             },
-            Self::String(_) | Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {
+            Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {
                 if other.is_mapping() || other.is_sequence() {
+                    // We can't merge simple non-null types over mappings or sequences
                     return Err(anyhow!(
                         "Can't merge {} over {}",
                         other.variant(),
                         self.variant()
                     ));
                 }
+                // overwrite self with the value that's being merged
                 let _prev = std::mem::replace(self, other);
+            }
+            Self::String(_) => {
+                unreachable!("Encountered unparsed String as merge target, this shouldn't happen!");
             }
             Self::ValueList(_) => {
                 // NOTE(sg): We should never end up with nested ValueLists with our implementation
@@ -490,20 +620,22 @@ impl Value {
     ///
     /// This method leaves the original Value unchanged. Use [`Value::flatten()`] if you want to
     /// flatten a Value in-place.
-    pub fn flattened(&self) -> Result<Self> {
+    ///
+    /// Note that we don't recommend calling `flattened()` on arbitrary Values. Users should always
+    /// prefer calling [`Value::rendered()`] or one of the in-place variations of that method.
+    pub(crate) fn flattened(&self) -> Result<Self> {
         match self {
+            // Flatten ValueList by iterating over its elements and merging each element into a
+            // base Value.
             Self::ValueList(l) => {
-                let mut it = l.iter();
-                let mut base = it
-                    .next()
-                    .ok_or_else(|| anyhow!("Empty valuelist?"))?
-                    .clone();
-
-                for v in it {
+                // NOTE(sg): Empty ValueLists get flattened to Value::Null
+                let mut base = Value::Null;
+                for v in l.iter() {
                     base.merge(v.clone())?;
                 }
                 Ok(base)
             }
+            // Flatten Mapping by flattening each value and inserting it into a new Mapping.
             Self::Mapping(m) => {
                 let mut n = Mapping::new();
                 for (k, v) in m.iter() {
@@ -511,6 +643,7 @@ impl Value {
                 }
                 Ok(Self::Mapping(n))
             }
+            // Flatten Sequence by flattening each element and inserting it into a new Sequence
             Self::Sequence(s) => {
                 let mut n = Vec::with_capacity(s.len());
                 for v in s {
@@ -518,16 +651,58 @@ impl Value {
                 }
                 Ok(Self::Sequence(n))
             }
-            Self::String(s) => Ok(Self::Literal(s.clone())),
+            // Simple values are flattened as themselves
             Self::Null | Self::Bool(_) | Self::Literal(_) | Self::Number(_) => Ok(self.clone()),
+            // Flattening an unparsed string is an error
+            Self::String(_) => Err(anyhow!(
+                "Can't flatten unparsed String, did you mean to call `rendered()`?"
+            )),
         }
     }
 
     /// Flattens the Value in-place.
     ///
     /// See [`Value::flattened()`] for details.
-    pub fn flatten(&mut self) -> Result<()> {
+    pub(super) fn flatten(&mut self) -> Result<()> {
         let _prev = std::mem::replace(self, self.flattened()?);
+        Ok(())
+    }
+
+    /// Renders the Value by interpolating Reclass references and flattening ValueLists.
+    ///
+    /// This method should be preferred over calling `Value::interpolate()` and
+    /// `Value::flattened()` directly.
+    ///
+    /// The method first interpolates any Reclass references found in the Value by looking up the
+    /// reference keys in `root`. After all references have been interpolated, the method flattens
+    /// any remaining ValueLists and returns the final "flattened" value.
+    pub fn rendered(&self, root: &Mapping) -> Result<Self> {
+        let mut v = self.interpolate(root)?;
+        v.flatten()?;
+        Ok(v)
+    }
+
+    /// Renders the Value in-place.
+    ///
+    /// See [`Value::rendered()`] for details.
+    pub fn render(&mut self, root: &Mapping) -> Result<()> {
+        let _prev = std::mem::replace(self, self.rendered(root)?);
+        Ok(())
+    }
+
+    /// Renders the Value in-place if it's a Mapping, using itself as the parameter lookup source.
+    /// Returns an error when called for a Value variant other than `Value::Mapping`.
+    ///
+    /// See [`Value::rendered()`] for details on how Reclass references are rendered.
+    pub fn render_with_self(&mut self) -> Result<()> {
+        let m = self.as_mapping().ok_or_else(|| {
+            anyhow!(
+                "Can't render {} with itself as the parameter source",
+                self.variant()
+            )
+        })?;
+        let n = self.rendered(m)?;
+        let _prev = std::mem::replace(self, n);
         Ok(())
     }
 }
@@ -537,6 +712,9 @@ mod value_tests;
 
 #[cfg(test)]
 mod value_flattened_tests;
+
+#[cfg(test)]
+mod value_interpolate_tests;
 
 #[cfg(test)]
 mod value_as_py_obj_tests;

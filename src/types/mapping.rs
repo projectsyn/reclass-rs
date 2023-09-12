@@ -338,6 +338,20 @@ impl Mapping {
         }
         Ok(())
     }
+
+    /// Returns a new Mapping with any Reclass references in the mapping interpolated.
+    /// The method looks up reference values in parameter `root`. After interpolation of each
+    /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
+    /// Mapping. Mapping keys are inserted into the new mapping unchanged.
+    pub(super) fn interpolate(&self, root: &Self) -> Result<Self> {
+        let mut res = Self::new();
+        for (k, v) in self.iter() {
+            let mut v = v.interpolate(root)?;
+            v.flatten()?;
+            res.insert(k.clone(), v)?;
+        }
+        Ok(res)
+    }
 }
 
 impl From<serde_yaml::Mapping> for Mapping {
@@ -362,6 +376,25 @@ impl From<Mapping> for serde_yaml::Mapping {
         for (k, v) in m.map {
             new.insert(serde_yaml::Value::from(k), serde_yaml::Value::from(v));
         }
+        new
+    }
+}
+
+impl From<Mapping> for serde_json::Map<String, serde_json::Value> {
+    fn from(m: Mapping) -> Self {
+        let mut new = Self::with_capacity(m.map.len());
+        for (k, v) in m.map {
+            // JSON keys must be strings, we convert some Value variants to string here
+            let k = match k {
+                Value::String(s) | Value::Literal(s) => s,
+                Value::Bool(b) => format!("{b}"),
+                Value::Number(n) => format!("{n}"),
+                Value::Null => "null".to_owned(),
+                _ => panic!("Can't serialize {} as JSON key", v.variant()),
+            };
+            new.insert(k, serde_json::Value::from(v));
+        }
+
         new
     }
 }
