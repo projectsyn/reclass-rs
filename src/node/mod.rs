@@ -8,7 +8,7 @@ use yaml_merge_keys::merge_keys_serde;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::Token;
 use crate::types::{Mapping, Value};
-use crate::Reclass;
+use crate::{to_lexical_absolute, Reclass};
 
 mod nodeinfo;
 
@@ -49,7 +49,7 @@ impl Node {
         invpath.push(npath);
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
-        meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
+        meta.uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
 
         Node::from_str(meta, None, &ncontents)
     }

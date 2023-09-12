@@ -17,7 +17,7 @@ use anyhow::{anyhow, Result};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR};
+use std::path::{Component, Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
 use inventory::Inventory;
@@ -42,6 +42,30 @@ pub struct Reclass {
     classes: HashMap<String, PathBuf>,
     /// List of discovered Reclass nodes in `nodes_path`
     nodes: HashMap<String, PathBuf>,
+}
+
+/// Converts `p` to an absolute path, but doesn't resolve symlinks. The function does normalize the
+/// path by resolving any `.` and `..` components which are present.
+///
+/// Copied from https://internals.rust-lang.org/t/path-to-lexical-absolute/14940.
+fn to_lexical_absolute(p: &Path) -> Result<PathBuf> {
+    let mut absolute = if p.is_absolute() {
+        PathBuf::new()
+    } else {
+        std::env::current_dir()?
+    };
+    for component in p.components() {
+        match component {
+            Component::CurDir => { /* do nothing for `.` components */ }
+            Component::ParentDir => {
+                // pop the last element that we added for `..` components
+                absolute.pop();
+            }
+            // just push the component for any other component
+            component => absolute.push(component.as_os_str()),
+        }
+    }
+    Ok(absolute)
 }
 
 fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> Result<()> {
@@ -74,7 +98,7 @@ fn walk_entity_dir(
     entity_map: &mut HashMap<String, PathBuf>,
     max_depth: usize,
 ) -> Result<()> {
-    let entity_root = PathBuf::from(root).canonicalize()?;
+    let entity_root = to_lexical_absolute(&PathBuf::from(root))?;
 
     for entry in WalkDir::new(root).max_depth(max_depth) {
         let entry = entry?;
@@ -85,13 +109,13 @@ fn walk_entity_dir(
         };
         if ext.is_some() && SUPPORTED_YAML_EXTS.contains(&ext.unwrap()) {
             // it's an entity (class or node), process it
-            let abspath = entry.path().canonicalize()?;
+            let abspath = to_lexical_absolute(entry.path())?;
             let relpath = abspath.strip_prefix(&entity_root)?;
             let cls = relpath
                 .with_extension("")
                 .to_str()
                 .ok_or(anyhow!(
-                    "Failed to canonicalize entity {}",
+                    "Failed to normalize entity {}",
                     entry.path().display()
                 ))?
                 .replace(MAIN_SEPARATOR, ".");
