@@ -48,6 +48,21 @@ impl Inventory {
                     .and_modify(|nodes: &mut Vec<String>| nodes.push(name.clone()))
                     .or_insert(vec![name.clone()]);
             }
+            // Ensure application and classes values are sorted. We need to consume the iterator,
+            // but we don't care about the vec of unit types which results from calling sort on the
+            // values_mut() elements, so we directly drop the resulting Vec.
+            drop(
+                inv.classes
+                    .values_mut()
+                    .map(|v| v.sort())
+                    .collect::<Vec<()>>(),
+            );
+            drop(
+                inv.applications
+                    .values_mut()
+                    .map(|v| v.sort())
+                    .collect::<Vec<()>>(),
+            );
             inv.nodes.insert(name.clone(), info);
         }
         Ok(inv)
