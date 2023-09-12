@@ -27,6 +27,15 @@ def test_nodeinfo_n1():
     }
 
 
+def test_nodeinfo_n1_meta_symlink():
+    r = reclass_rs.Reclass(
+        nodes_path="./tests/inventory/targets", classes_path="./tests/inventory/classes"
+    )
+    n = r.nodeinfo("n1")
+    npath = Path("./tests/inventory/targets/n1.yml").absolute()
+    assert n.__reclass__.uri == f"yaml_fs://{npath}"
+
+
 def test_nodeinfo_n2():
     r = reclass_rs.Reclass(
         nodes_path="./tests/inventory/nodes", classes_path="./tests/inventory/classes"
