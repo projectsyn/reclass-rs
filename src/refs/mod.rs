@@ -182,7 +182,7 @@ impl std::fmt::Display for Token {
         }
         match self {
             Token::Literal(s) => {
-                write!(f, "{}", s.clone().replace('\\', r"\\").replace('$', r"\$"))
+                write!(f, "{}", s.replace('\\', r"\\").replace('$', r"\$"))
             }
             Token::Ref(ts) => {
                 let refcontent = flatten(ts);
