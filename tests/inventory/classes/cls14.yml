@@ -1,0 +1,7 @@
+classes:
+  - cls15
+parameters:
+  foo:
+    bar: bar
+    baz: baz
+    qux: qux

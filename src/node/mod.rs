@@ -300,19 +300,23 @@ impl Node {
 }
 
 #[cfg(test)]
+fn make_reclass() -> Reclass {
+    Reclass::new(
+        "./tests/inventory/nodes",
+        "./tests/inventory/classes",
+        false,
+    )
+    .unwrap()
+}
+
+#[cfg(test)]
 mod node_tests {
     use super::*;
-    use crate::types::Value;
     use std::str::FromStr;
 
     #[test]
     fn test_parse() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
+        let r = make_reclass();
         let n = Node::parse(&r, "n1").unwrap();
         assert_eq!(
             n.classes,
@@ -335,12 +339,7 @@ mod node_tests {
     #[test]
     #[should_panic(expected = "Unknown node n0")]
     fn test_parse_error() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
+        let r = make_reclass();
         Node::parse(&r, "n0").unwrap();
     }
 
@@ -528,12 +527,7 @@ mod node_tests {
 
     #[test]
     fn test_read_class() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
+        let r = make_reclass();
         let n = Node::parse(&r, "n1").unwrap();
         let c = n.read_class(&r, "cls1").unwrap().unwrap();
         let expected = r#"
@@ -548,12 +542,7 @@ mod node_tests {
 
     #[test]
     fn test_read_class_relative() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
+        let r = make_reclass();
         let n = Node::parse(&r, "n1").unwrap();
         let c1 = n.read_class(&r, "nested.cls1").unwrap().unwrap();
         let c2 = c1.read_class(&r, ".cls2").unwrap().unwrap();
@@ -564,162 +553,7 @@ mod node_tests {
         let expected = Mapping::from_str(expected).unwrap();
         assert_eq!(c2.parameters, expected);
     }
-
-    #[test]
-    fn test_render_n1() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
-        let mut n = Node::parse(&r, "n1").unwrap();
-        assert_eq!(
-            n.classes,
-            UniqueList::from(vec!["cls1".to_owned(), "cls2".to_owned()])
-        );
-        assert_eq!(
-            n.applications,
-            RemovableList::from(vec!["app1".to_owned(), "app2".to_owned()])
-        );
-
-        n.render(&r).unwrap();
-
-        let expected = r#"
-        foo:
-          foo: foo
-          bar: cls2
-          baz: cls1
-        bar:
-          foo: foo
-        _reclass_:
-          environment: base
-          name:
-            short: n1
-            parts: ["n1"]
-            full: n1
-            path: n1
-        "#;
-        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
-        expected.render(&Mapping::new()).unwrap();
-        let params: Value = n.parameters.into();
-
-        assert_eq!(params, expected);
-    }
-
-    #[test]
-    fn test_render_n2() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
-        let mut n = Node::parse(&r, "n2").unwrap();
-        assert_eq!(n.classes, UniqueList::from(vec!["nested.cls1".to_owned()]));
-        assert_eq!(n.applications, RemovableList::from(vec![]));
-
-        n.render(&r).unwrap();
-
-        assert_eq!(
-            n.classes,
-            UniqueList::from(vec!["nested.cls2".to_owned(), "nested.cls1".to_owned()])
-        );
-
-        let expected = r#"
-        foo:
-          foo: nested.cls1
-          bar: n2
-        bar: bar
-        _reclass_:
-          environment: base
-          name:
-            short: n2
-            parts: ["n2"]
-            full: n2
-            path: n2
-        "#;
-        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
-        expected.render(&Mapping::new()).unwrap();
-        let params: Value = n.parameters.into();
-
-        dbg!(&params);
-
-        assert_eq!(params, expected);
-    }
-
-    #[test]
-    fn test_render_n3() {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
-        let mut n = Node::parse(&r, "n3").unwrap();
-        n.render(&r).unwrap();
-        let params: Value = n.parameters.into();
-
-        let expected = r#"
-        cluster:
-          name: c-test-cluster-1234
-        openshift:
-          infraID: c-test-cluster-1234-xlk3f
-          clusterID: 2888efd2-8a1b-4846-82ec-3a99506e2c70
-          baseDomain: c-test-cluster-1234.example.org
-          appsDomain: apps.c-test-cluster-1234.example.org
-          apiURL: api.c-test-cluster-1234.example.org
-          ssh_key: ""
-        _reclass_:
-          environment: base
-          name:
-            short: n3
-            parts: ["n3"]
-            full: n3
-            path: n3
-        "#;
-        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
-        expected.render(&Mapping::new()).unwrap();
-
-        assert_eq!(params, expected);
-    }
-
-    #[test]
-    fn test_render_n4() {
-        // Test case to cover class name with references
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
-
-        let mut n = Node::parse(&r, "n4").unwrap();
-        n.render(&r).unwrap();
-        assert_eq!(
-            n.classes,
-            UniqueList::from(vec!["cls8".into(), "${qux}".into(), "cls7".into()])
-        );
-        assert_eq!(n.applications, RemovableList::from(vec![]));
-
-        let params: Value = n.parameters.into();
-        let expected = r#"
-        foo:
-          foo: cls1
-          bar: cls1
-          baz: cls1
-        qux: cls1
-        _reclass_:
-          environment: base
-          name:
-            short: n4
-            parts: ["n4"]
-            full: n4
-            path: n4
-        "#;
-        let mut expected: Value = Mapping::from_str(expected).unwrap().into();
-        expected.render(&Mapping::new()).unwrap();
-
-        assert_eq!(params, expected);
-    }
 }
+
+#[cfg(test)]
+mod node_render_tests;

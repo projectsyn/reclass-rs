@@ -1,0 +1,7 @@
+classes:
+  - cls14
+parameters:
+  foo:
+    bar: n19
+  baz:
+    qux: n19

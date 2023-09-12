@@ -1,0 +1,7 @@
+parameters:
+  =constant: foo
+  foo: foo
+  foolist:
+    - a
+    - b
+    - c

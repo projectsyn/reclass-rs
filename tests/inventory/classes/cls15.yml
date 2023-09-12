@@ -1,0 +1,4 @@
+parameters:
+  ~baz:
+    baz: cls7
+    foo: cls7

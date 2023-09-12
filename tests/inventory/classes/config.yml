@@ -1,0 +1,3 @@
+parameters:
+  tenant: foo
+  cluster: bar

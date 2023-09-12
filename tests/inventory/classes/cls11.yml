@@ -1,0 +1,3 @@
+parameters:
+  baz: baz
+  fooer: ${foo}

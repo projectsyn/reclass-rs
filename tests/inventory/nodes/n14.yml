@@ -1,0 +1,9 @@
+classes:
+  - cls9
+  - cls13
+
+parameters:
+  target: n10
+
+  obj: ${foodict}
+  list: ${foolist}

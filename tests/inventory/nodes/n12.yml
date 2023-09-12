@@ -1,0 +1,13 @@
+# NOTE(sg): Python reclass and reclass_rs will generate different final
+# contents of `applications`. Python reclass will have applications=[c,a,b],
+# which reclass_rs will have applications=[c,a]
+applications:
+  - a
+  - b
+
+classes:
+  - cls9
+  - app1
+
+parameters:
+  target: n8

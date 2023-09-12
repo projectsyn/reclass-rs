@@ -48,6 +48,21 @@ impl Inventory {
                     .and_modify(|nodes: &mut Vec<String>| nodes.push(name.clone()))
                     .or_insert(vec![name.clone()]);
             }
+            // Ensure application and classes values are sorted. We need to consume the iterator,
+            // but we don't care about the vec of unit types which results from calling sort on the
+            // values_mut() elements, so we directly drop the resulting Vec.
+            drop(
+                inv.classes
+                    .values_mut()
+                    .map(|v| v.sort())
+                    .collect::<Vec<()>>(),
+            );
+            drop(
+                inv.applications
+                    .values_mut()
+                    .map(|v| v.sort())
+                    .collect::<Vec<()>>(),
+            );
             inv.nodes.insert(name.clone(), info);
         }
         Ok(inv)
@@ -87,7 +102,8 @@ mod inventory_tests {
         let r = Reclass::new(
             "./tests/inventory/nodes",
             "./tests/inventory/classes",
-            false,
+            // n18 includes a nonexistent class
+            true,
         )
         .unwrap();
         let inv = Inventory::render(&r).unwrap();
@@ -96,34 +112,82 @@ mod inventory_tests {
         // have individual tests for each NodeInfo in `src/node`.
         let mut nodes = inv.nodes.keys().cloned().collect::<Vec<String>>();
         nodes.sort();
-        assert_eq!(
-            nodes,
-            (1..=4).map(|n| format!("n{n}")).collect::<Vec<String>>()
-        );
 
-        // applications should contain app[1-2]
+        let mut expected_nodes = (1..=23).map(|n| format!("n{n}")).collect::<Vec<String>>();
+        expected_nodes.sort();
+
+        assert_eq!(nodes, expected_nodes);
+
+        // applications should contain app[1-2], [a-d]
         let mut expected_applications = HashMap::<String, Vec<String>>::new();
         expected_applications.insert("app1".into(), vec!["n1".into()]);
         expected_applications.insert("app2".into(), vec!["n1".into()]);
+        expected_applications.insert("a".into(), vec!["n12".into(), "n13".into()]);
+        expected_applications.insert("b".into(), vec!["n13".into()]);
+        expected_applications.insert("c".into(), vec!["n12".into()]);
+        expected_applications.insert("d".into(), vec!["n13".into()]);
+
         assert_eq!(inv.applications, expected_applications);
 
-        // classes should contain:
-        // * cls[1-8]
-        // * ${qux} -- interpolated as cls1 for n4, but both Python reclass and our implementation
-        // have the uninterpolated class name in the classes list.
-        // * nested.cls[1-2]
+        // classes should match the hash map defined below.
+        // Note that classes with parameter references are tracked unrendered and the rendered
+        // variants aren't added to the classes list for the node. Here's the expected
+        // rendered values:
+        // * ${cls9} -- rendered as cls9 for n15
+        // * ${qux} -- rendered as cls1 for n4
+        // * ${tenant}.${cluster} -- rendered as foo.bar for n16
+        // * \${baz} -- rendered as `${baz}` for n17
+        // * cluster.${dist} -- rendered as cluster.foo for n19
+
         let mut expected_classes = HashMap::<String, Vec<String>>::new();
+        expected_classes.insert("${cls9}".into(), vec!["n15".into()]);
+        expected_classes.insert("${qux}".into(), vec!["n4".into()]);
+        expected_classes.insert("${tenant}.${cluster}".into(), vec!["n16".into()]);
+        expected_classes.insert("\\${baz}".into(), vec!["n17".into()]);
+        expected_classes.insert("app1".into(), vec!["n12".into()]);
+        expected_classes.insert("app2".into(), vec!["n13".into()]);
         expected_classes.insert("cls1".into(), vec!["n1".into()]);
         expected_classes.insert("cls2".into(), vec!["n1".into()]);
-        expected_classes.insert("nested.cls1".into(), vec!["n2".into()]);
-        expected_classes.insert("nested.cls2".into(), vec!["n2".into()]);
         expected_classes.insert("cls3".into(), vec!["n3".into()]);
         expected_classes.insert("cls4".into(), vec!["n3".into()]);
         expected_classes.insert("cls5".into(), vec!["n3".into()]);
         expected_classes.insert("cls6".into(), vec!["n3".into()]);
         expected_classes.insert("cls7".into(), vec!["n4".into()]);
         expected_classes.insert("cls8".into(), vec!["n4".into()]);
-        expected_classes.insert("${qux}".into(), vec!["n4".into()]);
+        expected_classes.insert(
+            "cls9".into(),
+            vec![
+                "n10".into(),
+                "n12".into(),
+                "n13".into(),
+                "n14".into(),
+                "n18".into(),
+                "n5".into(),
+                "n6".into(),
+                "n7".into(),
+                "n9".into(),
+            ],
+        );
+        expected_classes.insert("cls9_meta".into(), vec!["n15".into()]);
+        expected_classes.insert("cls10".into(), vec!["n13".into(), "n5".into(), "n9".into()]);
+        expected_classes.insert("cls11".into(), vec!["n6".into()]);
+        expected_classes.insert("cls12".into(), vec!["n9".into()]);
+        expected_classes.insert("cls13".into(), vec!["n14".into()]);
+        expected_classes.insert("cls14".into(), vec!["n23".into()]);
+        expected_classes.insert("cls15".into(), vec!["n23".into()]);
+        expected_classes.insert("cluster.${dist}".into(), vec!["n19".into()]);
+        expected_classes.insert("cluster.default".into(), vec!["n19".into()]);
+        expected_classes.insert("cluster.facts".into(), vec!["n19".into()]);
+        expected_classes.insert("cluster.global".into(), vec!["n19".into()]);
+        expected_classes.insert("config".into(), vec!["n16".into()]);
+        expected_classes.insert("foo-indirect".into(), vec!["n20".into()]);
+        expected_classes.insert("nested.a".into(), vec!["n8".into()]);
+        expected_classes.insert("nested.a_sub".into(), vec!["n8".into(), "n9".into()]);
+        expected_classes.insert("nested.b".into(), vec!["n10".into()]);
+        expected_classes.insert("nested.cls1".into(), vec!["n2".into()]);
+        expected_classes.insert("nested.cls2".into(), vec!["n2".into()]);
+        expected_classes.insert("nonexisting".into(), vec!["n18".into()]);
+        expected_classes.insert("yaml-anchor".into(), vec!["n21".into()]);
 
         assert_eq!(inv.classes, expected_classes);
     }

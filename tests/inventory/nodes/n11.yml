@@ -1,0 +1,8 @@
+parameters:
+  foo: foo
+  bar:
+    foo: "7"
+    foo_int: 7
+
+  target: n${bar:${foo}}
+  target_int: n${bar:foo_int}
