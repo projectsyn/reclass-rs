@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use chrono::Local;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 use super::{NodeInfo, Reclass};
@@ -28,8 +29,8 @@ impl Inventory {
         // Render all nodes
         let infos: Vec<_> = r
             .nodes
-            .keys()
-            .map(|name| (name, { r.render_node(name) }))
+            .par_iter()
+            .map(|(name, _)| (name, { r.render_node(name) }))
             .collect();
 
         // Generate `Inventory` from the rendered nodes
