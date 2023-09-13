@@ -220,3 +220,45 @@ fn test_resolve_mapping_embedded() {
         Value::Literal(r#"foo: {"bar":"bar","baz":"baz"}"#.to_string())
     );
 }
+
+#[test]
+#[should_panic(expected = "Token resolution exceeded recursion depth of 64.")]
+fn test_resolve_recursive_error() {
+    let p = r#"
+    foo: ${foo}
+    "#;
+    let p = Mapping::from_str(p).unwrap();
+    let reftoken = parse_ref("${foo}").unwrap();
+
+    let mut state = ResolveState::default();
+    let _v = reftoken.resolve(&p, &mut state).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Token resolution exceeded recursion depth of 64.")]
+fn test_resolve_recursive_error_2() {
+    let p = r#"
+    foo: ${bar}
+    bar: ${foo}
+    "#;
+    let p = Mapping::from_str(p).unwrap();
+    let reftoken = parse_ref("${foo}").unwrap();
+
+    let mut state = ResolveState::default();
+    let _v = reftoken.resolve(&p, &mut state).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Token resolution exceeded recursion depth of 64.")]
+fn test_resolve_nested_recursive_error() {
+    let p = r#"
+    foo: ${baz}
+    baz:
+      qux: ${foo}
+    "#;
+    let p = Mapping::from_str(p).unwrap();
+    let reftoken = parse_ref("${foo}").unwrap();
+
+    let mut state = ResolveState::default();
+    let _v = reftoken.resolve(&p, &mut state).unwrap();
+}

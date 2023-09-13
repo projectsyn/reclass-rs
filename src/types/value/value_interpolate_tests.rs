@@ -412,3 +412,158 @@ fn test_merge_interpolate_embedded_nested_ref() {
         .unwrap();
     assert_eq!(val, &Value::Literal("baz-foo-1.22".into()));
 }
+
+#[test]
+fn test_interpolate_duplicate_ref_no_loop() {
+    let base = r#"
+    foo:
+      bar: ${baz}-${baz}
+    baz: baz
+    "#;
+    let base = Mapping::from_str(base).unwrap();
+
+    let p = base.render(&base).unwrap();
+
+    let expected = Mapping::from_str("{foo: {bar: baz-baz}, baz: baz}").unwrap();
+    let expected = expected.render(&Mapping::new()).unwrap();
+    assert_eq!(p, expected);
+}
+
+#[test]
+fn test_interpolate_sequence_duplicate_ref_no_loop() {
+    let base = r#"
+    foo:
+      bar:
+      - ${baz}
+      - ${baz}
+    baz: baz
+    "#;
+    let base = Mapping::from_str(base).unwrap();
+
+    let p = base.render(&base).unwrap();
+
+    let expected = Mapping::from_str("{foo: {bar: [baz, baz]}, baz: baz}").unwrap();
+    let expected = expected.render(&Mapping::new()).unwrap();
+    assert_eq!(p, expected);
+}
+
+#[test]
+fn test_interpolate_nested_mapping_no_loop() {
+    let base = r#"
+    foo:
+      bar:
+        baz: ${foo:baz:bar}
+        qux: foo
+      baz:
+        bar: qux
+        qux: ${foo:bar:qux}
+    "#;
+    let base = Mapping::from_str(base).unwrap();
+
+    let p = base.render(&base).unwrap();
+
+    let expected =
+        Mapping::from_str("{foo: {bar: {baz: qux, qux: foo}, baz: {bar: qux, qux: foo}}}").unwrap();
+    let expected = expected.render(&Mapping::new()).unwrap();
+    assert_eq!(p, expected);
+}
+
+#[test]
+#[should_panic(expected = "While resolving references in \
+    {\"foo\": {\"bar\": \"${bar}\"}, \"bar\": [{\"baz\": \"baz\", \"qux\": \"qux\"}, \
+    {\"baz\": \"${foo}\"}]}: Token resolution exceeded recursion depth of 64.")]
+fn test_merge_interpolate_loop() {
+    let base = r#"
+    foo:
+      bar: ${bar}
+    bar:
+      baz: baz
+      qux: qux
+    "#;
+    let base = Mapping::from_str(base).unwrap();
+    let config1 = r#"
+    bar:
+      baz: ${foo}
+    "#;
+    let config1 = Mapping::from_str(config1).unwrap();
+
+    let mut p = Mapping::new();
+    p.merge(&base).unwrap();
+    p.merge(&config1).unwrap();
+
+    let mut v = Value::from(p);
+    v.render_with_self().unwrap();
+}
+
+#[test]
+#[should_panic(expected = "While resolving references in \
+     {\"foo\": {\"bar\": [\"${bar}\", \"${baz}\"]}, \"bar\": \"${qux}\", \
+     \"baz\": {\"bar\": \"${foo}\"}, \"qux\": 3.14}: \
+     Token resolution exceeded recursion depth of 64.")]
+fn test_interpolate_sequence_loop() {
+    let base = r#"
+    foo:
+      bar:
+      - ${bar}
+      - ${baz}
+    bar: ${qux}
+    baz:
+      bar: ${foo}
+    qux: 3.14
+    "#;
+    let base = Mapping::from_str(base).unwrap();
+
+    let mut v = Value::from(base);
+    v.render_with_self().unwrap();
+}
+
+#[test]
+#[should_panic(expected = "While resolving references in \
+    {\"foo\": {\"bar\": {\"baz\": \"${foo:baz:bar}\", \"qux\": \"${foo:qux:foo}\"}, \
+    \"baz\": {\"bar\": \"qux\", \"qux\": \"${foo:bar:qux}\"}, \"qux\": \
+    {\"foo\": \"${foo:baz:qux}\"}}}: \
+    Token resolution exceeded recursion depth of 64.")]
+fn test_interpolate_nested_mapping_loop() {
+    let m = r#"
+    foo:
+      bar:
+        baz: ${foo:baz:bar}
+        qux: ${foo:qux:foo}
+      baz:
+        bar: qux
+        qux: ${foo:bar:qux}
+      qux:
+        foo: ${foo:baz:qux}
+    "#;
+    let m = Mapping::from_str(m).unwrap();
+
+    let mut v = Value::from(m);
+    v.render_with_self().unwrap();
+}
+
+#[test]
+#[should_panic(
+    expected = "While resolving references in \"${foo:${foo:${foo:${foo:${foo:\
+        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
+        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
+        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
+        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
+        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
+        ${foo:${foo:${foo:${foo:${foo:${foo}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}\
+        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}\": \
+        Token resolution exceeded recursion depth of 64."
+)]
+fn test_interpolate_depth_exceeded() {
+    // construct a reference string which is a nested sequence of ${foo:....${foo}} with 70 nesting
+    // levels. Note that the expected error has an empty list of reference paths because we hit the
+    // recursion limit before we even manage to construct the initial ref path in
+    // `Token::resolve()`.
+    let refstr = (0..70).fold("${foo}".to_string(), |s, _| format!("${{foo:{s}}}"));
+    let map = (0..70).fold(Mapping::from_str("foo: bar").unwrap(), |m, _| {
+        let mut n = Mapping::new();
+        n.insert("foo".into(), Value::Mapping(m)).unwrap();
+        n
+    });
+    let v = Value::from(refstr);
+    v.rendered(&map).unwrap();
+}
