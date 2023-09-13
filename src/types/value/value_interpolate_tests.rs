@@ -2,12 +2,22 @@ use super::*;
 
 use std::str::FromStr;
 
+impl Mapping {
+    pub(super) fn render(&self, root: &Self) -> Result<Self> {
+        let mut state = ResolveState::default();
+        self.interpolate(root, &mut state)
+    }
+}
+
 fn sequence_literal(v: Vec<Value>) -> Value {
-    Value::Sequence(v).interpolate(&Mapping::new()).unwrap()
+    let mut state = ResolveState::default();
+    Value::Sequence(v)
+        .interpolate(&Mapping::new(), &mut state)
+        .unwrap()
 }
 
 fn mapping_literal(m: Mapping) -> Value {
-    Value::Mapping(m.interpolate(&Mapping::new()).unwrap())
+    Value::Mapping(m.render(&Mapping::new()).unwrap())
 }
 
 #[test]
@@ -23,7 +33,7 @@ fn test_extend_sequence() {
         .unwrap();
 
     p.merge(&o).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(
         p.get(&"l".into()).unwrap(),
@@ -47,7 +57,7 @@ fn test_override_sequence() {
     .unwrap();
 
     p.merge(&o).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(
         p.get(&"l".into()).unwrap(),
@@ -78,7 +88,7 @@ fn test_extend_mapping() {
         .unwrap();
 
     p.merge(&o).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(r));
 }
@@ -100,7 +110,7 @@ fn test_override_mapping() {
         .unwrap();
 
     p.merge(&o).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(n));
 }
@@ -153,7 +163,7 @@ fn test_embedded_ref() {
     .unwrap();
 
     p.merge(&m).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"foo".into()).unwrap(), &Value::Literal("foo".into()));
     assert_eq!(
@@ -189,7 +199,7 @@ fn test_ref_in_sequence() {
     .unwrap();
 
     p.merge(&m).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"foo".into()).unwrap(), &Value::Literal("foo".into()));
     assert_eq!(p.get(&"bar".into()).unwrap(), &Value::Literal("bar".into()));
@@ -220,7 +230,7 @@ fn test_nested_ref() {
     .unwrap();
 
     p.merge(&m).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     assert_eq!(
         p.get(&"ref".into()).unwrap(),
@@ -246,7 +256,7 @@ fn test_merge_over_ref() {
     let overlay = Mapping::from_str(overlay).unwrap();
     p.merge(&overlay).unwrap();
 
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
     dbg!(&p);
 
     let merged_foo = r#"
@@ -279,7 +289,7 @@ fn test_merge_over_ref_nested() {
     let overlay = Mapping::from_str(overlay).unwrap();
 
     p.merge(&overlay).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     let merged_some = r#"
     foo:
@@ -314,7 +324,7 @@ fn test_merge_over_null() {
     let overlay = Mapping::from_str(overlay).unwrap();
 
     p.merge(&overlay).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     let merged_some = r#"
     foo:
@@ -345,7 +355,7 @@ fn test_merge_null() {
     let overlay = Mapping::from_str(overlay).unwrap();
 
     p.merge(&overlay).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     let merged_some = r#"
     foo: null"#;
@@ -391,7 +401,7 @@ fn test_merge_interpolate_embedded_nested_ref() {
     "#;
     let config2 = Mapping::from_str(config2).unwrap();
     p.merge(&config2).unwrap();
-    p = p.interpolate(&p).unwrap();
+    p = p.render(&p).unwrap();
 
     let val = p
         .get(&"foo".into())

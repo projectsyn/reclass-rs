@@ -10,6 +10,7 @@ use std::hash::{Hash, Hasher};
 
 use super::value::Value;
 use super::KeyPrefix;
+use crate::refs::ResolveState;
 
 /// Represents a YAML mapping in a form suitable to manage Reclass parameters.
 ///
@@ -356,10 +357,16 @@ impl Mapping {
     /// The method looks up reference values in parameter `root`. After interpolation of each
     /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
-    pub(super) fn interpolate(&self, root: &Self) -> Result<Self> {
+    pub(super) fn interpolate(&self, root: &Self, state: &mut ResolveState) -> Result<Self> {
         let mut res = Self::new();
         for (k, v) in self {
-            let mut v = v.interpolate(root)?;
+            // Reference loops in mappings can't be stretched across key-value pairs, so we pass a
+            // copy of the resolution state we're called with to the `interpolate` call for each
+            // value. Also, we don't need to update the state which we were called with, since we
+            // either manage to interpolate a value (in which case it doesn't contain a loop) or we
+            // don't and the whole interpolation is aborted.
+            let mut st = state.clone();
+            let mut v = v.interpolate(root, &mut st)?;
             v.flatten()?;
             res.insert(k.clone(), v)?;
         }

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use yaml_merge_keys::merge_keys_serde;
 
 use crate::list::{List, RemovableList, UniqueList};
-use crate::refs::Token;
+use crate::refs::{ResolveState, Token};
 use crate::types::{Mapping, Value};
 use crate::{to_lexical_absolute, Reclass};
 
@@ -216,7 +216,10 @@ impl Node {
                 if let Some(clstoken) = clstoken {
                     // If we got a token, render it, and convert it into a string with
                     // `raw_string()` to ensure no spurious quotes are injected.
-                    clstoken.render(&root.parameters)?.raw_string()?
+                    let mut state = ResolveState::default();
+                    clstoken
+                        .render(&root.parameters, &mut state)?
+                        .raw_string()?
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
                     // just convert cls into an owned String.
