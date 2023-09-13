@@ -222,7 +222,7 @@ fn test_resolve_mapping_embedded() {
 }
 
 #[test]
-#[should_panic(expected = "Token resolution exceeded recursion depth of 64.")]
+#[should_panic(expected = "Reference loop with reference paths [\"foo\"].")]
 fn test_resolve_recursive_error() {
     let p = r#"
     foo: ${foo}
@@ -235,7 +235,7 @@ fn test_resolve_recursive_error() {
 }
 
 #[test]
-#[should_panic(expected = "Token resolution exceeded recursion depth of 64.")]
+#[should_panic(expected = "Reference loop with reference paths [\"bar\", \"foo\"].")]
 fn test_resolve_recursive_error_2() {
     let p = r#"
     foo: ${bar}
@@ -249,7 +249,7 @@ fn test_resolve_recursive_error_2() {
 }
 
 #[test]
-#[should_panic(expected = "Token resolution exceeded recursion depth of 64.")]
+#[should_panic(expected = "Reference loop with reference paths [\"baz\", \"foo\"].")]
 fn test_resolve_nested_recursive_error() {
     let p = r#"
     foo: ${baz}

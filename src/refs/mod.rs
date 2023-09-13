@@ -3,6 +3,7 @@ mod parser;
 use crate::types::{Mapping, Value};
 use anyhow::{anyhow, Result};
 use nom::error::{convert_error, VerboseError};
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Eq)]
 /// Represents a parsed Reclass reference
@@ -18,9 +19,24 @@ pub enum Token {
 
 #[derive(Clone, Debug, Default)]
 pub struct ResolveState {
+    /// Reference paths which we've seen during reference resolution
+    seen_paths: HashSet<String>,
     /// Recursion depth of the resolution (in number of calls to Token::resolve() for Token::Ref
     /// objects).
     depth: usize,
+}
+
+impl ResolveState {
+    /// Formats paths that have been seen as a comma-separated list.
+    fn seen_paths_list(&self) -> String {
+        let mut paths = self
+            .seen_paths
+            .iter()
+            .map(|p| format!("\"{p}\""))
+            .collect::<Vec<String>>();
+        paths.sort();
+        paths.join(", ")
+    }
 }
 
 /// Maximum allowed recursion depth for Token::resolve(). We're fairly conservative with the value,
@@ -98,13 +114,23 @@ impl Token {
                     // implementation. We abort at a recursion depth of 64, since it's quite
                     // unlikely that there's a legitimate case where we have a recursion depth of
                     // 64 when resolving references for a well formed inventory.
+                    let paths = state.seen_paths_list();
                     return Err(anyhow!(
-                        "Token resolution exceeded recursion depth of {RESOLVE_MAX_DEPTH}."
+                        "Token resolution exceeded recursion depth of {RESOLVE_MAX_DEPTH}. \
+                        We've seen the following reference paths: [{paths}].",
                     ));
                 }
                 // Construct flattened ref path by resolving any potential nested references in the
                 // Ref's Vec<Token>.
                 let path = interpolate_token_slice(parts, params, state)?;
+
+                if state.seen_paths.contains(&path) {
+                    // we've already seen this reference, so we know there's a loop, and can abort
+                    // resolution.
+                    let paths = state.seen_paths_list();
+                    return Err(anyhow!("Reference loop with reference paths [{paths}]."));
+                }
+                state.seen_paths.insert(path.clone());
 
                 // generate iterator containing flattened reference path segments
                 let mut refpath_iter = path.split(':');
