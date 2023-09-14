@@ -7,9 +7,26 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
+      - uses: actions/checkout@v4
+      - name: Extract Git version from ref
+        id: git_version
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/})" >> ${GITHUB_OUTPUT}
+        env:
+          GITHUB_REF: ${{ github.ref }}
+      - name: Read Cargo.toml
+        id: cargo_version
+        uses: SebRollen/toml-action@v1.0.2
+        with:
+          file: Cargo.toml
+          field: package.version
+      - name: Verify that tag matches Cargo.toml version
+        run: |
+          if [ "v${{ steps.cargo_version.outputs.value }}" != "${{ steps.git_version.outputs.version }}" ]; then
+            exit 1
+          fi
       - name: Build changelog from PRs with labels
-        if: startsWith(github.ref, 'refs/tags/v')
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@v4
         with:
@@ -22,7 +39,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Read release message from tag commit
         id: tag_message
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           git fetch origin +refs/tags/*:refs/tags/*
           # Extract tag message
@@ -40,7 +56,6 @@ jobs:
         env:
           GITHUB_REF: ${{ github.ref }}
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: ncipollo/release-action@v1
         with:
           body: "# Summary\n\n${{steps.tag_message.outputs.message}}\n\n# Changes\n\n${{steps.build_changelog.outputs.changelog}}"
