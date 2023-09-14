@@ -3,6 +3,7 @@ mod parser;
 use crate::types::{Mapping, Value};
 use anyhow::{anyhow, Result};
 use nom::error::{convert_error, VerboseError};
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Eq)]
 /// Represents a parsed Reclass reference
@@ -15,6 +16,33 @@ pub enum Token {
     /// interspersed non-reference sections.
     Combined(Vec<Token>),
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct ResolveState {
+    /// Reference paths which we've seen during reference resolution
+    seen_paths: HashSet<String>,
+    /// Recursion depth of the resolution (in number of calls to Token::resolve() for Token::Ref
+    /// objects).
+    depth: usize,
+}
+
+impl ResolveState {
+    /// Formats paths that have been seen as a comma-separated list.
+    fn seen_paths_list(&self) -> String {
+        let mut paths = self
+            .seen_paths
+            .iter()
+            .map(|p| format!("\"{p}\""))
+            .collect::<Vec<String>>();
+        paths.sort();
+        paths.join(", ")
+    }
+}
+
+/// Maximum allowed recursion depth for Token::resolve(). We're fairly conservative with the value,
+/// since it's rather unlikely that a well-formed inventory will have any references that are
+/// nested deeper than 64.
+const RESOLVE_MAX_DEPTH: usize = 64;
 
 impl Token {
     /// Parses an arbitrary string into a `Token`. Returns None, if the string doesn't contain any
@@ -48,25 +76,25 @@ impl Token {
     /// the Mapping provided through parameter `params`.
     ///
     /// The heavy lifting is done by `Token::resolve()`.
-    pub fn render(&self, params: &Mapping) -> Result<Value> {
+    pub fn render(&self, params: &Mapping, state: &mut ResolveState) -> Result<Value> {
         if self.is_ref() {
             // handle value refs (i.e. refs where the full value of the key is replaced)
             // We call `interpolate()` after `resolve()` to ensure that we fully interpolate all
             // references if the result of `resolve()` is a complex Value (Mapping or Sequence).
-            self.resolve(params)?.interpolate(params)
+            self.resolve(params, state)?.interpolate(params, state)
         } else {
-            Ok(Value::Literal(self.resolve(params)?.raw_string()?))
+            Ok(Value::Literal(self.resolve(params, state)?.raw_string()?))
         }
     }
 
     /// Resolves the Token into a [`Value`]. References are looked up in the provided `params`
     /// Mapping.
-    fn resolve(&self, params: &Mapping) -> Result<Value> {
+    fn resolve(&self, params: &Mapping, state: &mut ResolveState) -> Result<Value> {
         match self {
             // Literal tokens can be directly turned into `Value::Literal`
             Self::Literal(s) => Ok(Value::Literal(s.to_string())),
             Self::Combined(tokens) => {
-                let res = interpolate_token_slice(tokens, params)?;
+                let res = interpolate_token_slice(tokens, params, state)?;
                 // The result of `interpolate_token_slice()` for a `Token::Combined()` can't result
                 // in more unresolved refs since we iterate over each segment until there's no
                 // Value::String() left, so we return a Value::Literal().
@@ -76,9 +104,33 @@ impl Token {
             // `interpolate_token_slice()`. Then we split the resolved reference path into segments
             // on `:` and iteratively look up each segment in the provided `params` Mapping.
             Self::Ref(parts) => {
+                // We track the number of calls to `Token::resolve()` for Token::Ref that the
+                // current `state` has seen in state.depth.
+                state.depth += 1;
+                if state.depth > RESOLVE_MAX_DEPTH {
+                    // If we've called `Token::resolve()` more than RESOLVE_MAX_DEPTH (64) times
+                    // recursively, it's likely that there's still an edge case where we don't
+                    // detect a reference loop with the current reference path tracking
+                    // implementation. We abort at a recursion depth of 64, since it's quite
+                    // unlikely that there's a legitimate case where we have a recursion depth of
+                    // 64 when resolving references for a well formed inventory.
+                    let paths = state.seen_paths_list();
+                    return Err(anyhow!(
+                        "Token resolution exceeded recursion depth of {RESOLVE_MAX_DEPTH}. \
+                        We've seen the following reference paths: [{paths}].",
+                    ));
+                }
                 // Construct flattened ref path by resolving any potential nested references in the
                 // Ref's Vec<Token>.
-                let path = interpolate_token_slice(parts, params)?;
+                let path = interpolate_token_slice(parts, params, state)?;
+
+                if state.seen_paths.contains(&path) {
+                    // we've already seen this reference, so we know there's a loop, and can abort
+                    // resolution.
+                    let paths = state.seen_paths_list();
+                    return Err(anyhow!("Reference loop with reference paths [{paths}]."));
+                }
+                state.seen_paths.insert(path.clone());
 
                 // generate iterator containing flattened reference path segments
                 let mut refpath_iter = path.split(':');
@@ -122,7 +174,7 @@ impl Token {
                         // individual references are resolved, and always do value lookups on
                         // resolved references.
                         Value::String(_) => {
-                            newv = v.interpolate(params)?;
+                            newv = v.interpolate(params, state)?;
                             v = newv.get(&key.into()).ok_or_else(|| {
                                 anyhow!("unable to lookup key '{key}' for '{path}'")
                             })?;
@@ -130,8 +182,12 @@ impl Token {
                         Value::ValueList(l) => {
                             let mut i = vec![];
                             for v in l {
+                                // When resolving references in ValueLists, we want to track state
+                                // separately for each layer, since reference loops can't be
+                                // stretched across layers.
+                                let mut st = state.clone();
                                 let v = if v.is_string() {
-                                    v.interpolate(params)?
+                                    v.interpolate(params, &mut st)?
                                 } else {
                                     v.clone()
                                 };
@@ -159,9 +215,9 @@ impl Token {
                 let mut v = v.clone();
                 // Finally, we iteratively interpolate `v` while it's a `Value::String()` or
                 // `Value::ValueList`. This ensures that the returned Value will never contain
-                // further references.
+                // further references. Here, we want to continue tracking the state normally.
                 while v.is_string() || v.is_value_list() {
-                    v = v.interpolate(params)?;
+                    v = v.interpolate(params, state)?;
                 }
                 Ok(v)
             }
@@ -195,15 +251,23 @@ impl std::fmt::Display for Token {
 
 /// Interpolate a `Vec<Token>`. Called from `Token::resolve()` for `Token::Combined` and
 /// `Token::Ref` Vecs.
-fn interpolate_token_slice(tokens: &[Token], params: &Mapping) -> Result<String> {
+fn interpolate_token_slice(
+    tokens: &[Token],
+    params: &Mapping,
+    state: &mut ResolveState,
+) -> Result<String> {
     // Iterate through each element of the Vec, and call Token::resolve() on each element.
     // Additionally, we repeatedly call `Value::interpolate()` on the resolved value for each
     // element, as long as that Value is a `Value::String`.
     let mut res = String::new();
     for t in tokens {
-        let mut v = t.resolve(params)?;
+        // Multiple separate refs in a combined or ref token can't form loops between each other.
+        // Each individual ref can still be part of a loop, so we make a fresh copy of the input
+        // state before resolving each element.
+        let mut st = state.clone();
+        let mut v = t.resolve(params, &mut st)?;
         while v.is_string() {
-            v = v.interpolate(params)?;
+            v = v.interpolate(params, &mut st)?;
         }
         res.push_str(&v.raw_string()?);
     }

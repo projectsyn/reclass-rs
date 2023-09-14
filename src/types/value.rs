@@ -8,7 +8,7 @@ use std::mem;
 
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
-use crate::refs::Token;
+use crate::refs::{ResolveState, Token};
 
 /// Represents a YAML value in a form suitable for processing Reclass parameters.
 #[derive(Clone, Debug, PartialEq)]
@@ -528,14 +528,14 @@ impl Value {
     ///
     /// Note that users should prefer calling `Value::rendered()` or one of its in-place variants
     /// over this method.
-    pub(crate) fn interpolate(&self, root: &Mapping) -> Result<Self> {
+    pub(crate) fn interpolate(&self, root: &Mapping, state: &mut ResolveState) -> Result<Self> {
         Ok(match self {
             Self::String(s) => {
                 // String interpolation parses any Reclass references in the String and resolves
                 // them. The result of `Token::render()` can be an arbitrary Value, except for
                 // `Value::String()`, since `render()` will recursively call `interpolate()`.
                 if let Some(token) = Token::parse(s)? {
-                    token.render(root)?
+                    token.render(root, state)?
                 } else {
                     // If Token::parse() returns None, we can be sure that there's no references
                     // int the String, and just return the string as a `Value::Literal`.
@@ -543,12 +543,18 @@ impl Value {
                 }
             }
             // Mappings are interpolated by calling `Mapping::interpolate()`.
-            Self::Mapping(m) => Self::Mapping(m.interpolate(root)?),
+            Self::Mapping(m) => Self::Mapping(m.interpolate(root, state)?),
             Self::Sequence(s) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
                 for it in s {
-                    let e = it.interpolate(root)?;
+                    // References in separate entries in sequences can't form loops. Therefore we
+                    // pass a copy of the current resolution state to the recursive call for each
+                    // element. We don't need to update the input state after we're done with a
+                    // Sequence either, since there's no potential to start recursing again, if
+                    // we've fully interpolated a Sequence.
+                    let mut st = state.clone();
+                    let e = it.interpolate(root, &mut st)?;
                     seq.push(e);
                 }
                 Self::Sequence(seq)
@@ -561,14 +567,23 @@ impl Value {
                 // NOTE(sg): Empty ValueLists are interpolated as Value::Null.
                 let mut r = Value::Null;
                 for v in l {
-                    r.merge(v.interpolate(root)?)?;
+                    // For each ValueList layer, we pass a copy of the current resolution state to
+                    // the recursive call to interpolate, since references in different ValueList
+                    // layers can't form loops with each other (Intuitively: either we manage to
+                    // resolve all references in a ValueList layer, or we don't, but once we're
+                    // done with a layer, any references that we saw there have been successfully
+                    // resolved, and don't matter for the next layer we're interpolating).
+                    let mut st = state.clone();
+                    r.merge(v.interpolate(root, &mut st)?)?;
                 }
                 // Depending on the structure of the ValueList, we may end up with a final
                 // interpolated Value which contains more ValueLists due to mapping merges. Such
                 // ValueLists can themselves contain further references. To handle this case, we
                 // call `interpolate()` again to resolve those references. This recursion stops
                 // once `Token::render()` doesn't produce new `Value::String()`.
-                r.interpolate(root)?
+                // For this interpolation, we need to actually update the resolution state, so we
+                // pass in the `state` which we were called with.
+                r.interpolate(root, state)?
             }
             _ => self.clone(),
         })
@@ -704,7 +719,10 @@ impl Value {
     /// reference keys in `root`. After all references have been interpolated, the method flattens
     /// any remaining ValueLists and returns the final "flattened" value.
     pub fn rendered(&self, root: &Mapping) -> Result<Self> {
-        let mut v = self.interpolate(root)?;
+        let mut state = ResolveState::default();
+        let mut v = self
+            .interpolate(root, &mut state)
+            .map_err(|e| anyhow!("While resolving references in {self}: {e}"))?;
         v.flatten()?;
         Ok(v)
     }

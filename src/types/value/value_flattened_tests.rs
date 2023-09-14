@@ -181,27 +181,27 @@ fn test_flattened_sequence_over_simple_value_error() {
 
 #[test]
 fn test_flattened_nested_mapping_value_list() {
-    // preprocess the valuelist entries by calling interpolate() on each entry to ensure we've
+    // preprocess the valuelist entries by calling render() on each entry to ensure we've
     // transformed all `Value::String()` to `Value::Literal()`.
     let v = Value::ValueList(vec![
         Mapping::from_str("foo: {foo: {foo: foo}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("foo: {foo: {foo: bar}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("foo: {foo: {bar: bar}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("foo: {bar: {bar: bar}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
     ]);
@@ -217,32 +217,32 @@ fn test_flattened_nested_mapping_value_list() {
 
 #[test]
 fn test_flattened_nested_mapping_value_list_2() {
-    // preprocess the valuelist entries by calling interpolate() on each entry to ensure we've
+    // preprocess the valuelist entries by calling render() on each entry to ensure we've
     // transformed all `Value::String()` to `Value::Literal()`.
     let v = Value::ValueList(vec![
         Mapping::from_str("qux: {foo: {foo: {foo: foo}}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("qux: {foo: {foo: {foo: bar}}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("qux: {foo: {foo: {bar: bar}}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("qux: {foo: {bar: {bar: bar}}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
         Mapping::from_str("qux: {bar: {bar: {bar: bar}}}")
             .unwrap()
-            .interpolate(&Mapping::new())
+            .render(&Mapping::new())
             .unwrap()
             .into(),
     ]);
