@@ -102,8 +102,11 @@ fn walk_entity_dir(
 ) -> Result<()> {
     let entity_root = to_lexical_absolute(&PathBuf::from(root))?;
 
-    for entry in WalkDir::new(root).max_depth(max_depth) {
+    // We need to follow symlinks when walking the root directory, so that inventories which
+    // contain symlinked directories are loaded correctly.
+    for entry in WalkDir::new(root).max_depth(max_depth).follow_links(true) {
         let entry = entry?;
+        // We use `entry.path()` here to get the symlink name for symlinked files.
         let ext = if let Some(ext) = entry.path().extension() {
             ext.to_str()
         } else {
