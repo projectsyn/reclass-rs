@@ -172,6 +172,10 @@ impl Reclass {
         n.render(self)?;
         Ok(NodeInfo::from(n))
     }
+
+    pub fn render_inventory(&self) -> Result<Inventory> {
+        Inventory::render(self)
+    }
 }
 
 #[pymethods]
@@ -200,7 +204,7 @@ impl Reclass {
 
     /// Returns the rendered data for the full inventory.
     pub fn inventory(&self) -> PyResult<Inventory> {
-        Inventory::render(self)
+        self.render_inventory()
             .map_err(|e| PyValueError::new_err(format!("Error while rendering inventory: {e}")))
     }
 
