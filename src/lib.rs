@@ -167,7 +167,7 @@ impl Reclass {
     }
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
-    fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
+    pub fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
         let mut n = Node::parse(self, nodename)?;
         n.render(self)?;
         Ok(NodeInfo::from(n))
