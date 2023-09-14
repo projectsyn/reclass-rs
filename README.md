@@ -75,6 +75,16 @@ cargo test
 * Use `cargo check` for checking that the code compiles
 * Use `cargo clippy` to check for code issues
 
+### Benchmarks
+
+You can run benchmarks for `Reclass::render_inventory()` with
+
+```
+cargo bench -F bench
+```
+
+The benchmarks are implemented with `criterion`.
+
 ## Testing reclass-rs in Kapitan
 
 

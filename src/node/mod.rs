@@ -241,6 +241,7 @@ impl Node {
             let maybec = self.read_class(r, &cls);
             let Ok(Some(mut c)) = maybec else {
                 if let Ok(None) = maybec {
+                    #[cfg(not(feature = "bench"))]
                     eprintln!("ignore missing class {cls}");
                     continue;
                 }
