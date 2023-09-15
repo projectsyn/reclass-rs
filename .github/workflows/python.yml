@@ -144,9 +144,26 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
+    if: "startsWith(github.ref, 'refs/tags/v')"
     needs: [linux, windows, macos, sdist]
     steps:
+      - uses: actions/checkout@v4
+      - name: Extract Git version from ref
+        id: git_version
+        run: echo "version=$(echo ${GITHUB_REF#refs/tags/})" >> ${GITHUB_OUTPUT}
+        env:
+          GITHUB_REF: ${{ github.ref }}
+      - name: Read Cargo.toml
+        id: cargo_version
+        uses: SebRollen/toml-action@v1.0.2
+        with:
+          file: Cargo.toml
+          field: package.version
+      - name: Verify that tag matches Cargo.toml version
+        run: |
+          if [ "v${{ steps.cargo_version.outputs.value }}" != "${{ steps.git_version.outputs.version }}" ]; then
+            exit 1
+          fi
       - uses: actions/download-artifact@v3
         with:
           name: wheels
