@@ -141,8 +141,8 @@ jobs:
           name: wheels
           path: dist
 
-  release:
-    name: Release
+  check-version:
+    name: Check if tag matches Cargo.toml version
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/v')"
     needs: [linux, windows, macos, sdist]
@@ -164,6 +164,13 @@ jobs:
           if [ "v${{ steps.cargo_version.outputs.value }}" != "${{ steps.git_version.outputs.version }}" ]; then
             exit 1
           fi
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/v')"
+    needs: [check-version]
+    steps:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
