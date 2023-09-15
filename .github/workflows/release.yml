@@ -60,6 +60,6 @@ jobs:
         with:
           body: "# Summary\n\n${{steps.tag_message.outputs.message}}\n\n# Changes\n\n${{steps.build_changelog.outputs.changelog}}"
           prerelease: "${{ contains(github.ref, '-rc') }}"
-          # Ensure target branch for release is "master"
-          commit: master
+          # Ensure target branch for release is "main"
+          commit: main
           token: ${{ secrets.GITHUB_TOKEN }}
