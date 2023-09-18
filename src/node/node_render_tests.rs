@@ -143,7 +143,7 @@ fn test_render_n5() {
         r#"
     # from cls9
     foo: bar
-    constant: foo
+    =constant: foo
     foolist:
       - a
       - b
@@ -169,7 +169,7 @@ fn test_render_n6() {
         r#"
     # from cls9
     foo: baz
-    constant: foo
+    =constant: foo
     foolist:
       - a
       - b
@@ -201,7 +201,7 @@ fn test_render_n7() {
         r#"
         # from cls9
         foo: foo
-        constant: foo
+        =constant: foo
         # overwritten in n7
         foolist:
           - bar
@@ -255,7 +255,7 @@ fn test_render_n9() {
         r#"
         # from cls9 via cls13
         foo: foo
-        constant: foo
+        =constant: foo
         foolist:
           - a
           - b
@@ -286,7 +286,7 @@ fn test_render_n10() {
         r#"
     # from cls9 via nested.b
     foo: foo
-    constant: foo
+    =constant: foo
     foolist:
       - a
       - b
@@ -328,7 +328,7 @@ fn test_render_n12() {
         "n12",
         r#"
         foo: foo
-        constant: foo
+        =constant: foo
         foolist:
           - a
           - b
@@ -358,7 +358,7 @@ fn test_render_n13() {
         "n13",
         r#"
         foo: foo
-        constant: foo
+        =constant: foo
         foolist:
           - a
           - b
@@ -394,7 +394,7 @@ fn test_render_n14() {
         "n14",
         r#"
         foo: foo
-        constant: foo
+        =constant: foo
         foolist: [a, b, c]
         foodict:
           bar: bar
@@ -420,7 +420,7 @@ fn test_render_n15() {
         r#"
         cls9: cls9
         foo: foo
-        constant: foo
+        =constant: foo
         foolist:
           - a
           - b
@@ -470,7 +470,7 @@ fn test_render_n18() {
         "n18",
         r#"
     foo: foo
-    constant: foo
+    =constant: foo
     foolist:
       - a
       - b
@@ -581,7 +581,7 @@ fn test_render_n23() {
     let expected = expected_params(
         "n23",
         r#"
-        baz:
+        ~baz:
           baz: cls7
           foo: cls7
           qux: n19
@@ -591,5 +591,7 @@ fn test_render_n23() {
           qux: qux
         "#,
     );
+    dbg!(&n.parameters);
+    dbg!(&expected);
     assert_eq!(n.parameters, expected);
 }
