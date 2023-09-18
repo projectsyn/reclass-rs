@@ -48,7 +48,7 @@ impl Token {
     /// Parses an arbitrary string into a `Token`. Returns None, if the string doesn't contain any
     /// opening reference markers.
     pub fn parse(s: &str) -> Result<Option<Self>> {
-        if !s.contains("${") {
+        if !s.contains("${") && !s.contains("$[") {
             // return None for strings which don't contain any references
             return Ok(None);
         }

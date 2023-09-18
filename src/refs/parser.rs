@@ -44,9 +44,20 @@ fn ref_close(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     context("ref_close", tag("}"))(input)
 }
 
+fn inv_open(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+    context("inv_open", tag("$["))(input)
+}
+
 fn ref_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context("ref_escape_open", preceded(tag("\\"), ref_open)),
+        String::from,
+    )(input)
+}
+
+fn inv_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(
+        context("inv_escape_open", preceded(tag("\\"), inv_open)),
         String::from,
     )(input)
 }
@@ -73,9 +84,14 @@ fn ref_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
     map(
         context(
             "ref_not_open",
-            tuple((not(tag("${")), not(tag("\\${")), not(tag("\\\\${")))),
+            tuple((
+                not(tag("${")),
+                not(tag("\\${")),
+                not(tag("\\\\${")),
+                not(tag("\\$[")),
+            )),
         ),
-        |(_, _, _)| (),
+        |_| (),
     )(input)
 }
 
@@ -123,6 +139,7 @@ fn ref_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
                 double_escape,
                 ref_escape_open,
                 ref_escape_close,
+                inv_escape_open,
                 ref_content,
             ))),
         ),
@@ -169,7 +186,10 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         )(input)
     }
 
-    context("string", alt((double_escape, ref_escape_open, content)))(input)
+    context(
+        "string",
+        alt((double_escape, ref_escape_open, inv_escape_open, content)),
+    )(input)
 }
 
 /// Parses either a Reclass reference or a section of the input with no references
@@ -604,6 +624,48 @@ mod test_parser_funcs {
         assert_eq!(
             parse_ref(&refstr),
             Ok(("", Token::Ref(vec![Token::literal_from_str(r"foo\\")])))
+        )
+    }
+
+    #[test]
+    fn test_parse_inventory_query_escape() {
+        // To ensure compatibility with Python reclass's reference parser, we parse `\$[` as `$[`
+        // even though we don't support inventory queries yet.
+        let refstr = r#"\$['foo']['bar']"#;
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok(("", Token::literal_from_str(r"$['foo']['bar']")))
+        )
+    }
+
+    #[test]
+    fn test_parse_inventory_query_escaped_embedded() {
+        // To ensure compatibility with Python reclass's reference parser, we parse `\$[` as `$[`
+        // even though we don't support inventory queries yet.
+        let refstr = r#"foo: \$['foo']['bar']"#;
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok(("", Token::literal_from_str(r"foo: $['foo']['bar']")))
+        )
+    }
+
+    #[test]
+    fn test_parse_inventory_query() {
+        // Non-escaped inventory queries are also parsed as literals.
+        let refstr = r#"$[foo:bar]"#;
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok(("", Token::literal_from_str(r"$[foo:bar]")))
+        )
+    }
+
+    #[test]
+    fn test_parse_inventory_query_double_escape() {
+        // Double-escaped inventory query is parsed as `\` followed by escaped inventory query.
+        let refstr = r#"\\$[foo:bar]"#;
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok(("", Token::literal_from_str(r"\$[foo:bar]")))
         )
     }
 }
