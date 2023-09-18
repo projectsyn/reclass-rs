@@ -591,7 +591,22 @@ fn test_render_n23() {
           qux: qux
         "#,
     );
-    dbg!(&n.parameters);
-    dbg!(&expected);
+    assert_eq!(n.parameters, expected);
+}
+
+#[test]
+fn test_render_n24() {
+    let r = make_reclass();
+    let n = r.render_node("n24").unwrap();
+
+    let expected = expected_params(
+        "n24",
+        r#"
+        fluentbit:
+          config:
+            inputs:
+              systemd: {}
+        "#,
+    );
     assert_eq!(n.parameters, expected);
 }

@@ -114,7 +114,7 @@ mod inventory_tests {
         let mut nodes = inv.nodes.keys().cloned().collect::<Vec<String>>();
         nodes.sort();
 
-        let mut expected_nodes = (1..=23).map(|n| format!("n{n}")).collect::<Vec<String>>();
+        let mut expected_nodes = (1..=24).map(|n| format!("n{n}")).collect::<Vec<String>>();
         expected_nodes.sort();
 
         assert_eq!(nodes, expected_nodes);
@@ -181,13 +181,16 @@ mod inventory_tests {
         expected_classes.insert("cluster.facts".into(), vec!["n19".into()]);
         expected_classes.insert("cluster.global".into(), vec!["n19".into()]);
         expected_classes.insert("config".into(), vec!["n16".into()]);
+        expected_classes.insert("defaults".into(), vec!["n24".into()]);
         expected_classes.insert("foo-indirect".into(), vec!["n20".into()]);
+        expected_classes.insert("meta".into(), vec!["n24".into()]);
         expected_classes.insert("nested.a".into(), vec!["n8".into()]);
         expected_classes.insert("nested.a_sub".into(), vec!["n8".into(), "n9".into()]);
         expected_classes.insert("nested.b".into(), vec!["n10".into()]);
         expected_classes.insert("nested.cls1".into(), vec!["n2".into()]);
         expected_classes.insert("nested.cls2".into(), vec!["n2".into()]);
         expected_classes.insert("nonexisting".into(), vec!["n18".into()]);
+        expected_classes.insert("override".into(), vec!["n24".into()]);
         expected_classes.insert("yaml-anchor".into(), vec!["n21".into()]);
 
         assert_eq!(inv.classes, expected_classes);
