@@ -134,6 +134,20 @@ fn walk_entity_dir(
 }
 
 impl Reclass {
+    pub fn new(nodes_path: &str, classes_path: &str, ignore_class_notfound: bool) -> Result<Self> {
+        let mut r = Self {
+            nodes_path: nodes_path.to_owned(),
+            classes_path: classes_path.to_owned(),
+            ignore_class_notfound,
+            classes: HashMap::new(),
+            nodes: HashMap::new(),
+        };
+        r.discover_nodes()
+            .map_err(|e| anyhow!("Error while discovering nodes: {e}"))?;
+        r.discover_classes()
+            .map_err(|e| anyhow!("Error while discovering classes: {e}"))?;
+        Ok(r)
+    }
     /// Discover all top-level YAML files in `r.nodes_path`.
     ///
     /// This method will raise an error if multiple nodes which resolve to the same node name
@@ -153,10 +167,14 @@ impl Reclass {
     }
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
-    fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
+    pub fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
         let mut n = Node::parse(self, nodename)?;
         n.render(self)?;
         Ok(NodeInfo::from(n))
+    }
+
+    pub fn render_inventory(&self) -> Result<Inventory> {
+        Inventory::render(self)
     }
 }
 
@@ -164,22 +182,13 @@ impl Reclass {
 impl Reclass {
     #[new]
     #[pyo3(signature = (nodes_path="./inventory/nodes", classes_path="./inventory/classes", ignore_class_notfound=false))]
-    pub fn new(
+    pub fn new_py(
         nodes_path: &str,
         classes_path: &str,
         ignore_class_notfound: bool,
     ) -> PyResult<Self> {
-        let mut r = Self {
-            nodes_path: nodes_path.to_owned(),
-            classes_path: classes_path.to_owned(),
-            ignore_class_notfound,
-            classes: HashMap::new(),
-            nodes: HashMap::new(),
-        };
-        r.discover_nodes()
-            .map_err(|e| PyValueError::new_err(format!("Error while discovering nodes: {e}")))?;
-        r.discover_classes()
-            .map_err(|e| PyValueError::new_err(format!("Error while discovering classes: {e}")))?;
+        let r = Self::new(nodes_path, classes_path, ignore_class_notfound)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(r)
     }
 
@@ -195,7 +204,7 @@ impl Reclass {
 
     /// Returns the rendered data for the full inventory.
     pub fn inventory(&self) -> PyResult<Inventory> {
-        Inventory::render(self)
+        self.render_inventory()
             .map_err(|e| PyValueError::new_err(format!("Error while rendering inventory: {e}")))
     }
 
@@ -254,7 +263,6 @@ mod tests {
         collides with definition in './tests/broken-inventory/classes/foo/bar.yml'. \
         Classes can only be defined once per inventory.")]
     fn test_reclass_discover_classes() {
-        pyo3::prepare_freethreaded_python();
         Reclass::new(
             "./tests/broken-inventory/nodes",
             "./tests/broken-inventory/classes",
