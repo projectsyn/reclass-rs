@@ -678,13 +678,7 @@ impl Value {
                 Ok(base)
             }
             // Flatten Mapping by flattening each value and inserting it into a new Mapping.
-            Self::Mapping(m) => {
-                let mut n = Mapping::new();
-                for (k, v) in m {
-                    n.insert(k.clone(), v.flattened()?)?;
-                }
-                Ok(Self::Mapping(n))
-            }
+            Self::Mapping(m) => Ok(Self::Mapping(m.flattened()?)),
             // Flatten Sequence by flattening each element and inserting it into a new Sequence
             Self::Sequence(s) => {
                 let mut n = Vec::with_capacity(s.len());

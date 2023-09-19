@@ -1,0 +1,7 @@
+parameters:
+  fluentbit:
+    config:
+      inputs:
+        systemd:
+          foo: bar
+          baz: qux

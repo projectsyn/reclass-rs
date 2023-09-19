@@ -38,13 +38,16 @@ expected_classes = {
     "cluster.facts": ["n19"],
     "cluster.global": ["n19"],
     "config": ["n16"],
+    "defaults": ["n24"],
     "foo-indirect": ["n20"],
+    "meta": ["n24"],
     "nested.a": ["n8"],
     "nested.a_sub": ["n8", "n9"],
     "nested.b": ["n10"],
     "nested.cls1": ["n2"],
     "nested.cls2": ["n2"],
     "nonexisting": ["n18"],
+    "override": ["n24"],
     "yaml-anchor": ["n21"],
 }
 
@@ -57,7 +60,7 @@ expected_applications = {
     "d": ["n13"],
 }
 
-expected_nodes = set([f"n{i}" for i in range(1, 24)])
+expected_nodes = set([f"n{i}" for i in range(1, 25)])
 
 
 def test_inventory():

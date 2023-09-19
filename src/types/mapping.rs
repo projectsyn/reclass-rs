@@ -353,7 +353,28 @@ impl Mapping {
         Ok(())
     }
 
-    /// Returns a new Mapping with any Reclass references in the mapping interpolated.
+    /// Returns a new Mapping with all values flattened while preserving const and override key
+    /// information.
+    ///
+    /// Used in `Value::flattened()` to preserve const and override key information when flattening
+    /// Mapping values.
+    pub(super) fn flattened(&self) -> Result<Self> {
+        let mut res = Self::new();
+        for (k, v) in self {
+            // Propagate key properties to the resulting mapping by using `insert_impl()`.
+            res.insert_impl(
+                k.clone(),
+                v.flattened()?,
+                self.is_const(k),
+                self.is_override(k),
+            )?;
+        }
+        Ok(res)
+    }
+
+    /// Returns a new Mapping with any Reclass references in the mapping interpolated while
+    /// preserving const and override key information.
+    ///
     /// The method looks up reference values in parameter `root`. After interpolation of each
     /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
@@ -368,7 +389,8 @@ impl Mapping {
             let mut st = state.clone();
             let mut v = v.interpolate(root, &mut st)?;
             v.flatten()?;
-            res.insert(k.clone(), v)?;
+            // Propagate key properties to the resulting mapping by using `insert_impl()`.
+            res.insert_impl(k.clone(), v, self.is_const(k), self.is_override(k))?;
         }
         Ok(res)
     }
