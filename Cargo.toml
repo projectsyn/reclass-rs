@@ -1,9 +1,12 @@
 [package]
 name = "reclass-rs"
-version = "0.1.0-rc1"
+version = "0.1.0"
 edition = "2021"
 license = "BSD-3-Clause"
+authors = ["VSHN AG <info@vshn.ch>"]
+repository = "https://github.com/projectsyn/reclass-rs"
 keywords = ["yaml", "reclass", "hierarchical config"]
+description = "Reclass defines a syntax and directory structure for recursively merging YAML data sources."
 
 [lib]
 name = "reclass_rs"
