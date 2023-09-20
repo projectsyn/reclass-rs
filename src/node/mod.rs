@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 use std::path::PathBuf;
 // TODO(sg): Switch to serde_yaml's `apply_merge()` once it supports recursive merges, cf.
@@ -181,7 +181,7 @@ impl Node {
         meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
         Ok(Some(
             Node::from_str(meta, Some(class_loc), &ccontents)
-                .with_context(|| format!("Deserializing {cls}"))?,
+                .map_err(|e| anyhow!("Deserializing {cls}: {e}"))?,
         ))
     }
 
