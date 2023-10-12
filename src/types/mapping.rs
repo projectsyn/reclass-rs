@@ -696,14 +696,14 @@ mod mapping_tests {
             let m = pym.as_ref(py);
             assert_eq!(m.len(), 6);
             assert_eq!(format!("{:?}", m.keys()), "['a', 'b', 'c', 'd', 'e', 'f']");
-            let a = m.get_item(&"a").unwrap();
+            let a = m.get_item(&"a").unwrap().unwrap();
             assert!(a.is_instance_of::<pyo3::types::PyInt>());
             assert!(a
                 .downcast_exact::<pyo3::types::PyInt>()
                 .unwrap()
                 .eq(1.into_py(py))
                 .unwrap());
-            let f = m.get_item(&"f").unwrap();
+            let f = m.get_item(&"f").unwrap().unwrap();
             assert!(f.is_instance_of::<PyDict>());
             let f = f.downcast_exact::<PyDict>().unwrap();
             assert_eq!(f.len(), 1);
