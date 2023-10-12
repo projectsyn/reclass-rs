@@ -104,7 +104,7 @@ fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
                 "ref_not_close",
                 tuple((not(tag("}")), not(tag("\\}")), not(tag("\\\\}")))),
             ),
-            |(_, _, _)| (),
+            |((), (), ())| (),
         )(input)
     }
 
@@ -113,9 +113,10 @@ fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
             "ref_text",
             alt((
                 map(many1(none_of("\\${}")), |ch| ch.iter().collect::<String>()),
-                map(tuple((not(tag("}")), take(1usize))), |(_, c): (_, &str)| {
-                    c.to_string()
-                }),
+                map(
+                    tuple((not(tag("}")), take(1usize))),
+                    |((), c): ((), &str)| c.to_string(),
+                ),
             )),
         )(input)
     }
@@ -125,7 +126,7 @@ fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
             "ref_content",
             tuple((ref_not_open, ref_not_close, ref_text)),
         ),
-        |(_, _, t)| t,
+        |((), (), t)| t,
     )(input)
 }
 
