@@ -6,8 +6,8 @@ This repository contains a Rust implementation of Reclass which is based on the 
 The Reclass implementation provided in this repository can be used both from other Rust programs and in Python programs.
 The `reclass-rs` Python module is implemented directly in Rust with [PyO3](https://pyo3.rs/latest/).
 
-Please note that this implementation doesn't yet support all the features and extensions which are availble in Kapitan Reclass.
-However, for features which are implemented, we aim to be compatbile with Kapitan Reclass.
+Please note that this implementation doesn't yet support all the features and extensions which are available in Kapitan Reclass.
+However, for features which are implemented, we aim to be compatible with Kapitan Reclass.
 
 The implementation currently supports the following features of Kapicorp Reclass:
 
