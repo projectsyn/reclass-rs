@@ -6,8 +6,8 @@ This repository contains a Rust implementation of Reclass which is based on the 
 The Reclass implementation provided in this repository can be used both from other Rust programs and in Python programs.
 The `reclass-rs` Python module is implemented directly in Rust with [PyO3](https://pyo3.rs/latest/).
 
-Please note that this implementation doesn't yet support all the features and extensions which are availble in Kapitan Reclass.
-However, for features which are implemented, we aim to be compatbile with Kapitan Reclass.
+Please note that this implementation doesn't yet support all the features and extensions which are available in Kapitan Reclass.
+However, for features which are implemented, we aim to be compatible with Kapitan Reclass.
 
 The implementation currently supports the following features of Kapicorp Reclass:
 
@@ -80,23 +80,15 @@ cargo test
 
 If you're using [Kapitan], you can test reclass-rs by installing `reclass-rs` in your Kapitan virtualenv:
 
-1. Build the `reclass-rs` wheel locally (this assumes that you've setup a local Python development environment, see above)
-
-```
-source .venv/bin/activate
-maturin build --release
-```
-
-2. Install the wheel in your Kapitan virtualenv
+1. Install `reclass-rs` in your Kapitan virtualenv
 
 ```
 KAPITAN_VENV=/path/to/your/kapitan/virtualenv
 source ${KAPITAN_VENV}/bin/activate
-# NOTE: make sure you use the same Python version as you use for the Kapitan virtualenv to build the wheel.
-pip install target/wheels/reclass_rs-*
+pip install reclass-rs
 ```
 
-3. Patch the Kapitan package in the virtualenv with the following command
+2. Patch the Kapitan package in the virtualenv with the following command
 
 ```
 patch -p1 -d $KAPITAN_VENV < hack/kapitan_0.32_reclass_rs.patch
