@@ -14,7 +14,7 @@ name = "reclass_rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-anyhow = "1.0.75"
+anyhow = "1.0.79"
 chrono = "0.4.31"
 indexmap = "2.1.0"
 nom = "7.1.3"
