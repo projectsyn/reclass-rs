@@ -547,13 +547,14 @@ impl Value {
             Self::Sequence(s) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
-                for it in s {
+                for (idx, it) in s.iter().enumerate() {
                     // References in separate entries in sequences can't form loops. Therefore we
                     // pass a copy of the current resolution state to the recursive call for each
                     // element. We don't need to update the input state after we're done with a
                     // Sequence either, since there's no potential to start recursing again, if
                     // we've fully interpolated a Sequence.
                     let mut st = state.clone();
+                    st.push_list_index(idx);
                     let e = it.interpolate(root, &mut st)?;
                     seq.push(e);
                 }
@@ -716,7 +717,7 @@ impl Value {
         let mut state = ResolveState::default();
         let mut v = self
             .interpolate(root, &mut state)
-            .map_err(|e| anyhow!("While resolving references in {self}: {e}"))?;
+            .map_err(|e| anyhow!("While resolving references: {e}"))?;
         v.flatten()?;
         Ok(v)
     }
