@@ -45,3 +45,35 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+
+  benchmarks:
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          crates:
+            cargo-criterion
+      - name: Run benchmarks
+        run: cargo criterion --features bench --message-format json 1>output.txt
+      - name: Download previous benchmark data
+        uses: actions/cache@v3
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-benchmark
+      - uses: brainstorm/github-action-benchmark@cargo-criterion-tool-extractor
+        with:
+          tool: cargo-criterion
+          output-file-path: output.txt
+          external-data-json-path: ./cache/benchmark-data.json
+          summary-always: true
+          fail-on-alert: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-fetch-gh-pages: true
