@@ -469,9 +469,9 @@ fn test_interpolate_nested_mapping_no_loop() {
 }
 
 #[test]
-#[should_panic(expected = "While resolving references in \
-    {\"foo\": {\"bar\": \"${bar}\"}, \"bar\": [{\"baz\": \"baz\", \"qux\": \"qux\"}, \
-    {\"baz\": \"${foo}\"}]}: Reference loop with reference paths [\"bar\", \"foo\"].")]
+#[should_panic(
+    expected = "While resolving references: Detected reference loop with reference paths [\"bar\", \"foo\"]."
+)]
 fn test_merge_interpolate_loop() {
     let base = r#"
     foo:
@@ -496,10 +496,8 @@ fn test_merge_interpolate_loop() {
 }
 
 #[test]
-#[should_panic(expected = "While resolving references in \
-     {\"foo\": {\"bar\": [\"${bar}\", \"${baz}\"]}, \"bar\": \"${qux}\", \
-     \"baz\": {\"bar\": \"${foo}\"}, \"qux\": 3.14}: \
-    Reference loop with reference paths [\"baz\", \"foo\"].")]
+#[should_panic(expected = "While resolving references: \
+    Detected reference loop with reference paths [\"baz\", \"foo\"].")]
 fn test_interpolate_sequence_loop() {
     let base = r#"
     foo:
@@ -518,11 +516,8 @@ fn test_interpolate_sequence_loop() {
 }
 
 #[test]
-#[should_panic(expected = "While resolving references in \
-    {\"foo\": {\"bar\": {\"baz\": \"${foo:baz:bar}\", \"qux\": \"${foo:qux:foo}\"}, \
-    \"baz\": {\"bar\": \"qux\", \"qux\": \"${foo:bar:qux}\"}, \"qux\": \
-    {\"foo\": \"${foo:baz:qux}\"}}}: \
-    Reference loop with reference paths [\"foo:bar:qux\", \"foo:baz:qux\", \"foo:qux:foo\"].")]
+#[should_panic(expected = "While resolving references: \
+    Detected reference loop with reference paths [\"foo:bar:qux\", \"foo:baz:qux\", \"foo:qux:foo\"]")]
 fn test_interpolate_nested_mapping_loop() {
     let m = r#"
     foo:
@@ -543,16 +538,8 @@ fn test_interpolate_nested_mapping_loop() {
 
 #[test]
 #[should_panic(
-    expected = "While resolving references in \"${foo:${foo:${foo:${foo:${foo:\
-        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
-        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
-        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
-        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
-        ${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:${foo:\
-        ${foo:${foo:${foo:${foo:${foo:${foo}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}\
-        }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}\": \
-        Token resolution exceeded recursion depth of 64. \
-        We've seen the following reference paths: []."
+    expected = "While resolving references: Token resolution exceeded recursion depth of 64 \
+    for parameter 'baz'. We've seen the following reference paths: []."
 )]
 fn test_interpolate_depth_exceeded() {
     // construct a reference string which is a nested sequence of ${foo:....${foo}} with 70 nesting
@@ -560,11 +547,12 @@ fn test_interpolate_depth_exceeded() {
     // recursion limit before we even manage to construct the initial ref path in
     // `Token::resolve()`.
     let refstr = (0..70).fold("${foo}".to_string(), |s, _| format!("${{foo:{s}}}"));
-    let map = (0..70).fold(Mapping::from_str("foo: bar").unwrap(), |m, _| {
+    let mut map = (0..70).fold(Mapping::from_str("foo: bar").unwrap(), |m, _| {
         let mut n = Mapping::new();
         n.insert("foo".into(), Value::Mapping(m)).unwrap();
         n
     });
-    let v = Value::from(refstr);
-    v.rendered(&map).unwrap();
+    map.insert("baz".into(), refstr.into()).unwrap();
+    let mut v = Value::from(map);
+    v.render_with_self().unwrap();
 }

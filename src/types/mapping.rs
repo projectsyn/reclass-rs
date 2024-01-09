@@ -387,6 +387,7 @@ impl Mapping {
             // either manage to interpolate a value (in which case it doesn't contain a loop) or we
             // don't and the whole interpolation is aborted.
             let mut st = state.clone();
+            st.push_mapping_key(k)?;
             let mut v = v.interpolate(root, &mut st)?;
             v.flatten()?;
             // Propagate key properties to the resulting mapping by using `insert_impl()`.

@@ -24,9 +24,37 @@ pub struct ResolveState {
     /// Recursion depth of the resolution (in number of calls to Token::resolve() for Token::Ref
     /// objects).
     depth: usize,
+    /// Parameters key which we're currently processing.
+    current_keys: Vec<String>,
 }
 
 impl ResolveState {
+    /// Pushes the provided index into the last element of current_keys as `[idx]`.
+    pub(crate) fn push_list_index(&mut self, idx: usize) {
+        let mut kcount = self.current_keys.len();
+        if kcount == 0 {
+            self.current_keys.push(String::new());
+            kcount = 1;
+        }
+        self.current_keys[kcount - 1].push_str(&format!("[{idx}]"));
+    }
+
+    /// Pushes mapping key into the `current_keys` list. If possible, the provided value is
+    /// formatted with `raw_string()`. Additionally, unprocessed `String` values are pushed as-is.
+    /// This function will return an error when it's called with a `Value::ValueList`.
+    pub(crate) fn push_mapping_key(&mut self, key: &Value) -> Result<()> {
+        let kstr = match key.raw_string() {
+            Ok(s) => s,
+            Err(_) => match key {
+                Value::String(s) => Ok(s.clone()),
+                Value::ValueList(_) => Err(anyhow!("Unable to render ValueList as key segment")),
+                _ => unreachable!("raw_string() implemented for other Value variants"),
+            }?,
+        };
+        self.current_keys.push(kstr);
+        Ok(())
+    }
+
     /// Formats paths that have been seen as a comma-separated list.
     fn seen_paths_list(&self) -> String {
         let mut paths = self
@@ -36,6 +64,45 @@ impl ResolveState {
             .collect::<Vec<String>>();
         paths.sort();
         paths.join(", ")
+    }
+
+    /// Formats current key by joining the segements with dots.
+    fn current_key(&self) -> String {
+        self.current_keys.join(".")
+    }
+
+    /// Renders a suitable error when a reference loop is detected.
+    fn render_reference_loop_error(&self) -> anyhow::Error {
+        let paths = self.seen_paths_list();
+        anyhow!("Detected reference loop with reference paths [{paths}].")
+    }
+
+    /// Renders a suitable error when the reference lookup depth limit is exceeded.
+    fn render_recursion_depth_error(&self) -> anyhow::Error {
+        let current_key = self.current_key();
+        let paths = self.seen_paths_list();
+        anyhow!(
+            "Token resolution exceeded recursion depth of {RESOLVE_MAX_DEPTH} for \
+            parameter '{current_key}'. We've seen the following reference paths: [{paths}].",
+        )
+    }
+
+    /// Renders a suitable error when the reference lookup fails due to a missing key.
+    fn render_missing_key_error(&self, path: &str, key: &str) -> anyhow::Error {
+        let current_key = self.current_key();
+        let r = format!("${{{path}}}");
+        anyhow!(
+            "lookup error for reference '{r}' in parameter '{current_key}': key '{key}' not found"
+        )
+    }
+
+    /// Renders a lookup error with the given message
+    fn render_lookup_error(&self, path: &str, key: &str, msg: &str) -> anyhow::Error {
+        let current_key = self.current_key();
+        let r = format!("${{{path}}}");
+        anyhow!(
+            "While looking up key '{key}' in reference '{r}' for parameter '{current_key}': {msg}"
+        )
     }
 }
 
@@ -114,11 +181,7 @@ impl Token {
                     // implementation. We abort at a recursion depth of 64, since it's quite
                     // unlikely that there's a legitimate case where we have a recursion depth of
                     // 64 when resolving references for a well formed inventory.
-                    let paths = state.seen_paths_list();
-                    return Err(anyhow!(
-                        "Token resolution exceeded recursion depth of {RESOLVE_MAX_DEPTH}. \
-                        We've seen the following reference paths: [{paths}].",
-                    ));
+                    return Err(state.render_recursion_depth_error());
                 }
                 // Construct flattened ref path by resolving any potential nested references in the
                 // Ref's Vec<Token>.
@@ -127,8 +190,7 @@ impl Token {
                 if state.seen_paths.contains(&path) {
                     // we've already seen this reference, so we know there's a loop, and can abort
                     // resolution.
-                    let paths = state.seen_paths_list();
-                    return Err(anyhow!("Reference loop with reference paths [{paths}]."));
+                    return Err(state.render_reference_loop_error());
                 }
                 state.seen_paths.insert(path.clone());
 
@@ -137,74 +199,60 @@ impl Token {
                 // we handle the first element separately, so we can establish a local mutable
                 // variable which we can update during the walk of the parameters Mapping.
                 let k0 = refpath_iter.next().unwrap();
-                let k0: Value = k0.into();
                 // v is the value which we update to point to the next value as we recursively
                 // descend into the params Mapping
                 let mut v = params
-                    .get(&k0)
-                    .ok_or_else(|| anyhow!("[k0] unable to lookup key '{k0}' for '{path}'"))?;
+                    .get(&k0.into())
+                    .ok_or_else(|| state.render_missing_key_error(&path, k0))?;
 
                 // newv is used to hold temporary Values generated by interpolating v
                 let mut newv;
 
                 // traversed is used to keep track of the path segments we've already processed
-                let mut traversed = vec![k0.as_str().unwrap().to_string()];
+                let mut traversed = vec![k0.to_string()];
 
                 // descend into the params Mapping, looking up each segment of the reference path
                 // sequentially, updating `v` and `newv` as we go.
                 for key in refpath_iter {
-                    match v {
+                    // For lookups into Strings and ValueLists, we locally interpolate the
+                    // value into `newv` so we don't have to worry about the order in which
+                    // individual references are resolved, and always do value lookups on
+                    // resolved references.
+                    newv = interpolate_string_or_valuelist(v, params, state)?;
+                    // at this point, newv should never be a Value::String or Value::ValueList.
+                    debug_assert!(!newv.is_string() && !newv.is_value_list());
+                    // Do lookup in interpolated value, return error if interpolated value doesn't
+                    // support lookups.
+                    match newv {
                         // trivial case: v is a Mapping, we can just lookup the next value based
                         // on `key`.
                         Value::Mapping(_) => {
-                            v = v.get(&key.into()).ok_or_else(|| {
-                                anyhow!("unable to lookup key '{key}' for '{path}'")
-                            })?;
+                            v = newv
+                                .get(&key.into())
+                                .ok_or_else(|| state.render_missing_key_error(&path, key))?;
                         }
                         // Sequence lookups aren't supported by Python Reclass. We may implement
                         // them in the future.
                         Value::Sequence(_) => {
-                            return Err(anyhow!(
-                                "While looking up {key} for '{path}': \
-                                Sequence lookups aren't supported for Reclass references!"
-                            ))
+                            return Err(state.render_lookup_error(
+                                &path,
+                                key,
+                                "Sequence lookups aren't supported for Reclass references!",
+                            ));
                         }
-                        // For lookups into Strings and ValueLists, we locally interpolate the
-                        // value into `newv` so we don't have to worry about the order in which
-                        // individual references are resolved, and always do value lookups on
-                        // resolved references.
-                        Value::String(_) => {
-                            newv = v.interpolate(params, state)?;
-                            v = newv.get(&key.into()).ok_or_else(|| {
-                                anyhow!("unable to lookup key '{key}' for '{path}'")
-                            })?;
-                        }
-                        Value::ValueList(l) => {
-                            let mut i = vec![];
-                            for v in l {
-                                // When resolving references in ValueLists, we want to track state
-                                // separately for each layer, since reference loops can't be
-                                // stretched across layers.
-                                let mut st = state.clone();
-                                let v = if v.is_string() {
-                                    v.interpolate(params, &mut st)?
-                                } else {
-                                    v.clone()
-                                };
-                                i.push(v);
-                            }
-                            newv = Value::ValueList(i).flattened()?;
-                            v = newv.get(&key.into()).ok_or_else(|| {
-                                anyhow!("unable to lookup key '{key}' for '{path}'")
-                            })?;
-                        }
+                        Value::String(_) | Value::ValueList(_) => unreachable!(
+                            "We should have rendered Value::String and Value::ValueList into some other variant"
+                        ),
                         // A lookup into any other Value variant is an error
                         _ => {
-                            return Err(anyhow!(
-                                "While looking up {key} for '{path}': \
-                                    Can't continue lookup, {} is a {}",
-                                traversed.join(":"),
-                                v.variant()
+                            return Err(state.render_lookup_error(
+                                &path,
+                                key,
+                                &format!(
+                                    "Can't continue lookup, {} is a {}",
+                                    traversed.join(":"),
+                                    newv.variant()
+                                ),
                             ));
                         }
                     }
@@ -272,6 +320,39 @@ fn interpolate_token_slice(
         res.push_str(&v.raw_string()?);
     }
     Ok(res)
+}
+
+fn interpolate_string_or_valuelist(
+    v: &Value,
+    params: &Mapping,
+    state: &mut ResolveState,
+) -> Result<Value> {
+    match v {
+        // For Value::String, we can simply call `interpolate()` on the value.
+        Value::String(_) => v.interpolate(params, state),
+        // For Value::ValueList, we interpolate each layer, and flatten the resulting layers into a
+        // single Value.  We don't use `interpolate()` here, since we only want to flatten the
+        // resulting ValueList here.
+        Value::ValueList(l) => {
+            let mut i = vec![];
+            for v in l {
+                // When resolving references in ValueLists, we want to track state
+                // separately for each layer, since reference loops can't be
+                // stretched across layers.
+                let mut st = state.clone();
+                let v = if v.is_string() {
+                    v.interpolate(params, &mut st)?
+                } else {
+                    v.clone()
+                };
+                i.push(v);
+            }
+            // Finally we flatten the resulting ValueList into a single Value.
+            Value::ValueList(i).flattened()
+        }
+        // Do nothing for other types
+        _ => Ok(v.clone()),
+    }
 }
 
 #[derive(Debug)]
