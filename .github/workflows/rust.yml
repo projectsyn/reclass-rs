@@ -45,3 +45,16 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+      - uses: boa-dev/criterion-compare-action@v3
+        with:
+          features: bench
+          branchName: ${{ github.base_ref }}
