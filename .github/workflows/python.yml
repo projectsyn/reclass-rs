@@ -106,7 +106,7 @@ jobs:
         env:
           VERSION: ${{ needs.get-version.outputs.version }}
         run: |
-          cargo set-version "${VERSION}"
+          cargo set-version "$env:VERSION"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
