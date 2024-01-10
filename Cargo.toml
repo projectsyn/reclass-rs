@@ -12,6 +12,8 @@ description = "Reclass defines a syntax and directory structure for recursively 
 name = "reclass_rs"
 # cdylib for pyo3 and rlib for `cargo test`
 crate-type = ["cdylib", "rlib"]
+# disable benchmarks for the lib crate
+bench = false
 
 [dependencies]
 anyhow = "1.0.79"
@@ -27,4 +29,18 @@ walkdir = "2.4.0"
 yaml-merge-keys = { version = "0.6.0", features = ["serde_yaml"] }
 
 [dev-dependencies]
+criterion = "0.5.1"
 paste = "1.0.14"
+
+[features]
+bench = []
+
+[[bench]]
+name = "inventory_single_threaded"
+harness = false
+required-features = ["bench"]
+
+[[bench]]
+name = "inventory_multi_threaded"
+harness = false
+required-features = ["bench"]
