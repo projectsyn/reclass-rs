@@ -19,8 +19,22 @@ permissions:
   contents: read
 
 jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.genversion.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "0"
+      - name: Generate package version from Git tag
+        id: genversion
+        run: |
+          echo "version=$(git describe --tags --always --match=v* | sed 's/^v//' | cut -d- -f1,2)" >> "$GITHUB_OUTPUT"
+
   linux:
     runs-on: ubuntu-latest
+    needs: get-version
     strategy:
       matrix:
         target: [x86_64, x86, aarch64, armv7, s390x, ppc64le]
@@ -29,6 +43,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+      - uses: taiki-e/cache-cargo-install-action@v1
+        with:
+          tool: cargo-edit
+      - name: Set package version
+        env:
+          VERSION: ${{ needs.get-version.outputs.version }}
+        run: |
+          cargo set-version "${VERSION}"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -67,6 +89,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    needs: get-version
     strategy:
       matrix:
         target: [x64, x86]
@@ -76,6 +99,14 @@ jobs:
         with:
           python-version: '3.10'
           architecture: ${{ matrix.target }}
+      - uses: taiki-e/cache-cargo-install-action@v1
+        with:
+          tool: cargo-edit
+      - name: Set package version
+        env:
+          VERSION: ${{ needs.get-version.outputs.version }}
+        run: |
+          cargo set-version "$env:VERSION"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -98,6 +129,7 @@ jobs:
 
   macos:
     runs-on: macos-latest
+    needs: get-version
     strategy:
       matrix:
         target: [x86_64, aarch64]
@@ -106,6 +138,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+      - uses: taiki-e/cache-cargo-install-action@v1
+        with:
+          tool: cargo-edit
+      - name: Set package version
+        env:
+          VERSION: ${{ needs.get-version.outputs.version }}
+        run: |
+          cargo set-version "${VERSION}"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -128,8 +168,17 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
+    needs: get-version
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/cache-cargo-install-action@v1
+        with:
+          tool: cargo-edit
+      - name: Set package version
+        env:
+          VERSION: ${{ needs.get-version.outputs.version }}
+        run: |
+          cargo set-version "${VERSION}"
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -141,35 +190,11 @@ jobs:
           name: wheels
           path: dist
 
-  check-version:
-    name: Check if tag matches Cargo.toml version
-    runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/v')"
-    needs: [linux, windows, macos, sdist]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Extract Git version from ref
-        id: git_version
-        run: echo "version=$(echo ${GITHUB_REF#refs/tags/})" >> ${GITHUB_OUTPUT}
-        env:
-          GITHUB_REF: ${{ github.ref }}
-      - name: Read Cargo.toml
-        id: cargo_version
-        uses: SebRollen/toml-action@v1.0.2
-        with:
-          file: Cargo.toml
-          field: package.version
-      - name: Verify that tag matches Cargo.toml version
-        run: |
-          if [ "v${{ steps.cargo_version.outputs.value }}" != "${{ steps.git_version.outputs.version }}" ]; then
-            exit 1
-          fi
-
   release:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/v')"
-    needs: [check-version]
+    needs: [linux, windows, macos, sdist]
     steps:
       - uses: actions/download-artifact@v4
         with:

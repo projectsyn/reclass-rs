@@ -106,7 +106,23 @@ patch -p1 -d $KAPITAN_VENV < hack/kapitan_0.32_reclass_rs.patch
 
 Please note that we've only tested the patch against the Kapitan 0.32 release as published on PyPI.
 
+## Automated package version management
+
+We generate the package version of `reclass-rs` from the latest Git tag when building Python wheels.
+To ensure this always works, we keep the version in the committed `Cargo.toml` as `0.0.0`.
+
+We generate the package version from Git by calling `git describe --tags --always --match=v*`.
+This command produces something like `v0.1.1-61-g531ca91`.
+We always strip the leading `v`, since neither Cargo nor maturin support versions with leading `v`.
+If we're building a branch or PR, we discard the component derived from the commit hash.
+For the example output above, the package version for a branch or PR build will become `0.1.1.post61`.
+For tag builds, the command ouptut will be just the tag, so the package version will match the tag.
+
+The version is injected with [cargo-edit]'s `cargo set-version` before the Python wheels are built.
+
+See the ["Python" workflow](./.github/workflows/python.yml) for more details.
 
 [rustup]: https://rustup.rs/
 [maturin]: https://github.com/PyO3/maturin
 [Kapitan]: https://kapitan.dev
+[cargo-edit]: https://github.com/killercup/cargo-edit
