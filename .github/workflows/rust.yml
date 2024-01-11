@@ -48,6 +48,7 @@ jobs:
 
   benchmarks:
     runs-on: ubuntu-latest
+    if: github.base_ref != ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
