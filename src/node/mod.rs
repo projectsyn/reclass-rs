@@ -46,8 +46,7 @@ impl Node {
         let mut meta = NodeInfoMeta::new(name, name, "", "base");
 
         let npath = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
-        let mut invpath = PathBuf::from(&r.config.nodes_path);
-        invpath.push(npath);
+        let invpath = r.config.node_path(npath);
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         meta.uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
@@ -173,8 +172,7 @@ impl Node {
         };
 
         // Render inventory path of class based from `r.classes_path`.
-        let mut invpath = PathBuf::from(&r.config.classes_path);
-        invpath.push(cpath);
+        let invpath = r.config.class_path(cpath);
 
         // Load file contents and create Node
         let mut meta = NodeInfoMeta::default();
@@ -306,12 +304,7 @@ impl Node {
 
 #[cfg(test)]
 fn make_reclass() -> Reclass {
-    Reclass::new(
-        "./tests/inventory/nodes",
-        "./tests/inventory/classes",
-        false,
-    )
-    .unwrap()
+    Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap()
 }
 
 #[cfg(test)]

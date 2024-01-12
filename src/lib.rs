@@ -108,8 +108,22 @@ fn walk_entity_dir(
 }
 
 impl Reclass {
-    pub fn new(nodes_path: &str, classes_path: &str, ignore_class_notfound: bool) -> Result<Self> {
-        let config = Config::new(nodes_path, classes_path, ignore_class_notfound);
+    pub fn new(
+        inventory_path: &str,
+        nodes_path: &str,
+        classes_path: &str,
+        ignore_class_notfound: bool,
+    ) -> Result<Self> {
+        let config = Config::new(
+            Some(inventory_path),
+            Some(nodes_path),
+            Some(classes_path),
+            Some(ignore_class_notfound),
+        )?;
+        Self::new_from_config(config)
+    }
+
+    pub fn new_from_config(config: Config) -> Result<Self> {
         let mut r = Self {
             config,
             classes: HashMap::new(),
@@ -121,6 +135,7 @@ impl Reclass {
             .map_err(|e| anyhow!("Error while discovering classes: {e}"))?;
         Ok(r)
     }
+
     /// Discover all top-level YAML files in `r.nodes_path`.
     ///
     /// This method will raise an error if multiple nodes which resolve to the same node name
@@ -154,14 +169,21 @@ impl Reclass {
 #[pymethods]
 impl Reclass {
     #[new]
-    #[pyo3(signature = (nodes_path="./inventory/nodes", classes_path="./inventory/classes", ignore_class_notfound=false))]
+    #[pyo3(signature = (inventory_path=".", nodes_path=None, classes_path=None, ignore_class_notfound=None))]
     pub fn new_py(
-        nodes_path: &str,
-        classes_path: &str,
-        ignore_class_notfound: bool,
+        inventory_path: Option<&str>,
+        nodes_path: Option<&str>,
+        classes_path: Option<&str>,
+        ignore_class_notfound: Option<bool>,
     ) -> PyResult<Self> {
-        let r = Self::new(nodes_path, classes_path, ignore_class_notfound)
-            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        let c = Config::new(
+            inventory_path,
+            nodes_path,
+            classes_path,
+            ignore_class_notfound,
+        )
+        .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        let r = Self::new_from_config(c).map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(r)
     }
 
@@ -197,7 +219,7 @@ impl Reclass {
 
 impl Default for Reclass {
     fn default() -> Self {
-        Self::new("./inventory/nodes", "./inventory/classes", false).unwrap()
+        Self::new(".", "nodes", "classes", false).unwrap()
     }
 }
 
@@ -219,12 +241,8 @@ mod tests {
 
     #[test]
     fn test_reclass_new() {
-        let n = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
+        let n = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        assert_eq!(n.config.inventory_path, "./tests/inventory");
         assert_eq!(n.config.nodes_path, "./tests/inventory/nodes");
         assert_eq!(n.config.classes_path, "./tests/inventory/classes");
         assert_eq!(n.config.ignore_class_notfound, false);
@@ -236,11 +254,6 @@ mod tests {
         collides with definition in './tests/broken-inventory/classes/foo/bar.yml'. \
         Classes can only be defined once per inventory.")]
     fn test_reclass_discover_classes() {
-        Reclass::new(
-            "./tests/broken-inventory/nodes",
-            "./tests/broken-inventory/classes",
-            false,
-        )
-        .unwrap();
+        Reclass::new("./tests/broken-inventory", "nodes", "classes", false).unwrap();
     }
 }
