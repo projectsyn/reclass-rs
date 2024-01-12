@@ -8,9 +8,10 @@ def test_import_new():
         "./tests/inventory/targets", "./tests/inventory/classes", True
     )
     assert r is not None
-    assert r.nodes_path == "./tests/inventory/targets"
-    assert r.classes_path == "./tests/inventory/classes"
-    assert r.ignore_class_notfound
+    assert r.config is not None
+    assert r.config.nodes_path == "./tests/inventory/targets"
+    assert r.config.classes_path == "./tests/inventory/classes"
+    assert r.config.ignore_class_notfound
 
 
 def test_import_raises():

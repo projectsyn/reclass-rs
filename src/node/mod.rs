@@ -45,7 +45,7 @@ impl Node {
         let mut meta = NodeInfoMeta::new(name, name, "", "base");
 
         let npath = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
-        let mut invpath = PathBuf::from(&r.nodes_path);
+        let mut invpath = PathBuf::from(&r.config.nodes_path);
         invpath.push(npath);
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
@@ -157,7 +157,7 @@ impl Node {
 
         // Lookup path for provided class in r.classes, handling ignore_class_notfound
         let Some(cpath) = r.classes.get(&cls) else {
-            if r.ignore_class_notfound {
+            if r.config.ignore_class_notfound {
                 return Ok(None);
             }
             return Err(anyhow!("Class {cls} not found"));
@@ -172,7 +172,7 @@ impl Node {
         };
 
         // Render inventory path of class based from `r.classes_path`.
-        let mut invpath = PathBuf::from(&r.classes_path);
+        let mut invpath = PathBuf::from(&r.config.classes_path);
         invpath.push(cpath);
 
         // Load file contents and create Node

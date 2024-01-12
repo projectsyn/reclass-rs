@@ -7,6 +7,7 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
 
+mod config;
 mod inventory;
 mod list;
 mod node;
@@ -22,6 +23,7 @@ use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
+use config::Config;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
 
@@ -31,15 +33,9 @@ const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct Reclass {
-    /// Path to node definitions in inventory
+    /// Reclass config
     #[pyo3(get)]
-    pub nodes_path: String,
-    #[pyo3(get)]
-    /// Path to class definitions in inventory
-    pub classes_path: String,
-    /// Whether to ignore included classes which don't exist (yet)
-    #[pyo3(get)]
-    pub ignore_class_notfound: bool,
+    pub config: Config,
     /// List of discovered Reclass classes in `classes_path`
     classes: HashMap<String, PathBuf>,
     /// List of discovered Reclass nodes in `nodes_path`
@@ -135,10 +131,9 @@ fn walk_entity_dir(
 
 impl Reclass {
     pub fn new(nodes_path: &str, classes_path: &str, ignore_class_notfound: bool) -> Result<Self> {
+        let config = Config::new(nodes_path, classes_path, ignore_class_notfound);
         let mut r = Self {
-            nodes_path: nodes_path.to_owned(),
-            classes_path: classes_path.to_owned(),
-            ignore_class_notfound,
+            config,
             classes: HashMap::new(),
             nodes: HashMap::new(),
         };
@@ -154,7 +149,7 @@ impl Reclass {
     /// exist. Currently the only case where this can happen is when an inventory defines a node as
     /// both `<name>.yml` and `<name>.yaml`.
     fn discover_nodes(&mut self) -> Result<()> {
-        walk_entity_dir(&self.nodes_path, &mut self.nodes, 1)
+        walk_entity_dir(&self.config.nodes_path, &mut self.nodes, 1)
     }
 
     /// Discover all classes in `r.classes_path` and store the resulting list in `r.known_classes`.
@@ -163,7 +158,7 @@ impl Reclass {
     /// class name exist (e.g. classes `foo..bar.yml` and `foo/.bar.yml` are both included as
     /// `foo..bar`).
     fn discover_classes(&mut self) -> Result<()> {
-        walk_entity_dir(&self.classes_path, &mut self.classes, usize::MAX)
+        walk_entity_dir(&self.config.classes_path, &mut self.classes, usize::MAX)
     }
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
@@ -252,9 +247,9 @@ mod tests {
             false,
         )
         .unwrap();
-        assert_eq!(n.nodes_path, "./tests/inventory/nodes");
-        assert_eq!(n.classes_path, "./tests/inventory/classes");
-        assert_eq!(n.ignore_class_notfound, false);
+        assert_eq!(n.config.nodes_path, "./tests/inventory/nodes");
+        assert_eq!(n.config.classes_path, "./tests/inventory/classes");
+        assert_eq!(n.config.ignore_class_notfound, false);
     }
 
     #[test]
