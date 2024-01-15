@@ -8,6 +8,7 @@
 #![allow(clippy::similar_names)]
 
 mod config;
+mod fsutil;
 mod inventory;
 mod list;
 mod node;
@@ -20,10 +21,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
-use std::path::{Component, Path, PathBuf, MAIN_SEPARATOR};
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
 use config::Config;
+use fsutil::to_lexical_absolute;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
 
@@ -40,30 +42,6 @@ pub struct Reclass {
     classes: HashMap<String, PathBuf>,
     /// List of discovered Reclass nodes in `nodes_path`
     nodes: HashMap<String, PathBuf>,
-}
-
-/// Converts `p` to an absolute path, but doesn't resolve symlinks. The function does normalize the
-/// path by resolving any `.` and `..` components which are present.
-///
-/// Copied from https://internals.rust-lang.org/t/path-to-lexical-absolute/14940.
-fn to_lexical_absolute(p: &Path) -> Result<PathBuf> {
-    let mut absolute = if p.is_absolute() {
-        PathBuf::new()
-    } else {
-        std::env::current_dir()?
-    };
-    for component in p.components() {
-        match component {
-            Component::CurDir => { /* do nothing for `.` components */ }
-            Component::ParentDir => {
-                // pop the last element that we added for `..` components
-                absolute.pop();
-            }
-            // just push the component for any other component
-            component => absolute.push(component.as_os_str()),
-        }
-    }
-    Ok(absolute)
 }
 
 fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> Result<()> {

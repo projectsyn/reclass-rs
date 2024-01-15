@@ -5,10 +5,11 @@ use std::path::PathBuf;
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
 use crate::types::{Mapping, Value};
-use crate::{to_lexical_absolute, Reclass};
+use crate::Reclass;
 
 mod nodeinfo;
 
