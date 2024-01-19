@@ -610,3 +610,21 @@ fn test_render_n24() {
     );
     assert_eq!(n.parameters, expected);
 }
+
+#[test]
+fn test_render_n25() {
+    let r = make_reclass();
+    let n = r.render_node("n25").unwrap();
+
+    let expected = expected_params(
+        "n25",
+        r#"
+        foo:
+          foo: foo/init
+          bar: bar
+        "#,
+    );
+    println!("{:#?}", n.parameters);
+    assert_eq!(n.parameters, expected);
+    assert_eq!(n.classes, vec!["bar", "foo"]);
+}
