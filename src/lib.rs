@@ -96,15 +96,33 @@ fn walk_entity_dir(
             // it's an entity (class or node), process it
             let abspath = to_lexical_absolute(entry.path())?;
             let relpath = abspath.strip_prefix(&entity_root)?;
-            let cls = relpath
-                .with_extension("")
+            let cls = relpath.with_extension("");
+            let (cls, loc) = if cls.ends_with("init") {
+                // treat `foo/init.yml` as contents for class `foo`
+                let cls = cls
+                    .parent()
+                    .ok_or(anyhow!(
+                        "Failed to normalize entity {}",
+                        entry.path().display()
+                    ))?
+                    .to_owned();
+                // here, unwrap can't panic since we otherwise would have already returned an error
+                // in the previous statement.
+                let loc = relpath.parent().unwrap();
+                // For `init.ya?ml` classes, the location is parent directory of the directory
+                // holding the class file.
+                (cls, loc.parent().unwrap_or(Path::new("")))
+            } else {
+                // For normal classes, the location is the directory holding the class file.
+                (cls, relpath.parent().unwrap_or(Path::new("")))
+            };
+            let cls = cls
                 .to_str()
                 .ok_or(anyhow!(
                     "Failed to normalize entity {}",
                     entry.path().display()
                 ))?
                 .replace(MAIN_SEPARATOR, ".");
-            let loc = relpath.parent().unwrap_or(Path::new(""));
             if let Some(prev) = entity_map.get(&cls) {
                 return err_duplicate_entity(root, relpath, &cls, &prev.path);
             }
