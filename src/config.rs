@@ -29,6 +29,18 @@ impl CompatFlag {
     }
 }
 
+impl TryFrom<&str> for CompatFlag {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self> {
+        match value {
+            "compose-node-name-literal-dots"
+            | "compose_node_name_literal_dots"
+            | "ComposeNodeNameLiteralDots" => Ok(Self::ComposeNodeNameLiteralDots),
+            _ => Err(anyhow!("Unknown compatibility flag '{value}'")),
+        }
+    }
+}
+
 #[pyclass]
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -150,6 +162,21 @@ impl Config {
                     self.compose_node_name = v.as_bool().ok_or(anyhow!(
                         "Expected value of config key 'compose_node_name' to be a boolean"
                     ))?;
+                }
+                "reclass_rs_compat_flags" => {
+                    let flags = v.as_sequence().ok_or(anyhow!(
+                        "Expected value of config key 'reclass_rs_compat_flags' to be a list"
+                    ))?;
+                    for f in flags {
+                        let f = f
+                            .as_str()
+                            .ok_or(anyhow!("Expected compatibility flag to be a string"))?;
+                        if let Ok(flag) = CompatFlag::try_from(f) {
+                            self.compatflags.insert(flag);
+                        } else {
+                            eprintln!("Unknown compatibility flag '{f}', ignoring...");
+                        }
+                    }
                 }
                 _ => {
                     eprintln!(

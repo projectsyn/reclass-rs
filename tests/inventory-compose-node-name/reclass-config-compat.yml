@@ -1,0 +1,9 @@
+# Add reclass-config.yml for Kapitan/Python reclass
+nodes_uri: nodes
+classes_uri: classes
+compose_node_name: true
+allow_none_override: true
+ignore_class_notfound: true
+reclass_rs_compat_flags: 
+  - compose-node-name-literal-dots
+  - foo

@@ -212,9 +212,7 @@ mod inventory_tests {
             None,
         )
         .unwrap();
-        c.load_from_file("reclass-config.yml").unwrap();
-        c.compatflags
-            .insert(crate::config::CompatFlag::ComposeNodeNameLiteralDots);
+        c.load_from_file("reclass-config-compat.yml").unwrap();
         let r = Reclass::new_from_config(c).unwrap();
         let invabsdir = std::fs::canonicalize("./tests/inventory-compose-node-name").unwrap();
         let invabsdir = invabsdir.to_str().unwrap();
