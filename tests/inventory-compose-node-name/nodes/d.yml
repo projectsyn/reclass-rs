@@ -1,0 +1,6 @@
+classes:
+  - cls1
+
+parameters:
+  node_name: d
+  short_name: d

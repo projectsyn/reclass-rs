@@ -193,4 +193,86 @@ mod inventory_tests {
 
         assert_eq!(inv.classes, expected_classes);
     }
+
+    use crate::types::Value;
+    fn literal(v: &str) -> Value {
+        Value::Literal(v.to_string())
+    }
+
+    fn sequence(i: &[&str]) -> Value {
+        Value::Sequence(i.iter().map(|s| literal(s)).collect::<Vec<Value>>())
+    }
+
+    #[test]
+    fn test_render_compose_node_name() {
+        let mut c = crate::Config::new(
+            Some("./tests/inventory-compose-node-name"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        c.load_from_file("reclass-config.yml").unwrap();
+        let r = Reclass::new_from_config(c).unwrap();
+        let invabsdir = std::fs::canonicalize("./tests/inventory-compose-node-name").unwrap();
+        let invabsdir = invabsdir.to_str().unwrap();
+        let inv = Inventory::render(&r).unwrap();
+        let mut nodes = inv.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(nodes, vec!["a", "a.1", "b.1", "c.1", "d"]);
+
+        let node = &inv.nodes["a"];
+        assert_eq!(node.reclass.node, "a");
+        assert_eq!(node.reclass.name, "a");
+        assert_eq!(
+            node.reclass.uri,
+            format!("yaml_fs://{invabsdir}/nodes/a.yml")
+        );
+        let params_reclass_name = node
+            .parameters
+            .get(&"_reclass_".into())
+            .unwrap()
+            .get(&"name".into())
+            .unwrap();
+        assert_eq!(params_reclass_name.get(&"full".into()), Some(&literal("a")));
+        assert_eq!(
+            params_reclass_name.get(&"short".into()),
+            Some(&literal("a"))
+        );
+        assert_eq!(params_reclass_name.get(&"path".into()), Some(&literal("a")));
+        assert_eq!(
+            params_reclass_name.get(&"parts".into()),
+            Some(&sequence(&["a"]))
+        );
+
+        let node = &inv.nodes["a.1"];
+        assert_eq!(node.reclass.node, "a.1");
+        assert_eq!(node.reclass.name, "a.1");
+        assert_eq!(
+            node.reclass.uri,
+            format!("yaml_fs://{invabsdir}/nodes/a.1.yml")
+        );
+        let params_reclass_name = node
+            .parameters
+            .get(&"_reclass_".into())
+            .unwrap()
+            .get(&"name".into())
+            .unwrap();
+        assert_eq!(
+            params_reclass_name.get(&"full".into()),
+            Some(&literal("a.1"))
+        );
+        assert_eq!(
+            params_reclass_name.get(&"short".into()),
+            Some(&literal("1"))
+        );
+        assert_eq!(
+            params_reclass_name.get(&"path".into()),
+            Some(&literal("a/1"))
+        );
+        assert_eq!(
+            params_reclass_name.get(&"parts".into()),
+            Some(&sequence(&["a", "1"]))
+        );
+    }
 }

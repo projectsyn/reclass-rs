@@ -21,6 +21,9 @@ pub struct Config {
     /// Whether to ignore included classes which don't exist (yet)
     #[pyo3(get)]
     pub ignore_class_notfound: bool,
+    /// Whether to treat nested files in `nodes_path` as node definitions
+    #[pyo3(get)]
+    pub compose_node_name: bool,
 }
 
 impl Config {
@@ -70,6 +73,7 @@ impl Config {
             nodes_path: to_lexical_normal(&npath, true).display().to_string(),
             classes_path: to_lexical_normal(&cpath, true).display().to_string(),
             ignore_class_notfound: ignore_class_notfound.unwrap_or(false),
+            compose_node_name: false,
         })
     }
 
@@ -111,6 +115,11 @@ impl Config {
                 "ignore_class_notfound" => {
                     self.ignore_class_notfound = v.as_bool().ok_or(anyhow!(
                         "Expected value of config key 'ignore_class_notfound' to be a boolean"
+                    ))?;
+                }
+                "compose_node_name" => {
+                    self.compose_node_name = v.as_bool().ok_or(anyhow!(
+                        "Expected value of config key 'compose_node_name' to be a boolean"
                     ))?;
                 }
                 _ => {

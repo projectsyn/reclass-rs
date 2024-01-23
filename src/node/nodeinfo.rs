@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use chrono::offset::Local;
 use chrono::DateTime;
 use pyo3::prelude::*;
@@ -44,15 +45,30 @@ impl NodeInfoMeta {
     }
 
     /// Generates a Mapping suitable to use as meta parameter `_reclass_`
-    pub(crate) fn as_reclass(&self) -> Mapping {
+    pub(crate) fn as_reclass(&self) -> Result<Mapping> {
         let namedata: Vec<(Value, Value)> = vec![
             ("full".into(), self.name.clone().into()),
             (
                 "parts".into(),
-                Value::Sequence(vec![self.name.clone().into()]),
+                Value::Sequence(
+                    self.name
+                        .split('.')
+                        .map(|s| s.into())
+                        .collect::<Vec<Value>>(),
+                ),
             ),
-            ("path".into(), self.name.clone().into()),
-            ("short".into(), self.name.clone().into()),
+            (
+                "path".into(),
+                self.name.split('.').collect::<Vec<_>>().join("/").into(),
+            ),
+            (
+                "short".into(),
+                self.name
+                    .split('.')
+                    .last()
+                    .ok_or(anyhow!("Empty node name?"))?
+                    .into(),
+            ),
         ];
         let namedata = Mapping::from_iter(namedata);
 
@@ -64,7 +80,7 @@ impl NodeInfoMeta {
             .insert("name".into(), Value::Mapping(namedata))
             .unwrap();
 
-        pmeta
+        Ok(pmeta)
     }
 }
 
