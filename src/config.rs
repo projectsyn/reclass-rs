@@ -1,8 +1,33 @@
 use anyhow::{anyhow, Result};
 use pyo3::prelude::*;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use crate::fsutil::to_lexical_normal;
+
+/// Flags to change reclass-rs behavior to be compaible with Python reclass
+#[pyclass]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum CompatFlag {
+    /// This flag enables Python Reclass-compatible rendering of fields `path` and `parts` in
+    /// `NodeInfoMeta` when Reclass option `compose-node-name` is enabled.
+    ///
+    /// By default, if this flag isn't enabled, reclass-rs will preserve literal dots in the node's
+    /// file path when rendering fields `path` and `parts` in `NodeInfoMeta` when
+    /// `compose-node-name` is enabled.
+    ComposeNodeNameLiteralDots,
+}
+
+#[pymethods]
+impl CompatFlag {
+    fn __hash__(&self) -> u64 {
+        let mut h = DefaultHasher::new();
+        self.hash(&mut h);
+        h.finish()
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug, Default)]
@@ -24,6 +49,9 @@ pub struct Config {
     /// Whether to treat nested files in `nodes_path` as node definitions
     #[pyo3(get)]
     pub compose_node_name: bool,
+    /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
+    #[pyo3(get)]
+    pub compatflags: HashSet<CompatFlag>,
 }
 
 impl Config {
@@ -74,6 +102,7 @@ impl Config {
             classes_path: to_lexical_normal(&cpath, true).display().to_string(),
             ignore_class_notfound: ignore_class_notfound.unwrap_or(false),
             compose_node_name: false,
+            compatflags: HashSet::new(),
         })
     }
 

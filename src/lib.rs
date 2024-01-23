@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
-use config::Config;
+use config::{CompatFlag, Config};
 use fsutil::to_lexical_absolute;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};

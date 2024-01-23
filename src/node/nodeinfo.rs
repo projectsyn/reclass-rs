@@ -3,13 +3,17 @@ use chrono::offset::Local;
 use chrono::DateTime;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::path::PathBuf;
 
+use crate::config::{CompatFlag, Config};
 use crate::types::{Mapping, Value};
 
 /// Contains metadata for a Reclass node's rendered data
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct NodeInfoMeta {
+    /// Inventory path of node
+    parts: PathBuf,
     /// Original node name
     #[pyo3(get)]
     pub node: String,
@@ -29,13 +33,14 @@ pub struct NodeInfoMeta {
 
 impl Default for NodeInfoMeta {
     fn default() -> Self {
-        Self::new("", "", "", "")
+        Self::new("", "", "", PathBuf::new(), "")
     }
 }
 
 impl NodeInfoMeta {
-    pub fn new(node: &str, name: &str, uri: &str, environment: &str) -> Self {
+    pub fn new(node: &str, name: &str, uri: &str, parts: PathBuf, environment: &str) -> Self {
         Self {
+            parts,
             node: node.into(),
             name: name.into(),
             uri: uri.into(),
@@ -45,29 +50,39 @@ impl NodeInfoMeta {
     }
 
     /// Generates a Mapping suitable to use as meta parameter `_reclass_`
-    pub(crate) fn as_reclass(&self) -> Result<Mapping> {
+    pub(crate) fn as_reclass(&self, config: &Config) -> Result<Mapping> {
+        let parts = if config.compose_node_name
+            && config
+                .compatflags
+                .contains(&CompatFlag::ComposeNodeNameLiteralDots)
+        {
+            // when CompatFlag ComposeNodeNameLiteralDots is set, we naively split the node's name
+            // by dots to generate the parts list for the node metadata.
+            // This matches Python reclass's behavior, but is incorrect for nodes which contain
+            // literal dots in the file name.
+            self.name.split('.').collect::<Vec<&str>>()
+        } else {
+            // If the compat flag isn't set, we generate the parts list from the provided shortened
+            // pathbuf containing the path within `nodes_path` which preserves literal dots in the
+            // node's filename.
+            self.parts
+                .iter()
+                .map(|s| {
+                    s.to_str()
+                        .ok_or(anyhow!("Unable to convert path segment {s:?} to a string"))
+                })
+                .collect::<Result<Vec<&str>, _>>()?
+        };
         let namedata: Vec<(Value, Value)> = vec![
             ("full".into(), self.name.clone().into()),
             (
                 "parts".into(),
-                Value::Sequence(
-                    self.name
-                        .split('.')
-                        .map(|s| s.into())
-                        .collect::<Vec<Value>>(),
-                ),
+                Value::Sequence(parts.iter().map(|&s| s.into()).collect::<Vec<Value>>()),
             ),
-            (
-                "path".into(),
-                self.name.split('.').collect::<Vec<_>>().join("/").into(),
-            ),
+            ("path".into(), parts.join("/").into()),
             (
                 "short".into(),
-                self.name
-                    .split('.')
-                    .last()
-                    .ok_or(anyhow!("Empty node name?"))?
-                    .into(),
+                (*parts.iter().last().ok_or(anyhow!("Empty node name?"))?).into(),
             ),
         ];
         let namedata = Mapping::from_iter(namedata);

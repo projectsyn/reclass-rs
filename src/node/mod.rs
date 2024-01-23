@@ -5,10 +5,11 @@ use std::path::PathBuf;
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
 use crate::types::{Mapping, Value};
-use crate::{to_lexical_absolute, Reclass};
+use crate::Reclass;
 
 mod nodeinfo;
 
@@ -47,7 +48,7 @@ impl Node {
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         let uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
-        let meta = NodeInfoMeta::new(name, name, &uri, "base");
+        let meta = NodeInfoMeta::new(name, name, &uri, nodeinfo.path.with_extension(""), "base");
         Node::from_str(meta, None, &ncontents)
     }
 
@@ -281,7 +282,7 @@ impl Node {
         // class loading. This roughly corresponds to Python reclass's
         // `_get_automatic_parameters()`.
         base.parameters
-            .insert("_reclass_".into(), self.meta.as_reclass()?.into())?;
+            .insert("_reclass_".into(), self.meta.as_reclass(&r.config)?.into())?;
 
         let mut seen = vec![];
         let mut root = Node::default();
