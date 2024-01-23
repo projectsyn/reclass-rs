@@ -462,7 +462,7 @@ fn test_render_n17() {
 
 #[test]
 fn test_render_n18() {
-    let r = Reclass::new("./tests/inventory/nodes", "./tests/inventory/classes", true).unwrap();
+    let r = Reclass::new("./tests/inventory", "nodes", "classes", true).unwrap();
     let n = r.render_node("n18").unwrap();
 
     // # Parameters

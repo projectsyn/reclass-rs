@@ -101,8 +101,9 @@ mod inventory_tests {
     #[test]
     fn test_render() {
         let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
+            "./tests/inventory",
+            "nodes",
+            "classes",
             // n18 includes a nonexistent class
             true,
         )

@@ -65,8 +65,7 @@ expected_nodes = set([f"n{i}" for i in range(1, 25)])
 
 def test_inventory():
     r = reclass_rs.Reclass(
-        nodes_path="./tests/inventory/nodes",
-        classes_path="./tests/inventory/classes",
+        inventory_path="./tests/inventory",
         ignore_class_notfound=True,
     )
     inv = r.inventory()
@@ -80,8 +79,7 @@ def test_inventory():
 
 def test_inventory_as_dict():
     r = reclass_rs.Reclass(
-        nodes_path="./tests/inventory/nodes",
-        classes_path="./tests/inventory/classes",
+        inventory_path="./tests/inventory",
         ignore_class_notfound=True,
     )
     inv = r.inventory().as_dict()

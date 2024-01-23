@@ -10,7 +10,7 @@ fn bench(c: &mut Criterion) {
         .unwrap();
 
     c.bench_function("Reclass::inventory() single-threaded", |b| {
-        let r = Reclass::new("./tests/inventory/nodes", "./tests/inventory/classes", true).unwrap();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", true).unwrap();
         b.iter(|| black_box(r.render_inventory().unwrap()))
     });
 }

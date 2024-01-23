@@ -7,13 +7,9 @@ use reclass_rs::Reclass;
 fn test_reclass() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
-        let r = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap()
-        .into_py(py);
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false)
+            .unwrap()
+            .into_py(py);
         let locals = PyDict::new(py);
         locals.set_item("r", r).unwrap();
         py.run(

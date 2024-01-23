@@ -5,10 +5,11 @@ use std::path::PathBuf;
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
 use crate::types::{Mapping, Value};
-use crate::{to_lexical_absolute, Reclass};
+use crate::Reclass;
 
 mod nodeinfo;
 
@@ -45,8 +46,7 @@ impl Node {
         let mut meta = NodeInfoMeta::new(name, name, "", "base");
 
         let npath = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
-        let mut invpath = PathBuf::from(&r.nodes_path);
-        invpath.push(npath);
+        let invpath = r.config.node_path(npath);
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         meta.uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
@@ -157,7 +157,7 @@ impl Node {
 
         // Lookup path for provided class in r.classes, handling ignore_class_notfound
         let Some(cpath) = r.classes.get(&cls) else {
-            if r.ignore_class_notfound {
+            if r.config.ignore_class_notfound {
                 return Ok(None);
             }
             return Err(anyhow!("Class {cls} not found"));
@@ -172,8 +172,7 @@ impl Node {
         };
 
         // Render inventory path of class based from `r.classes_path`.
-        let mut invpath = PathBuf::from(&r.classes_path);
-        invpath.push(cpath);
+        let invpath = r.config.class_path(cpath);
 
         // Load file contents and create Node
         let mut meta = NodeInfoMeta::default();
@@ -305,12 +304,7 @@ impl Node {
 
 #[cfg(test)]
 fn make_reclass() -> Reclass {
-    Reclass::new(
-        "./tests/inventory/nodes",
-        "./tests/inventory/classes",
-        false,
-    )
-    .unwrap()
+    Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap()
 }
 
 #[cfg(test)]

@@ -7,6 +7,8 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
 
+mod config;
+mod fsutil;
 mod inventory;
 mod list;
 mod node;
@@ -19,9 +21,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
-use std::path::{Component, Path, PathBuf, MAIN_SEPARATOR};
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
+use config::Config;
+use fsutil::to_lexical_absolute;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
 
@@ -31,43 +35,13 @@ const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 #[pyclass]
 #[derive(Clone, Debug)]
 pub struct Reclass {
-    /// Path to node definitions in inventory
+    /// Reclass config
     #[pyo3(get)]
-    pub nodes_path: String,
-    #[pyo3(get)]
-    /// Path to class definitions in inventory
-    pub classes_path: String,
-    /// Whether to ignore included classes which don't exist (yet)
-    #[pyo3(get)]
-    pub ignore_class_notfound: bool,
+    pub config: Config,
     /// List of discovered Reclass classes in `classes_path`
     classes: HashMap<String, PathBuf>,
     /// List of discovered Reclass nodes in `nodes_path`
     nodes: HashMap<String, PathBuf>,
-}
-
-/// Converts `p` to an absolute path, but doesn't resolve symlinks. The function does normalize the
-/// path by resolving any `.` and `..` components which are present.
-///
-/// Copied from https://internals.rust-lang.org/t/path-to-lexical-absolute/14940.
-fn to_lexical_absolute(p: &Path) -> Result<PathBuf> {
-    let mut absolute = if p.is_absolute() {
-        PathBuf::new()
-    } else {
-        std::env::current_dir()?
-    };
-    for component in p.components() {
-        match component {
-            Component::CurDir => { /* do nothing for `.` components */ }
-            Component::ParentDir => {
-                // pop the last element that we added for `..` components
-                absolute.pop();
-            }
-            // just push the component for any other component
-            component => absolute.push(component.as_os_str()),
-        }
-    }
-    Ok(absolute)
 }
 
 fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> Result<()> {
@@ -134,11 +108,24 @@ fn walk_entity_dir(
 }
 
 impl Reclass {
-    pub fn new(nodes_path: &str, classes_path: &str, ignore_class_notfound: bool) -> Result<Self> {
+    pub fn new(
+        inventory_path: &str,
+        nodes_path: &str,
+        classes_path: &str,
+        ignore_class_notfound: bool,
+    ) -> Result<Self> {
+        let config = Config::new(
+            Some(inventory_path),
+            Some(nodes_path),
+            Some(classes_path),
+            Some(ignore_class_notfound),
+        )?;
+        Self::new_from_config(config)
+    }
+
+    pub fn new_from_config(config: Config) -> Result<Self> {
         let mut r = Self {
-            nodes_path: nodes_path.to_owned(),
-            classes_path: classes_path.to_owned(),
-            ignore_class_notfound,
+            config,
             classes: HashMap::new(),
             nodes: HashMap::new(),
         };
@@ -148,13 +135,14 @@ impl Reclass {
             .map_err(|e| anyhow!("Error while discovering classes: {e}"))?;
         Ok(r)
     }
+
     /// Discover all top-level YAML files in `r.nodes_path`.
     ///
     /// This method will raise an error if multiple nodes which resolve to the same node name
     /// exist. Currently the only case where this can happen is when an inventory defines a node as
     /// both `<name>.yml` and `<name>.yaml`.
     fn discover_nodes(&mut self) -> Result<()> {
-        walk_entity_dir(&self.nodes_path, &mut self.nodes, 1)
+        walk_entity_dir(&self.config.nodes_path, &mut self.nodes, 1)
     }
 
     /// Discover all classes in `r.classes_path` and store the resulting list in `r.known_classes`.
@@ -163,7 +151,7 @@ impl Reclass {
     /// class name exist (e.g. classes `foo..bar.yml` and `foo/.bar.yml` are both included as
     /// `foo..bar`).
     fn discover_classes(&mut self) -> Result<()> {
-        walk_entity_dir(&self.classes_path, &mut self.classes, usize::MAX)
+        walk_entity_dir(&self.config.classes_path, &mut self.classes, usize::MAX)
     }
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
@@ -181,14 +169,21 @@ impl Reclass {
 #[pymethods]
 impl Reclass {
     #[new]
-    #[pyo3(signature = (nodes_path="./inventory/nodes", classes_path="./inventory/classes", ignore_class_notfound=false))]
+    #[pyo3(signature = (inventory_path=".", nodes_path=None, classes_path=None, ignore_class_notfound=None))]
     pub fn new_py(
-        nodes_path: &str,
-        classes_path: &str,
-        ignore_class_notfound: bool,
+        inventory_path: Option<&str>,
+        nodes_path: Option<&str>,
+        classes_path: Option<&str>,
+        ignore_class_notfound: Option<bool>,
     ) -> PyResult<Self> {
-        let r = Self::new(nodes_path, classes_path, ignore_class_notfound)
-            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        let c = Config::new(
+            inventory_path,
+            nodes_path,
+            classes_path,
+            ignore_class_notfound,
+        )
+        .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        let r = Self::new_from_config(c).map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(r)
     }
 
@@ -224,7 +219,7 @@ impl Reclass {
 
 impl Default for Reclass {
     fn default() -> Self {
-        Self::new("./inventory/nodes", "./inventory/classes", false).unwrap()
+        Self::new(".", "nodes", "classes", false).unwrap()
     }
 }
 
@@ -232,6 +227,8 @@ impl Default for Reclass {
 fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register the top-level `Reclass` Python class which is used to configure the library
     m.add_class::<Reclass>()?;
+    // Register the `Config` class
+    m.add_class::<Config>()?;
     // Register the NodeInfoMeta and NodeInfo classes
     m.add_class::<NodeInfoMeta>()?;
     m.add_class::<NodeInfo>()?;
@@ -246,15 +243,11 @@ mod tests {
 
     #[test]
     fn test_reclass_new() {
-        let n = Reclass::new(
-            "./tests/inventory/nodes",
-            "./tests/inventory/classes",
-            false,
-        )
-        .unwrap();
-        assert_eq!(n.nodes_path, "./tests/inventory/nodes");
-        assert_eq!(n.classes_path, "./tests/inventory/classes");
-        assert_eq!(n.ignore_class_notfound, false);
+        let n = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        assert_eq!(n.config.inventory_path, "./tests/inventory");
+        assert_eq!(n.config.nodes_path, "./tests/inventory/nodes");
+        assert_eq!(n.config.classes_path, "./tests/inventory/classes");
+        assert_eq!(n.config.ignore_class_notfound, false);
     }
 
     #[test]
@@ -263,11 +256,6 @@ mod tests {
         collides with definition in './tests/broken-inventory/classes/foo/bar.yml'. \
         Classes can only be defined once per inventory.")]
     fn test_reclass_discover_classes() {
-        Reclass::new(
-            "./tests/broken-inventory/nodes",
-            "./tests/broken-inventory/classes",
-            false,
-        )
-        .unwrap();
+        Reclass::new("./tests/broken-inventory", "nodes", "classes", false).unwrap();
     }
 }
