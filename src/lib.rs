@@ -314,6 +314,21 @@ impl Reclass {
             eprintln!("While initializing global thread pool: {e}");
         }
     }
+
+    /// Sets the provided CompatFlag in the current Reclass instance's config object
+    pub fn set_compat_flag(&mut self, flag: CompatFlag) {
+        self.config.compatflags.insert(flag);
+    }
+
+    /// Unsets the provided CompatFlag in the current Reclass instance's config object
+    pub fn unset_compat_flag(&mut self, flag: &CompatFlag) {
+        self.config.compatflags.remove(flag);
+    }
+
+    /// Clears the compatflags set in the current Reclass instance's config object
+    pub fn clear_compat_flags(&mut self) {
+        self.config.compatflags.clear();
+    }
 }
 
 impl Default for Reclass {
@@ -326,8 +341,9 @@ impl Default for Reclass {
 fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register the top-level `Reclass` Python class which is used to configure the library
     m.add_class::<Reclass>()?;
-    // Register the `Config` class
+    // Register the `Config` class and `CompatFlag` enum
     m.add_class::<Config>()?;
+    m.add_class::<CompatFlag>()?;
     // Register the NodeInfoMeta and NodeInfo classes
     m.add_class::<NodeInfoMeta>()?;
     m.add_class::<NodeInfo>()?;
