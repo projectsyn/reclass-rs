@@ -90,6 +90,13 @@ impl Config {
     }
 }
 
+#[pymethods]
+impl Config {
+    fn __repr__(&self) -> String {
+        format!("{self:#?}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

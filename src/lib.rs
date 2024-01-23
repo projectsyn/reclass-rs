@@ -227,6 +227,8 @@ impl Default for Reclass {
 fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register the top-level `Reclass` Python class which is used to configure the library
     m.add_class::<Reclass>()?;
+    // Register the `Config` class
+    m.add_class::<Config>()?;
     // Register the NodeInfoMeta and NodeInfo classes
     m.add_class::<NodeInfoMeta>()?;
     m.add_class::<NodeInfo>()?;
