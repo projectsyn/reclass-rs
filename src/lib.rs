@@ -218,6 +218,16 @@ impl Reclass {
         Ok(r)
     }
 
+    #[classmethod]
+    fn from_config(_cls: &PyType, inventory_path: &str, config_file: &str) -> PyResult<Self> {
+        let mut c = Config::new(Some(inventory_path), None, None, None)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        c.load_from_file(config_file)
+            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        let r = Self::new_from_config(c).map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Ok(r)
+    }
+
     fn __repr__(&self) -> String {
         format!("{self:#?}")
     }
