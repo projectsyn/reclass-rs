@@ -88,12 +88,8 @@ impl NodeInfoMeta {
         let namedata = Mapping::from_iter(namedata);
 
         let mut pmeta = Mapping::new();
-        pmeta
-            .insert("environment".into(), self.environment.clone().into())
-            .unwrap();
-        pmeta
-            .insert("name".into(), Value::Mapping(namedata))
-            .unwrap();
+        pmeta.insert("environment".into(), self.environment.clone().into())?;
+        pmeta.insert("name".into(), Value::Mapping(namedata))?;
 
         Ok(pmeta)
     }
