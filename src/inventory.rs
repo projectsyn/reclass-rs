@@ -203,6 +203,57 @@ mod inventory_tests {
         Value::Sequence(i.iter().map(|s| literal(s)).collect::<Vec<Value>>())
     }
 
+    fn check_compose_node_name_shared(inv: &Inventory, invabsdir: &str) {
+        let mut nodes = inv.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(
+            nodes,
+            vec!["a", "a.1", "b.1", "c.1", "c._c.1", "d", "d1", "d2"]
+        );
+
+        for n in nodes {
+            if n == "a.1" {
+                // not checking a.1 here, since it's the one node that is rendered differently
+                // between compat- and nocompat-mode.
+                continue;
+            }
+            let node = &inv.nodes[n];
+            assert_eq!(node.reclass.node, *n);
+            assert_eq!(node.reclass.name, *n);
+            let expected_full_name = node.parameters.get(&"node_name".into()).unwrap();
+            let expected_short_name = node.parameters.get(&"short_name".into()).unwrap();
+            let expected_path = node.parameters.get(&"path".into()).unwrap();
+            let expected_parts = node.parameters.get(&"parts".into()).unwrap();
+            let expected_uri_suffix = node.parameters.get(&"uri_suffix".into()).unwrap();
+            assert_eq!(
+                node.reclass.uri,
+                format!(
+                    "yaml_fs://{invabsdir}/nodes/{}",
+                    expected_uri_suffix.as_str().unwrap()
+                )
+            );
+            let params_reclass_name = node
+                .parameters
+                .get(&"_reclass_".into())
+                .unwrap()
+                .get(&"name".into())
+                .unwrap();
+            assert_eq!(
+                params_reclass_name.get(&"full".into()),
+                Some(expected_full_name)
+            );
+            assert_eq!(
+                params_reclass_name.get(&"short".into()),
+                Some(expected_short_name)
+            );
+            assert_eq!(params_reclass_name.get(&"path".into()), Some(expected_path));
+            assert_eq!(
+                params_reclass_name.get(&"parts".into()),
+                Some(expected_parts)
+            )
+        }
+    }
+
     #[test]
     fn test_render_compose_node_name_pycompat() {
         let mut c = crate::Config::new(
@@ -214,36 +265,12 @@ mod inventory_tests {
         .unwrap();
         c.load_from_file("reclass-config-compat.yml").unwrap();
         let r = Reclass::new_from_config(c).unwrap();
+
+        let inv = Inventory::render(&r).unwrap();
+
         let invabsdir = std::fs::canonicalize("./tests/inventory-compose-node-name").unwrap();
         let invabsdir = invabsdir.to_str().unwrap();
-        let inv = Inventory::render(&r).unwrap();
-        let mut nodes = inv.nodes.keys().collect::<Vec<_>>();
-        nodes.sort();
-        assert_eq!(nodes, vec!["a", "a.1", "b.1", "c.1", "d"]);
-
-        let node = &inv.nodes["a"];
-        assert_eq!(node.reclass.node, "a");
-        assert_eq!(node.reclass.name, "a");
-        assert_eq!(
-            node.reclass.uri,
-            format!("yaml_fs://{invabsdir}/nodes/a.yml")
-        );
-        let params_reclass_name = node
-            .parameters
-            .get(&"_reclass_".into())
-            .unwrap()
-            .get(&"name".into())
-            .unwrap();
-        assert_eq!(params_reclass_name.get(&"full".into()), Some(&literal("a")));
-        assert_eq!(
-            params_reclass_name.get(&"short".into()),
-            Some(&literal("a"))
-        );
-        assert_eq!(params_reclass_name.get(&"path".into()), Some(&literal("a")));
-        assert_eq!(
-            params_reclass_name.get(&"parts".into()),
-            Some(&sequence(&["a"]))
-        );
+        check_compose_node_name_shared(&inv, invabsdir);
 
         let node = &inv.nodes["a.1"];
         assert_eq!(node.reclass.node, "a.1");
@@ -287,36 +314,12 @@ mod inventory_tests {
         .unwrap();
         c.load_from_file("reclass-config.yml").unwrap();
         let r = Reclass::new_from_config(c).unwrap();
+
+        let inv = Inventory::render(&r).unwrap();
+
         let invabsdir = std::fs::canonicalize("./tests/inventory-compose-node-name").unwrap();
         let invabsdir = invabsdir.to_str().unwrap();
-        let inv = Inventory::render(&r).unwrap();
-        let mut nodes = inv.nodes.keys().collect::<Vec<_>>();
-        nodes.sort();
-        assert_eq!(nodes, vec!["a", "a.1", "b.1", "c.1", "d"]);
-
-        let node = &inv.nodes["a"];
-        assert_eq!(node.reclass.node, "a");
-        assert_eq!(node.reclass.name, "a");
-        assert_eq!(
-            node.reclass.uri,
-            format!("yaml_fs://{invabsdir}/nodes/a.yml")
-        );
-        let params_reclass_name = node
-            .parameters
-            .get(&"_reclass_".into())
-            .unwrap()
-            .get(&"name".into())
-            .unwrap();
-        assert_eq!(params_reclass_name.get(&"full".into()), Some(&literal("a")));
-        assert_eq!(
-            params_reclass_name.get(&"short".into()),
-            Some(&literal("a"))
-        );
-        assert_eq!(params_reclass_name.get(&"path".into()), Some(&literal("a")));
-        assert_eq!(
-            params_reclass_name.get(&"parts".into()),
-            Some(&sequence(&["a"]))
-        );
+        check_compose_node_name_shared(&inv, invabsdir);
 
         let node = &inv.nodes["a.1"];
         assert_eq!(node.reclass.node, "a.1");
