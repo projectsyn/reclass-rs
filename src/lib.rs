@@ -37,6 +37,7 @@ struct EntityInfo {
     loc: PathBuf,
 }
 
+#[derive(Eq, PartialEq)]
 enum EntityKind {
     Node,
     Class,
@@ -159,13 +160,23 @@ fn walk_entity_dir(
                 // For normal classes, the location is the directory holding the class file.
                 (cls, relpath.parent().unwrap_or(Path::new("")))
             };
-            let cls = cls
-                .to_str()
-                .ok_or(anyhow!(
-                    "Failed to normalize entity {}",
-                    entry.path().display()
-                ))?
-                .replace(MAIN_SEPARATOR, ".");
+            let cls = cls.to_str().ok_or(anyhow!(
+                "Failed to normalize entity {}",
+                entry.path().display()
+            ))?;
+            let (cls, loc) = if kind == &EntityKind::Node && max_depth > 1 && cls.starts_with('_') {
+                // special case node paths starting with _ for compose-node-name
+                (
+                    cls.split(MAIN_SEPARATOR).last().ok_or(anyhow!(
+                        "Can't shorten node name for {}",
+                        entry.path().display()
+                    ))?,
+                    Path::new(""),
+                )
+            } else {
+                (cls, loc)
+            };
+            let cls = cls.replace(MAIN_SEPARATOR, ".");
             if let Some(prev) = entity_map.get(&cls) {
                 return err_duplicate_entity(kind, root, relpath, &cls, &prev.path);
             }
@@ -385,14 +396,20 @@ mod tests {
         .unwrap();
         c.load_from_file("reclass-config.yml").unwrap();
         let r = Reclass::new_from_config(c).unwrap();
-        assert_eq!(r.nodes.len(), 5);
+        assert_eq!(r.nodes.len(), 8);
         let mut nodes = r.nodes.keys().collect::<Vec<_>>();
         nodes.sort();
-        assert_eq!(nodes, vec!["a", "a.1", "b.1", "c.1", "d"]);
+        assert_eq!(
+            nodes,
+            vec!["a", "a.1", "b.1", "c.1", "c._c.1", "d", "d1", "d2"]
+        );
         assert_eq!(r.nodes["a"].path, PathBuf::from("a.yml"));
         assert_eq!(r.nodes["a.1"].path, PathBuf::from("a.1.yml"));
         assert_eq!(r.nodes["b.1"].path, PathBuf::from("b/1.yml"));
         assert_eq!(r.nodes["c.1"].path, PathBuf::from("c/1.yml"));
+        assert_eq!(r.nodes["c._c.1"].path, PathBuf::from("c/_c/1.yml"));
         assert_eq!(r.nodes["d"].path, PathBuf::from("d.yml"));
+        assert_eq!(r.nodes["d1"].path, PathBuf::from("_d/d1.yml"));
+        assert_eq!(r.nodes["d2"].path, PathBuf::from("_d/d/d2.yml"));
     }
 }

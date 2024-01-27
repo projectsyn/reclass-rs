@@ -51,6 +51,13 @@ impl NodeInfoMeta {
 
     /// Generates a Mapping suitable to use as meta parameter `_reclass_`
     pub(crate) fn as_reclass(&self, config: &Config) -> Result<Mapping> {
+        let part0 = self
+            .parts
+            .iter()
+            .next()
+            .ok_or(anyhow!("Can't extract first path segment for node"))?
+            .to_str()
+            .ok_or(anyhow!("Unable to convert path segment to a string"))?;
         let parts = if config.compose_node_name
             && config
                 .compatflags
@@ -61,6 +68,15 @@ impl NodeInfoMeta {
             // This matches Python reclass's behavior, but is incorrect for nodes which contain
             // literal dots in the file name.
             self.name.split('.').collect::<Vec<&str>>()
+        } else if part0.starts_with('_') {
+            // Always drop path prefix for paths that start with `_`
+            vec![self
+                .parts
+                .iter()
+                .last()
+                .ok_or(anyhow!("Unable to extract last segment from node"))?
+                .to_str()
+                .ok_or(anyhow!("Unable to convert path segment to a string"))?]
         } else {
             // If the compat flag isn't set, we generate the parts list from the provided shortened
             // pathbuf containing the path within `nodes_path` which preserves literal dots in the

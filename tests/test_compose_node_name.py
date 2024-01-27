@@ -44,7 +44,16 @@ def test_compose_node_name_compat():
 
     inv = r.inventory()
 
-    assert set(inv.nodes.keys()) == {"a.1", "a", "b.1", "c.1", "d"}
+    assert set(inv.nodes.keys()) == {
+        "a.1",
+        "a",
+        "b.1",
+        "c.1",
+        "c._c.1",
+        "d",
+        "d1",
+        "d2",
+    }
 
     a1 = inv.nodes["a.1"].parameters["_reclass_"]["name"]
     assert a1["full"] == "a.1"
@@ -62,7 +71,16 @@ def test_compose_node_name():
 
     inv = r.inventory()
 
-    assert set(inv.nodes.keys()) == {"a.1", "a", "b.1", "c.1", "d"}
+    assert set(inv.nodes.keys()) == {
+        "a.1",
+        "a",
+        "b.1",
+        "c.1",
+        "c._c.1",
+        "d",
+        "d1",
+        "d2",
+    }
 
     a1 = inv.nodes["a.1"].parameters["_reclass_"]["name"]
     assert a1["full"] == "a.1"

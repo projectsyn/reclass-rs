@@ -1,0 +1,8 @@
+# compose-node-name treats nodes whose path in `nodes_path` starts with `_`
+# as top-level nodes.
+parameters:
+  node_name: "d2"
+  short_name: "d2"
+  path: "d2"
+  parts: ["d2"]
+  uri_suffix: "_d/d/d2.yml"
