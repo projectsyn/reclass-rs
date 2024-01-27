@@ -1,0 +1,8 @@
+classes:
+  - service.foo
+  - service.bar
+  - missing
+  - a
+  - amissing
+
+parameters: {}

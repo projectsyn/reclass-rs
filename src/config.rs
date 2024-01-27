@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use pyo3::prelude::*;
+use regex::RegexSet;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -63,6 +64,9 @@ pub struct Config {
     pub compose_node_name: bool,
     /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
     #[pyo3(get)]
+    pub ignore_class_notfound_regexp: Vec<String>,
+    pub ignore_class_notfound_regexset: RegexSet,
+    #[pyo3(get)]
     pub compatflags: HashSet<CompatFlag>,
 }
 
@@ -114,6 +118,8 @@ impl Config {
             classes_path: to_lexical_normal(&cpath, true).display().to_string(),
             ignore_class_notfound: ignore_class_notfound.unwrap_or(false),
             compose_node_name: false,
+            ignore_class_notfound_regexp: vec![".*".to_string()],
+            ignore_class_notfound_regexset: RegexSet::new([".*"])?,
             compatflags: HashSet::new(),
         })
     }
@@ -158,6 +164,22 @@ impl Config {
                         "Expected value of config key 'ignore_class_notfound' to be a boolean"
                     ))?;
                 }
+                "ignore_class_notfound_regexp" => {
+                    let list = v.as_sequence().ok_or(anyhow!(
+                        "Expected value of config key 'ignore_class_notfound_regexp' to be a list"
+                    ))?;
+                    self.ignore_class_notfound_regexp.clear();
+                    for val in list {
+                        self.ignore_class_notfound_regexp.push(
+                            val.as_str()
+                                .ok_or(anyhow!(
+                                "Expected entry of 'ignore_class_notfound_regexp' to be a string"
+                            ))?
+                                .to_string(),
+                        );
+                    }
+                    self.ignore_class_notfound_regexp.shrink_to_fit();
+                }
                 "compose_node_name" => {
                     self.compose_node_name = v.as_bool().ok_or(anyhow!(
                         "Expected value of config key 'compose_node_name' to be a boolean"
@@ -185,6 +207,13 @@ impl Config {
                 }
             }
         }
+        self.compile_ignore_class_notfound_patterns()?;
+        Ok(())
+    }
+
+    fn compile_ignore_class_notfound_patterns(&mut self) -> Result<()> {
+        self.ignore_class_notfound_regexset = RegexSet::new(&self.ignore_class_notfound_regexp)
+            .map_err(|e| anyhow!("while compiling ignore_class_notfound regex patterns: {e}"))?;
         Ok(())
     }
 

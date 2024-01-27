@@ -155,8 +155,26 @@ impl Node {
 
         // Lookup path for provided class in r.classes, handling ignore_class_notfound
         let Some(classinfo) = r.classes.get(&cls) else {
-            if r.config.ignore_class_notfound {
+            // ignore_class_notfound_regexp is only applied if ignore_class_notfound == true.
+            // By default the regexset has a single pattern for .* so that all missing classes are
+            // ignored.
+            if r.config.ignore_class_notfound
+                && r.config.ignore_class_notfound_regexset.is_match(&cls)
+            {
                 return Ok(None);
+            }
+            if r.config.ignore_class_notfound {
+                // return an error informing the user that we didn't ignore the missing class
+                // based on the configured regex patterns.
+                eprintln!(
+                    "Missing class '{cls}' not ignored due to configured regex patterns: [{}]",
+                    r.config
+                        .ignore_class_notfound_regexp
+                        .iter()
+                        .map(|s| format!("'{s}'"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
             return Err(anyhow!("Class {cls} not found"));
         };
@@ -545,3 +563,5 @@ mod node_tests {
 
 #[cfg(test)]
 mod node_render_tests;
+#[cfg(test)]
+mod node_render_tests_ignore_class_notfound_regexp;
