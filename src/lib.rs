@@ -340,6 +340,34 @@ impl Reclass {
     pub fn clear_compat_flags(&mut self) {
         self.config.compatflags.clear();
     }
+
+    /// Returns a dict containing all discovered nodes with their paths relative to `nodes_path`.
+    ///
+    /// NOTE: We don't use the generated getter here, because we don't want to return the
+    /// EntityInfo.
+    #[getter]
+    pub fn nodes(&self) -> PyResult<HashMap<String, PathBuf>> {
+        let res = self
+            .nodes
+            .iter()
+            .map(|(k, v)| (k.clone(), v.path.clone()))
+            .collect::<HashMap<String, PathBuf>>();
+        Ok(res)
+    }
+
+    /// Returns the dict of all discovered classes and their paths relative to `classes_path`.
+    ///
+    /// NOTE: We don't use the generated getter here, because we don't want to return the
+    /// EntityInfo.
+    #[getter]
+    pub fn classes(&self) -> PyResult<HashMap<String, PathBuf>> {
+        let res = self
+            .classes
+            .iter()
+            .map(|(k, v)| (k.clone(), v.path.clone()))
+            .collect::<HashMap<String, PathBuf>>();
+        Ok(res)
+    }
 }
 
 impl Default for Reclass {
