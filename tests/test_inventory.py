@@ -67,6 +67,27 @@ expected_nodes = set([f"n{i}" for i in range(1, 26)])
 
 def test_inventory():
     r = reclass_rs.Reclass.from_config("./tests/inventory", "reclass-config.yml")
+
+    assert set(r.nodes.keys()) == expected_nodes
+    included_classes = set(expected_classes.keys())
+    all_classes = set(r.classes.keys())
+    # discovered classes which aren't shown with their resolved names in the output:
+    assert all_classes - included_classes == {
+        "${baz}",  # appears as `\\${baz}`
+        "cluster.foo",  # appears as `cluster.${dist}`
+        "config_symlink",  # doesn't appear
+        "foo.bar",  # appears as `${tenant}.${cluster}`
+    }
+    # class includes which aren't shown in their resolved form:
+    assert included_classes - all_classes == {
+        "${cls9}",  # resolved as `cls9` for n15
+        "${qux}",  # resolved as `cls1` for n4
+        "${tenant}.${cluster}",  # resolved as `foo.bar` for n16
+        "\\${baz}",  # resolved as `${baz}` for n17
+        "cluster.${dist}",  # resolved as `cluster.foo` for n19
+        "nonexisting",  # skipped because ignore_class_notfound=True
+    }
+
     inv = r.inventory()
 
     assert set(inv.nodes.keys()) == expected_nodes
