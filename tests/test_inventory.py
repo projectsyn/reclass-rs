@@ -7,6 +7,7 @@ expected_classes = {
     "${qux}": ["n4"],
     "app1": ["n12"],
     "app2": ["n13"],
+    "bar": ["n25"],
     "cls1": ["n1"],
     "cls2": ["n1"],
     "cls3": ["n3"],
@@ -39,6 +40,7 @@ expected_classes = {
     "cluster.global": ["n19"],
     "config": ["n16"],
     "defaults": ["n24"],
+    "foo": ["n25"],
     "foo-indirect": ["n20"],
     "meta": ["n24"],
     "nested.a": ["n8"],
@@ -60,7 +62,7 @@ expected_applications = {
     "d": ["n13"],
 }
 
-expected_nodes = set([f"n{i}" for i in range(1, 25)])
+expected_nodes = set([f"n{i}" for i in range(1, 26)])
 
 
 def test_inventory():

@@ -45,8 +45,8 @@ impl Node {
     pub fn parse(r: &Reclass, name: &str) -> Result<Self> {
         let mut meta = NodeInfoMeta::new(name, name, "", "base");
 
-        let npath = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
-        let invpath = r.config.node_path(npath);
+        let nodeinfo = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
+        let invpath = r.config.node_path(&nodeinfo.path);
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         meta.uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
@@ -156,30 +156,22 @@ impl Node {
         let cls = self.abs_class_name(class)?;
 
         // Lookup path for provided class in r.classes, handling ignore_class_notfound
-        let Some(cpath) = r.classes.get(&cls) else {
+        let Some(classinfo) = r.classes.get(&cls) else {
             if r.config.ignore_class_notfound {
                 return Ok(None);
             }
             return Err(anyhow!("Class {cls} not found"));
         };
 
-        // Extract the directory in which the new class is stored to use for the new class's
-        // `own_loc`.
-        let class_loc = if let Some(parent) = cpath.parent() {
-            PathBuf::from(parent)
-        } else {
-            PathBuf::new()
-        };
-
         // Render inventory path of class based from `r.classes_path`.
-        let invpath = r.config.class_path(cpath);
+        let invpath = r.config.class_path(&classinfo.path);
 
         // Load file contents and create Node
         let mut meta = NodeInfoMeta::default();
         let ccontents = std::fs::read_to_string(invpath.canonicalize()?)?;
         meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
         Ok(Some(
-            Node::from_str(meta, Some(class_loc), &ccontents)
+            Node::from_str(meta, Some(classinfo.loc.clone()), &ccontents)
                 .map_err(|e| anyhow!("Deserializing {cls}: {e}"))?,
         ))
     }

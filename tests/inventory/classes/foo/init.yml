@@ -1,0 +1,8 @@
+classes:
+  # this is resolved to top-level `bar`, because content in `foo/init.yml` is
+  # treated exactly as if it were defined as `foo.yml`.
+  - .bar
+
+parameters:
+  foo:
+    foo: foo/init

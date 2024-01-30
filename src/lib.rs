@@ -31,6 +31,12 @@ use node::{Node, NodeInfo, NodeInfoMeta};
 
 const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
+#[derive(Clone, Debug)]
+struct EntityInfo {
+    path: PathBuf,
+    loc: PathBuf,
+}
+
 /// This struct holds configuration fields for various library behaviors
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -39,9 +45,9 @@ pub struct Reclass {
     #[pyo3(get)]
     pub config: Config,
     /// List of discovered Reclass classes in `classes_path`
-    classes: HashMap<String, PathBuf>,
+    classes: HashMap<String, EntityInfo>,
     /// List of discovered Reclass nodes in `nodes_path`
-    nodes: HashMap<String, PathBuf>,
+    nodes: HashMap<String, EntityInfo>,
 }
 
 fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> Result<()> {
@@ -71,7 +77,7 @@ fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> R
 
 fn walk_entity_dir(
     root: &str,
-    entity_map: &mut HashMap<String, PathBuf>,
+    entity_map: &mut HashMap<String, EntityInfo>,
     max_depth: usize,
 ) -> Result<()> {
     let entity_root = to_lexical_absolute(&PathBuf::from(root))?;
@@ -90,8 +96,27 @@ fn walk_entity_dir(
             // it's an entity (class or node), process it
             let abspath = to_lexical_absolute(entry.path())?;
             let relpath = abspath.strip_prefix(&entity_root)?;
-            let cls = relpath
-                .with_extension("")
+            let cls = relpath.with_extension("");
+            let (cls, loc) = if cls.ends_with("init") {
+                // treat `foo/init.yml` as contents for class `foo`
+                let cls = cls
+                    .parent()
+                    .ok_or(anyhow!(
+                        "Failed to normalize entity {}",
+                        entry.path().display()
+                    ))?
+                    .to_owned();
+                // here, unwrap can't panic since we otherwise would have already returned an error
+                // in the previous statement.
+                let loc = relpath.parent().unwrap();
+                // For `init.ya?ml` classes, the location is parent directory of the directory
+                // holding the class file.
+                (cls, loc.parent().unwrap_or(Path::new("")))
+            } else {
+                // For normal classes, the location is the directory holding the class file.
+                (cls, relpath.parent().unwrap_or(Path::new("")))
+            };
+            let cls = cls
                 .to_str()
                 .ok_or(anyhow!(
                     "Failed to normalize entity {}",
@@ -99,9 +124,15 @@ fn walk_entity_dir(
                 ))?
                 .replace(MAIN_SEPARATOR, ".");
             if let Some(prev) = entity_map.get(&cls) {
-                return err_duplicate_entity(root, relpath, &cls, prev);
+                return err_duplicate_entity(root, relpath, &cls, &prev.path);
             }
-            entity_map.insert(cls, relpath.to_path_buf());
+            entity_map.insert(
+                cls,
+                EntityInfo {
+                    path: relpath.to_path_buf(),
+                    loc: PathBuf::from(loc),
+                },
+            );
         }
     }
     Ok(())

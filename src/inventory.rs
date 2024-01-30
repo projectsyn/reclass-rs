@@ -115,7 +115,7 @@ mod inventory_tests {
         let mut nodes = inv.nodes.keys().cloned().collect::<Vec<String>>();
         nodes.sort();
 
-        let mut expected_nodes = (1..=24).map(|n| format!("n{n}")).collect::<Vec<String>>();
+        let mut expected_nodes = (1..=25).map(|n| format!("n{n}")).collect::<Vec<String>>();
         expected_nodes.sort();
 
         assert_eq!(nodes, expected_nodes);
@@ -148,6 +148,7 @@ mod inventory_tests {
         expected_classes.insert("\\${baz}".into(), vec!["n17".into()]);
         expected_classes.insert("app1".into(), vec!["n12".into()]);
         expected_classes.insert("app2".into(), vec!["n13".into()]);
+        expected_classes.insert("bar".into(), vec!["n25".into()]);
         expected_classes.insert("cls1".into(), vec!["n1".into()]);
         expected_classes.insert("cls2".into(), vec!["n1".into()]);
         expected_classes.insert("cls3".into(), vec!["n3".into()]);
@@ -183,6 +184,7 @@ mod inventory_tests {
         expected_classes.insert("cluster.global".into(), vec!["n19".into()]);
         expected_classes.insert("config".into(), vec!["n16".into()]);
         expected_classes.insert("defaults".into(), vec!["n24".into()]);
+        expected_classes.insert("foo".into(), vec!["n25".into()]);
         expected_classes.insert("foo-indirect".into(), vec!["n20".into()]);
         expected_classes.insert("meta".into(), vec!["n24".into()]);
         expected_classes.insert("nested.a".into(), vec!["n8".into()]);
