@@ -100,14 +100,9 @@ mod inventory_tests {
 
     #[test]
     fn test_render() {
-        let r = Reclass::new(
-            "./tests/inventory",
-            "nodes",
-            "classes",
-            // n18 includes a nonexistent class
-            true,
-        )
-        .unwrap();
+        let mut c = crate::Config::new(Some("./tests/inventory"), None, None, None).unwrap();
+        c.load_from_file("reclass-config.yml").unwrap();
+        let r = Reclass::new_from_config(c).unwrap();
         let inv = Inventory::render(&r).unwrap();
 
         // Check that all nodes are in `inv.nodes`. We do not verify the NodeInfos here, since we
