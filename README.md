@@ -19,10 +19,10 @@ The implementation currently supports the following features of Kapicorp Reclass
 * Nested references
 * References in class names
 * Loading classes with relative names
+* Loading Reclass configuration options from `reclass-config.yaml`
 
 The following Kapicorp Reclass features aren't supported:
 
-* Loading Reclass configuration options from `reclass-config.yaml`
 * Ignoring overwritten missing references
 * Inventory Queries
 * The Reclass option `ignore_class_notfound_regexp`

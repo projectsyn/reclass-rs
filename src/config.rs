@@ -73,6 +73,56 @@ impl Config {
         })
     }
 
+    /// Load additional config options from the file at `<self.inventory_path>/<config_file>`.
+    ///
+    /// This method assumes that you've created a Config object with a suitable `inventory_path`.
+    ///
+    /// The method will print diagnostic messages for config options which aren't implemented yet.
+    pub fn load_from_file(&mut self, config_file: &str) -> Result<()> {
+        let mut cfg_path = PathBuf::from(&self.inventory_path);
+        cfg_path.push(config_file);
+
+        let cfg_file = std::fs::read_to_string(&cfg_path)?;
+        let cfg: serde_yaml::Value = serde_yaml::from_str(&cfg_file)?;
+        for (k, v) in cfg
+            .as_mapping()
+            .ok_or(anyhow!("Expected reclass config to be a Mapping"))?
+        {
+            let kstr = serde_yaml::to_string(k)?;
+            let vstr = serde_yaml::to_string(v)?;
+            let kstr = kstr.trim();
+            let vstr = vstr.trim();
+            match kstr {
+                "nodes_uri" => {
+                    let npath = cfg_path
+                        .with_file_name(vstr)
+                        .to_str()
+                        .ok_or(anyhow!("Can't create nodes path from config file"))?
+                        .to_owned();
+                    self.nodes_path = npath;
+                }
+                "classes_uri" => {
+                    self.classes_path = cfg_path
+                        .with_file_name(vstr)
+                        .to_str()
+                        .ok_or(anyhow!("Can't create nodes path from config file"))?
+                        .to_owned();
+                }
+                "ignore_class_notfound" => {
+                    self.ignore_class_notfound = v.as_bool().ok_or(anyhow!(
+                        "Expected value of config key 'ignore_class_notfound' to be a boolean"
+                    ))?;
+                }
+                _ => {
+                    eprintln!(
+                        "reclass-config.yml entry '{kstr}={vstr}' not implemented yet, ignoring..."
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Construct path to node from `self.inventory_path`, `self.nodes_path` and the provided path
     /// to the node relative to the inventory nodes directory.
     pub(crate) fn node_path(&self, npath: &PathBuf) -> PathBuf {
