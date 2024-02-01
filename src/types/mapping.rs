@@ -280,17 +280,64 @@ impl Mapping {
     /// Removes the entry for key `k` from the map and returns its value if the key was present in
     /// the map. Additionally, removes the key from the list of constant keys if it was marked
     /// constant.
+    /// This method calls [`Mapping::swap_remove`].
     #[inline]
     pub fn remove(&mut self, k: &Value) -> Option<Value> {
+        self.swap_remove(k)
+    }
+
+    /// Removes the entry for key `k` from the map and returns its value if the key was present in
+    /// the map. Additionally, removes the key from the list of constant keys if it was marked
+    /// constant.
+    ///
+    /// This method swaps the last element in the mapping with the removed element, thus executing
+    /// in O(1) on average, but changing the order of elements in the mapping.
+    #[inline]
+    pub fn swap_remove(&mut self, k: &Value) -> Option<Value> {
         self.const_keys.remove(k);
-        self.map.remove(k)
+        self.map.swap_remove(k)
+    }
+
+    /// Removes the entry for key `k` from the map and returns its value if the key was present in
+    /// the map. Additionally, removes the key from the list of constant keys if it was marked
+    /// constant.
+    ///
+    /// This method shifts all elements "after" the removed element in the map. This preserves the
+    /// order of elements, but changes the index of all elements after the removed element. This
+    /// executes in O(n).
+    #[inline]
+    pub fn shift_remove(&mut self, k: &Value) -> Option<Value> {
+        self.const_keys.remove(k);
+        self.map.shift_remove(k)
     }
 
     /// Removes and returns the key-value pair for `k` if the key is present in the map.
+    ///
+    /// This method calls `swap_remove_entry`.
     #[inline]
     pub fn remove_entry(&mut self, k: &Value) -> Option<(Value, Value)> {
+        self.swap_remove_entry(k)
+    }
+
+    /// Removes and returns the key-value pair for `k` if the key is present in the map.
+    ///
+    /// This method swaps the last element in the mapping with the removed element, thus executing
+    /// in O(1) on average, but changing the order of elements in the mapping.
+    #[inline]
+    pub fn swap_remove_entry(&mut self, k: &Value) -> Option<(Value, Value)> {
         self.const_keys.remove(k);
-        self.map.remove_entry(k)
+        self.map.swap_remove_entry(k)
+    }
+
+    /// Removes and returns the key-value pair for `k` if the key is present in the map.
+    ///
+    /// This method shifts all elements "after" the removed element in the map. This preserves the
+    /// order of elements, but changes the index of all elements after the removed element. This
+    /// executes in O(n).
+    #[inline]
+    pub fn shift_remove_entry(&mut self, k: &Value) -> Option<(Value, Value)> {
+        self.const_keys.remove(k);
+        self.map.shift_remove_entry(k)
     }
 
     /// Returns the number of key-value pairs in the map.
