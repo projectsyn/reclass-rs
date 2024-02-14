@@ -1,0 +1,6 @@
+parameters:
+  node_name: a
+  short_name: a
+  path: "a"
+  parts: ["a"]
+  uri_suffix: "a.yml"

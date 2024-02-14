@@ -1,8 +1,45 @@
 use anyhow::{anyhow, Result};
 use pyo3::prelude::*;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use crate::fsutil::to_lexical_normal;
+
+/// Flags to change reclass-rs behavior to be compaible with Python reclass
+#[pyclass]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub enum CompatFlag {
+    /// This flag enables Python Reclass-compatible rendering of fields `path` and `parts` in
+    /// `NodeInfoMeta` when Reclass option `compose-node-name` is enabled.
+    ///
+    /// By default, if this flag isn't enabled, reclass-rs will preserve literal dots in the node's
+    /// file path when rendering fields `path` and `parts` in `NodeInfoMeta` when
+    /// `compose-node-name` is enabled.
+    ComposeNodeNameLiteralDots,
+}
+
+#[pymethods]
+impl CompatFlag {
+    fn __hash__(&self) -> u64 {
+        let mut h = DefaultHasher::new();
+        self.hash(&mut h);
+        h.finish()
+    }
+}
+
+impl TryFrom<&str> for CompatFlag {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self> {
+        match value {
+            "compose-node-name-literal-dots"
+            | "compose_node_name_literal_dots"
+            | "ComposeNodeNameLiteralDots" => Ok(Self::ComposeNodeNameLiteralDots),
+            _ => Err(anyhow!("Unknown compatibility flag '{value}'")),
+        }
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug, Default)]
@@ -21,6 +58,12 @@ pub struct Config {
     /// Whether to ignore included classes which don't exist (yet)
     #[pyo3(get)]
     pub ignore_class_notfound: bool,
+    /// Whether to treat nested files in `nodes_path` as node definitions
+    #[pyo3(get)]
+    pub compose_node_name: bool,
+    /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
+    #[pyo3(get)]
+    pub compatflags: HashSet<CompatFlag>,
 }
 
 impl Config {
@@ -70,6 +113,8 @@ impl Config {
             nodes_path: to_lexical_normal(&npath, true).display().to_string(),
             classes_path: to_lexical_normal(&cpath, true).display().to_string(),
             ignore_class_notfound: ignore_class_notfound.unwrap_or(false),
+            compose_node_name: false,
+            compatflags: HashSet::new(),
         })
     }
 
@@ -112,6 +157,26 @@ impl Config {
                     self.ignore_class_notfound = v.as_bool().ok_or(anyhow!(
                         "Expected value of config key 'ignore_class_notfound' to be a boolean"
                     ))?;
+                }
+                "compose_node_name" => {
+                    self.compose_node_name = v.as_bool().ok_or(anyhow!(
+                        "Expected value of config key 'compose_node_name' to be a boolean"
+                    ))?;
+                }
+                "reclass_rs_compat_flags" => {
+                    let flags = v.as_sequence().ok_or(anyhow!(
+                        "Expected value of config key 'reclass_rs_compat_flags' to be a list"
+                    ))?;
+                    for f in flags {
+                        let f = f
+                            .as_str()
+                            .ok_or(anyhow!("Expected compatibility flag to be a string"))?;
+                        if let Ok(flag) = CompatFlag::try_from(f) {
+                            self.compatflags.insert(flag);
+                        } else {
+                            eprintln!("Unknown compatibility flag '{f}', ignoring...");
+                        }
+                    }
                 }
                 _ => {
                     eprintln!(

@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
-use config::Config;
+use config::{CompatFlag, Config};
 use fsutil::to_lexical_absolute;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
@@ -35,6 +35,42 @@ const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 struct EntityInfo {
     path: PathBuf,
     loc: PathBuf,
+}
+
+#[derive(Eq, PartialEq)]
+enum EntityKind {
+    Node,
+    Class,
+}
+
+impl std::fmt::Display for EntityKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EntityKind::Node => write!(f, "node"),
+            EntityKind::Class => write!(f, "class"),
+        }
+    }
+}
+
+impl EntityKind {
+    fn plural(&self, capitalize: bool) -> &'static str {
+        match self {
+            Self::Node => {
+                if capitalize {
+                    "Nodes"
+                } else {
+                    "nodes"
+                }
+            }
+            Self::Class => {
+                if capitalize {
+                    "Classes"
+                } else {
+                    "classes"
+                }
+            }
+        }
+    }
 }
 
 /// This struct holds configuration fields for various library behaviors
@@ -50,7 +86,13 @@ pub struct Reclass {
     nodes: HashMap<String, EntityInfo>,
 }
 
-fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> Result<()> {
+fn err_duplicate_entity(
+    kind: &EntityKind,
+    root: &str,
+    relpath: &Path,
+    cls: &str,
+    prev: &Path,
+) -> Result<()> {
     fn stringify(p: &Path) -> Result<&str> {
         p.to_str()
             .ok_or(anyhow!("Failed to convert {} to string", p.display()))
@@ -70,12 +112,14 @@ fn err_duplicate_entity(root: &str, relpath: &Path, cls: &str, prev: &Path) -> R
         (relpath, prev)
     };
     Err(anyhow!(
-        "Definition of class '{cls}' in '{first}' collides with definition in '{second}'. \
-            Classes can only be defined once per inventory."
+        "Definition of {kind} '{cls}' in '{first}' collides with definition in '{second}'. \
+            {} can only be defined once per inventory.",
+        kind.plural(true)
     ))
 }
 
 fn walk_entity_dir(
+    kind: &EntityKind,
     root: &str,
     entity_map: &mut HashMap<String, EntityInfo>,
     max_depth: usize,
@@ -116,15 +160,25 @@ fn walk_entity_dir(
                 // For normal classes, the location is the directory holding the class file.
                 (cls, relpath.parent().unwrap_or(Path::new("")))
             };
-            let cls = cls
-                .to_str()
-                .ok_or(anyhow!(
-                    "Failed to normalize entity {}",
-                    entry.path().display()
-                ))?
-                .replace(MAIN_SEPARATOR, ".");
+            let cls = cls.to_str().ok_or(anyhow!(
+                "Failed to normalize entity {}",
+                entry.path().display()
+            ))?;
+            let (cls, loc) = if kind == &EntityKind::Node && max_depth > 1 && cls.starts_with('_') {
+                // special case node paths starting with _ for compose-node-name
+                (
+                    cls.split(MAIN_SEPARATOR).last().ok_or(anyhow!(
+                        "Can't shorten node name for {}",
+                        entry.path().display()
+                    ))?,
+                    Path::new(""),
+                )
+            } else {
+                (cls, loc)
+            };
+            let cls = cls.replace(MAIN_SEPARATOR, ".");
             if let Some(prev) = entity_map.get(&cls) {
-                return err_duplicate_entity(root, relpath, &cls, &prev.path);
+                return err_duplicate_entity(kind, root, relpath, &cls, &prev.path);
             }
             entity_map.insert(
                 cls,
@@ -173,7 +227,17 @@ impl Reclass {
     /// exist. Currently the only case where this can happen is when an inventory defines a node as
     /// both `<name>.yml` and `<name>.yaml`.
     fn discover_nodes(&mut self) -> Result<()> {
-        walk_entity_dir(&self.config.nodes_path, &mut self.nodes, 1)
+        let depth = if self.config.compose_node_name {
+            usize::MAX
+        } else {
+            1
+        };
+        walk_entity_dir(
+            &EntityKind::Node,
+            &self.config.nodes_path,
+            &mut self.nodes,
+            depth,
+        )
     }
 
     /// Discover all classes in `r.classes_path` and store the resulting list in `r.known_classes`.
@@ -182,7 +246,12 @@ impl Reclass {
     /// class name exist (e.g. classes `foo..bar.yml` and `foo/.bar.yml` are both included as
     /// `foo..bar`).
     fn discover_classes(&mut self) -> Result<()> {
-        walk_entity_dir(&self.config.classes_path, &mut self.classes, usize::MAX)
+        walk_entity_dir(
+            &EntityKind::Class,
+            &self.config.classes_path,
+            &mut self.classes,
+            usize::MAX,
+        )
     }
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
@@ -256,6 +325,21 @@ impl Reclass {
             eprintln!("While initializing global thread pool: {e}");
         }
     }
+
+    /// Sets the provided CompatFlag in the current Reclass instance's config object
+    pub fn set_compat_flag(&mut self, flag: CompatFlag) {
+        self.config.compatflags.insert(flag);
+    }
+
+    /// Unsets the provided CompatFlag in the current Reclass instance's config object
+    pub fn unset_compat_flag(&mut self, flag: &CompatFlag) {
+        self.config.compatflags.remove(flag);
+    }
+
+    /// Clears the compatflags set in the current Reclass instance's config object
+    pub fn clear_compat_flags(&mut self) {
+        self.config.compatflags.clear();
+    }
 }
 
 impl Default for Reclass {
@@ -268,8 +352,9 @@ impl Default for Reclass {
 fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Register the top-level `Reclass` Python class which is used to configure the library
     m.add_class::<Reclass>()?;
-    // Register the `Config` class
+    // Register the `Config` class and `CompatFlag` enum
     m.add_class::<Config>()?;
+    m.add_class::<CompatFlag>()?;
     // Register the NodeInfoMeta and NodeInfo classes
     m.add_class::<NodeInfoMeta>()?;
     m.add_class::<NodeInfo>()?;
@@ -298,5 +383,33 @@ mod tests {
         Classes can only be defined once per inventory.")]
     fn test_reclass_discover_classes() {
         Reclass::new("./tests/broken-inventory", "nodes", "classes", false).unwrap();
+    }
+
+    #[test]
+    fn test_reclass_discover_nodes_compose_node_name() {
+        let mut c = Config::new(
+            Some("./tests/inventory-compose-node-name"),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        c.load_from_file("reclass-config.yml").unwrap();
+        let r = Reclass::new_from_config(c).unwrap();
+        assert_eq!(r.nodes.len(), 8);
+        let mut nodes = r.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(
+            nodes,
+            vec!["a", "a.1", "b.1", "c.1", "c._c.1", "d", "d1", "d2"]
+        );
+        assert_eq!(r.nodes["a"].path, PathBuf::from("a.yml"));
+        assert_eq!(r.nodes["a.1"].path, PathBuf::from("a.1.yml"));
+        assert_eq!(r.nodes["b.1"].path, PathBuf::from("b/1.yml"));
+        assert_eq!(r.nodes["c.1"].path, PathBuf::from("c/1.yml"));
+        assert_eq!(r.nodes["c._c.1"].path, PathBuf::from("c/_c/1.yml"));
+        assert_eq!(r.nodes["d"].path, PathBuf::from("d.yml"));
+        assert_eq!(r.nodes["d1"].path, PathBuf::from("_d/d1.yml"));
+        assert_eq!(r.nodes["d2"].path, PathBuf::from("_d/d/d2.yml"));
     }
 }

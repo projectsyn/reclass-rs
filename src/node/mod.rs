@@ -43,14 +43,12 @@ impl Node {
     ///
     /// The heavy lifting is done in `Reclass.discover_nodes()` and `Node::from_str`.
     pub fn parse(r: &Reclass, name: &str) -> Result<Self> {
-        let mut meta = NodeInfoMeta::new(name, name, "", "base");
-
         let nodeinfo = r.nodes.get(name).ok_or(anyhow!("Unknown node {name}"))?;
         let invpath = r.config.node_path(&nodeinfo.path);
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
-        meta.uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
-
+        let uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
+        let meta = NodeInfoMeta::new(name, name, &uri, nodeinfo.path.with_extension(""), "base");
         Node::from_str(meta, None, &ncontents)
     }
 
@@ -284,7 +282,7 @@ impl Node {
         // class loading. This roughly corresponds to Python reclass's
         // `_get_automatic_parameters()`.
         base.parameters
-            .insert("_reclass_".into(), self.meta.as_reclass().into())?;
+            .insert("_reclass_".into(), self.meta.as_reclass(&r.config)?.into())?;
 
         let mut seen = vec![];
         let mut root = Node::default();

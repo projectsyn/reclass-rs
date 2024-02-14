@@ -1,0 +1,9 @@
+classes:
+  - cls1
+
+parameters:
+  node_name: d
+  short_name: d
+  path: "d"
+  parts: ["d"]
+  uri_suffix: "d.yml"

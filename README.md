@@ -20,13 +20,14 @@ The implementation currently supports the following features of Kapicorp Reclass
 * References in class names
 * Loading classes with relative names
 * Loading Reclass configuration options from `reclass-config.yaml`
+* The Reclass option `componse_node_name`
+** reclass-rs provides a non-compatible mode for `compose_node_name` which preserves literal dots in node names
 
 The following Kapicorp Reclass features aren't supported:
 
 * Ignoring overwritten missing references
 * Inventory Queries
 * The Reclass option `ignore_class_notfound_regexp`
-* The Reclass option `componse_node_name`
 * The Reclass option `allow_none_override` can't be set to `False`
 * The Reclass `yaml_git` and `mixed` storage types
 * Any Reclass option which is not mentioned explicitly here or above

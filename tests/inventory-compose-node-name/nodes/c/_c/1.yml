@@ -1,0 +1,6 @@
+parameters:
+  node_name: c._c.1
+  short_name: "1"
+  path: "c/_c/1"
+  parts: ["c", "_c", "1"]
+  uri_suffix: "c/_c/1.yml"
