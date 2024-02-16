@@ -62,7 +62,7 @@ expected_applications = {
     "d": ["n13"],
 }
 
-expected_nodes = set([f"n{i}" for i in range(1, 26)])
+expected_nodes = {f"n{i}" for i in range(1, 26)}
 
 
 def test_inventory():
