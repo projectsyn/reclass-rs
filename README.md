@@ -21,7 +21,7 @@ The implementation currently supports the following features of Kapicorp Reclass
 * Loading classes with relative names
 * Loading Reclass configuration options from `reclass-config.yaml`
 * The Reclass option `componse_node_name`
-** reclass-rs provides a non-compatible mode for `compose_node_name` which preserves literal dots in node names
+  * reclass-rs provides a non-compatible mode for `compose_node_name` which preserves literal dots in node names
 
 The following Kapicorp Reclass features aren't supported:
 
