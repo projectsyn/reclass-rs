@@ -19,6 +19,9 @@ def test_import_new():
     assert pathlib.Path(r.config.classes_path) == invpath / "classes"
     assert r.config.ignore_class_notfound
 
+    assert r.nodes is not None
+    assert r.classes is not None
+
 
 def test_import_raises():
     with pytest.raises(ValueError) as exc:
