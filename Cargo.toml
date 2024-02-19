@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 bench = false
 
 [dependencies]
-anyhow = "1.0.79"
+anyhow = "1.0.80"
 chrono = "0.4.34"
 indexmap = "2.2.3"
 nom = "7.1.3"
