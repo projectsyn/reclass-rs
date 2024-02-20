@@ -64,8 +64,8 @@ pub struct Config {
     pub compose_node_name: bool,
     /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
     #[pyo3(get)]
-    pub ignore_class_notfound_regexp: Vec<String>,
-    pub ignore_class_notfound_regexset: RegexSet,
+    ignore_class_notfound_regexp: Vec<String>,
+    ignore_class_notfound_regexset: RegexSet,
     #[pyo3(get)]
     pub compatflags: HashSet<CompatFlag>,
 }
@@ -211,6 +211,22 @@ impl Config {
         Ok(())
     }
 
+    /// Returns the currently configured `ignore_class_notfound_regexp` pattern list.
+    pub fn get_ignore_class_notfound_regexp(&self) -> &Vec<String> {
+        &self.ignore_class_notfound_regexp
+    }
+
+    /// Updates the saved ignore_class_notfound_regexp pattern list with the provided list and
+    /// ensures that the precompiled RegexSet is updated to match the new pattern list.
+    pub fn set_ignore_class_notfound_regexp(&mut self, patterns: Vec<String>) -> Result<()> {
+        self.ignore_class_notfound_regexp = patterns;
+        self.compile_ignore_class_notfound_patterns()
+    }
+
+    pub(crate) fn is_class_ignored(&self, cls: &str) -> bool {
+        self.ignore_class_notfound && self.ignore_class_notfound_regexset.is_match(cls)
+    }
+
     fn compile_ignore_class_notfound_patterns(&mut self) -> Result<()> {
         self.ignore_class_notfound_regexset = RegexSet::new(&self.ignore_class_notfound_regexp)
             .map_err(|e| anyhow!("while compiling ignore_class_notfound regex patterns: {e}"))?;
@@ -314,5 +330,18 @@ mod tests {
         assert_eq!(cfg.nodes_path, "./inventory/targets");
         assert_eq!(cfg.classes_path, "./inventory/classes");
         assert_eq!(cfg.ignore_class_notfound, false);
+    }
+
+    #[test]
+    fn test_config_update_ignore_class_notfound_patterns() {
+        let mut cfg = Config::new(Some("./inventory"), None, None, None).unwrap();
+        assert_eq!(cfg.ignore_class_notfound_regexp, vec![".*"]);
+
+        cfg.set_ignore_class_notfound_regexp(vec![".*foo".into(), "bar.*".into()])
+            .unwrap();
+
+        assert!(cfg.ignore_class_notfound_regexset.is_match("thefooer"));
+        assert!(cfg.ignore_class_notfound_regexset.is_match("baring"));
+        assert!(!cfg.ignore_class_notfound_regexset.is_match("bazzer"));
     }
 }
