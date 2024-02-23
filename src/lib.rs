@@ -287,13 +287,26 @@ impl Reclass {
         Ok(r)
     }
 
+    /// Creates a `Reclass` instance for the provided `inventory_path` and loads config options
+    /// from the provided config file. The value of `config_file` is interpreted relative to
+    /// `inventory_path`.
+    ///
+    /// Returns a `Reclass` instance or raises a `ValueError`
     #[classmethod]
-    fn from_config(_cls: &PyType, inventory_path: &str, config_file: &str) -> PyResult<Self> {
+    fn from_config_file(cls: &PyType, inventory_path: &str, config_file: &str) -> PyResult<Self> {
         let mut c = Config::new(Some(inventory_path), None, None, None)
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         c.load_from_file(config_file)
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
-        let r = Self::new_from_config(c).map_err(|e| PyValueError::new_err(format!("{e}")))?;
+        Self::from_config(cls, c)
+    }
+
+    /// Creates a `Reclass` instance from the provided `Config` instance.
+    ///
+    /// Returns a `Reclass` instance or raises a `ValueError`
+    #[classmethod]
+    fn from_config(_cls: &PyType, config: Config) -> PyResult<Self> {
+        let r = Self::new_from_config(config).map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(r)
     }
 

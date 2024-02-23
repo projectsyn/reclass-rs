@@ -4,7 +4,7 @@ import reclass_rs
 
 
 def test_ignore_regexp_render_n1():
-    r = reclass_rs.Reclass.from_config(
+    r = reclass_rs.Reclass.from_config_file(
         "./tests/inventory-class-notfound-regexp", "reclass-config.yml"
     )
     assert r.config.ignore_class_notfound_regexp == ["service\\..*", ".*missing.*"]
@@ -15,7 +15,7 @@ def test_ignore_regexp_render_n1():
 
 
 def test_ignore_regexp_render_n2():
-    r = reclass_rs.Reclass.from_config(
+    r = reclass_rs.Reclass.from_config_file(
         "./tests/inventory-class-notfound-regexp", "reclass-config.yml"
     )
     assert r.config.ignore_class_notfound_regexp == ["service\\..*", ".*missing.*"]
@@ -27,7 +27,7 @@ def test_ignore_regexp_render_n2():
 
 
 def test_ignore_regexp_update_config_render_n2():
-    r = reclass_rs.Reclass.from_config(
+    r = reclass_rs.Reclass.from_config_file(
         "./tests/inventory-class-notfound-regexp", "reclass-config.yml"
     )
     r.set_ignore_class_notfound_regexp([".*"])

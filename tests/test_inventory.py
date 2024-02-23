@@ -66,7 +66,7 @@ expected_nodes = {f"n{i}" for i in range(1, 26)}
 
 
 def test_inventory():
-    r = reclass_rs.Reclass.from_config("./tests/inventory", "reclass-config.yml")
+    r = reclass_rs.Reclass.from_config_file("./tests/inventory", "reclass-config.yml")
 
     assert set(r.nodes.keys()) == expected_nodes
     included_classes = set(expected_classes.keys())
