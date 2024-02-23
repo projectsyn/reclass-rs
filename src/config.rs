@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Result};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyType};
 use regex::RegexSet;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
@@ -263,6 +265,35 @@ impl Config {
 impl Config {
     fn __repr__(&self) -> String {
         format!("{self:#?}")
+    }
+
+    /// Creates a Config object based on the provided `inventory_path` and the config options
+    /// passed in the `config` Python dict.
+    ///
+    /// Returns a `Config` object or raises a `ValueError`.
+    #[classmethod]
+    fn from_dict(_cls: &PyType, inventory_path: &str, config: &PyDict) -> PyResult<Self> {
+        let mut cfg = Config::new(Some(inventory_path), None, None, None).map_err(|e| {
+            PyValueError::new_err(format!(
+                "Failed to initialize reclass-rs config object: {e}"
+            ))
+        })?;
+
+        // `set_option()` expects `cfg_path` to be the path to the reclass config file. Since we're
+        // not actually reading from the file here, we need to push an arbitrary path segment so
+        // that `set_option()` will configure the `nodes_path` and `classes_path` fields correctly.
+        let mut cfg_path = PathBuf::from(inventory_path);
+        cfg_path.push("dummy");
+
+        for (k, v) in config {
+            let kstr = k.extract::<&str>()?;
+            let val: crate::types::Value = TryInto::try_into(v)?;
+            cfg.set_option(&cfg_path, kstr, &val.into()).map_err(|e| {
+                PyValueError::new_err(format!("Error while setting option {kstr}: {e}"))
+            })?;
+        }
+
+        Ok(cfg)
     }
 }
 
