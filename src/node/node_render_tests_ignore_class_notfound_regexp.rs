@@ -10,7 +10,7 @@ fn test_render_n1() {
         None,
     )
     .unwrap();
-    c.load_from_file("reclass-config.yml").unwrap();
+    c.load_from_file("reclass-config.yml", false).unwrap();
     let r = Reclass::new_from_config(c).unwrap();
 
     let n1 = r.render_node("n1").unwrap();
@@ -33,7 +33,7 @@ fn test_render_n2() {
         None,
     )
     .unwrap();
-    c.load_from_file("reclass-config.yml").unwrap();
+    c.load_from_file("reclass-config.yml", false).unwrap();
     let r = Reclass::new_from_config(c).unwrap();
 
     let n2 = r.render_node("n2");

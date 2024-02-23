@@ -293,10 +293,16 @@ impl Reclass {
     ///
     /// Returns a `Reclass` instance or raises a `ValueError`
     #[classmethod]
-    fn from_config_file(cls: &PyType, inventory_path: &str, config_file: &str) -> PyResult<Self> {
+    #[pyo3(signature = (inventory_path, config_file, verbose=false))]
+    fn from_config_file(
+        cls: &PyType,
+        inventory_path: &str,
+        config_file: &str,
+        verbose: bool,
+    ) -> PyResult<Self> {
         let mut c = Config::new(Some(inventory_path), None, None, None)
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
-        c.load_from_file(config_file)
+        c.load_from_file(config_file, verbose)
             .map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Self::from_config(cls, c)
     }
@@ -447,7 +453,7 @@ mod tests {
             None,
         )
         .unwrap();
-        c.load_from_file("reclass-config.yml").unwrap();
+        c.load_from_file("reclass-config.yml", true).unwrap();
         let r = Reclass::new_from_config(c).unwrap();
         assert_eq!(r.nodes.len(), 8);
         let mut nodes = r.nodes.keys().collect::<Vec<_>>();

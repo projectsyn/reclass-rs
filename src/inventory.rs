@@ -101,7 +101,7 @@ mod inventory_tests {
     #[test]
     fn test_render() {
         let mut c = crate::Config::new(Some("./tests/inventory"), None, None, None).unwrap();
-        c.load_from_file("reclass-config.yml").unwrap();
+        c.load_from_file("reclass-config.yml", false).unwrap();
         let r = Reclass::new_from_config(c).unwrap();
         let inv = Inventory::render(&r).unwrap();
 
@@ -263,7 +263,8 @@ mod inventory_tests {
             None,
         )
         .unwrap();
-        c.load_from_file("reclass-config-compat.yml").unwrap();
+        c.load_from_file("reclass-config-compat.yml", false)
+            .unwrap();
         let r = Reclass::new_from_config(c).unwrap();
 
         let inv = Inventory::render(&r).unwrap();
@@ -312,7 +313,7 @@ mod inventory_tests {
             None,
         )
         .unwrap();
-        c.load_from_file("reclass-config.yml").unwrap();
+        c.load_from_file("reclass-config.yml", false).unwrap();
         let r = Reclass::new_from_config(c).unwrap();
 
         let inv = Inventory::render(&r).unwrap();
