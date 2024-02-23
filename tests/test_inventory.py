@@ -112,3 +112,37 @@ def test_inventory_as_dict():
 
     assert "__reclass__" in inv
     assert set(inv["__reclass__"].keys()) == set(["timestamp"])
+
+
+def test_reclass_from_config():
+    config_options = {
+        "nodes_uri": "targets",
+        "classes_uri": "classes",
+        "ignore_class_notfound": True,
+        "compose_node_name": True,
+    }
+    c = reclass_rs.Config.from_dict("./tests/inventory", config_options)
+    assert c is not None
+
+    r = reclass_rs.Reclass.from_config(c)
+    assert r is not None
+
+    assert set(r.nodes.keys()) == expected_nodes
+    included_classes = set(expected_classes.keys())
+    all_classes = set(r.classes.keys())
+    # discovered classes which aren't shown with their resolved names in the output:
+    assert all_classes - included_classes == {
+        "${baz}",  # appears as `\\${baz}`
+        "cluster.foo",  # appears as `cluster.${dist}`
+        "config_symlink",  # doesn't appear
+        "foo.bar",  # appears as `${tenant}.${cluster}`
+    }
+    # class includes which aren't shown in their resolved form:
+    assert included_classes - all_classes == {
+        "${cls9}",  # resolved as `cls9` for n15
+        "${qux}",  # resolved as `cls1` for n4
+        "${tenant}.${cluster}",  # resolved as `foo.bar` for n16
+        "\\${baz}",  # resolved as `${baz}` for n17
+        "cluster.${dist}",  # resolved as `cluster.foo` for n19
+        "nonexisting",  # skipped because ignore_class_notfound=True
+    }
