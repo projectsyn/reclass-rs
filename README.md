@@ -13,6 +13,7 @@ The implementation currently supports the following features of Kapicorp Reclass
 
 * The Reclass options `nodes_path` and `classes_path`
 * The Reclass option `ignore_class_notfound`
+* The Reclass option `ignore_class_notfound_regexp`
 * Escaped parameter references
 * Merging referenced lists and dictionaries
 * Constant parameters
@@ -27,7 +28,6 @@ The following Kapicorp Reclass features aren't supported:
 
 * Ignoring overwritten missing references
 * Inventory Queries
-* The Reclass option `ignore_class_notfound_regexp`
 * The Reclass option `allow_none_override` can't be set to `False`
 * The Reclass `yaml_git` and `mixed` storage types
 * Any Reclass option which is not mentioned explicitly here or above

@@ -368,6 +368,18 @@ impl Reclass {
             .collect::<HashMap<String, PathBuf>>();
         Ok(res)
     }
+
+    /// Update the current Reclass instance's config object with the provided
+    /// `ignore_class_notfound_regexp` patterns
+    pub fn set_ignore_class_notfound_regexp(&mut self, patterns: Vec<String>) -> PyResult<()> {
+        self.config
+            .set_ignore_class_notfound_regexp(patterns)
+            .map_err(|e| {
+                PyValueError::new_err(format!(
+                    "Error while setting ignore_class_notfound_regexp: {e}"
+                ))
+            })
+    }
 }
 
 impl Default for Reclass {
