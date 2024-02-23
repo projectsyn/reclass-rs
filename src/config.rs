@@ -124,6 +124,79 @@ impl Config {
         })
     }
 
+    fn set_option(
+        &mut self,
+        cfg_path: &std::path::Path,
+        k: &str,
+        v: &serde_yaml::Value,
+    ) -> Result<()> {
+        let vstr = serde_yaml::to_string(v)?;
+        let vstr = vstr.trim();
+        match k {
+            "nodes_uri" => {
+                let npath = cfg_path
+                    .with_file_name(vstr)
+                    .to_str()
+                    .ok_or(anyhow!("Can't create nodes path from config file"))?
+                    .to_owned();
+                self.nodes_path = npath;
+            }
+            "classes_uri" => {
+                self.classes_path = cfg_path
+                    .with_file_name(vstr)
+                    .to_str()
+                    .ok_or(anyhow!("Can't create nodes path from config file"))?
+                    .to_owned();
+            }
+            "ignore_class_notfound" => {
+                self.ignore_class_notfound = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'ignore_class_notfound' to be a boolean"
+                ))?;
+            }
+            "ignore_class_notfound_regexp" => {
+                let list = v.as_sequence().ok_or(anyhow!(
+                    "Expected value of config key 'ignore_class_notfound_regexp' to be a list"
+                ))?;
+                self.ignore_class_notfound_regexp.clear();
+                for val in list {
+                    self.ignore_class_notfound_regexp.push(
+                        val.as_str()
+                            .ok_or(anyhow!(
+                                "Expected entry of 'ignore_class_notfound_regexp' to be a string"
+                            ))?
+                            .to_string(),
+                    );
+                }
+                self.ignore_class_notfound_regexp.shrink_to_fit();
+            }
+            "compose_node_name" => {
+                self.compose_node_name = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'compose_node_name' to be a boolean"
+                ))?;
+            }
+            "reclass_rs_compat_flags" => {
+                let flags = v.as_sequence().ok_or(anyhow!(
+                    "Expected value of config key 'reclass_rs_compat_flags' to be a list"
+                ))?;
+                for f in flags {
+                    let f = f
+                        .as_str()
+                        .ok_or(anyhow!("Expected compatibility flag to be a string"))?;
+                    if let Ok(flag) = CompatFlag::try_from(f) {
+                        self.compatflags.insert(flag);
+                    } else {
+                        eprintln!("Unknown compatibility flag '{f}', ignoring...");
+                    }
+                }
+            }
+            _ => {
+                eprintln!("reclass-config.yml entry '{k}={vstr}' not implemented yet, ignoring...");
+            }
+        };
+
+        Ok(())
+    }
+
     /// Load additional config options from the file at `<self.inventory_path>/<config_file>`.
     ///
     /// This method assumes that you've created a Config object with a suitable `inventory_path`.
@@ -140,72 +213,8 @@ impl Config {
             .ok_or(anyhow!("Expected reclass config to be a Mapping"))?
         {
             let kstr = serde_yaml::to_string(k)?;
-            let vstr = serde_yaml::to_string(v)?;
             let kstr = kstr.trim();
-            let vstr = vstr.trim();
-            match kstr {
-                "nodes_uri" => {
-                    let npath = cfg_path
-                        .with_file_name(vstr)
-                        .to_str()
-                        .ok_or(anyhow!("Can't create nodes path from config file"))?
-                        .to_owned();
-                    self.nodes_path = npath;
-                }
-                "classes_uri" => {
-                    self.classes_path = cfg_path
-                        .with_file_name(vstr)
-                        .to_str()
-                        .ok_or(anyhow!("Can't create nodes path from config file"))?
-                        .to_owned();
-                }
-                "ignore_class_notfound" => {
-                    self.ignore_class_notfound = v.as_bool().ok_or(anyhow!(
-                        "Expected value of config key 'ignore_class_notfound' to be a boolean"
-                    ))?;
-                }
-                "ignore_class_notfound_regexp" => {
-                    let list = v.as_sequence().ok_or(anyhow!(
-                        "Expected value of config key 'ignore_class_notfound_regexp' to be a list"
-                    ))?;
-                    self.ignore_class_notfound_regexp.clear();
-                    for val in list {
-                        self.ignore_class_notfound_regexp.push(
-                            val.as_str()
-                                .ok_or(anyhow!(
-                                "Expected entry of 'ignore_class_notfound_regexp' to be a string"
-                            ))?
-                                .to_string(),
-                        );
-                    }
-                    self.ignore_class_notfound_regexp.shrink_to_fit();
-                }
-                "compose_node_name" => {
-                    self.compose_node_name = v.as_bool().ok_or(anyhow!(
-                        "Expected value of config key 'compose_node_name' to be a boolean"
-                    ))?;
-                }
-                "reclass_rs_compat_flags" => {
-                    let flags = v.as_sequence().ok_or(anyhow!(
-                        "Expected value of config key 'reclass_rs_compat_flags' to be a list"
-                    ))?;
-                    for f in flags {
-                        let f = f
-                            .as_str()
-                            .ok_or(anyhow!("Expected compatibility flag to be a string"))?;
-                        if let Ok(flag) = CompatFlag::try_from(f) {
-                            self.compatflags.insert(flag);
-                        } else {
-                            eprintln!("Unknown compatibility flag '{f}', ignoring...");
-                        }
-                    }
-                }
-                _ => {
-                    eprintln!(
-                        "reclass-config.yml entry '{kstr}={vstr}' not implemented yet, ignoring..."
-                    );
-                }
-            }
+            self.set_option(&cfg_path, kstr, v)?;
         }
         self.compile_ignore_class_notfound_patterns()?;
         Ok(())
