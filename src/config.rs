@@ -131,6 +131,7 @@ impl Config {
         cfg_path: &std::path::Path,
         k: &str,
         v: &serde_yaml::Value,
+        verbose: bool,
     ) -> Result<()> {
         let vstr = serde_yaml::to_string(v)?;
         let vstr = vstr.trim();
@@ -192,7 +193,11 @@ impl Config {
                 }
             }
             _ => {
-                eprintln!("reclass-config.yml entry '{k}={vstr}' not implemented yet, ignoring...");
+                if verbose {
+                    eprintln!(
+                        "reclass-config.yml entry '{k}={vstr}' not implemented yet, ignoring..."
+                    );
+                }
             }
         };
 
@@ -203,8 +208,9 @@ impl Config {
     ///
     /// This method assumes that you've created a Config object with a suitable `inventory_path`.
     ///
-    /// The method will print diagnostic messages for config options which aren't implemented yet.
-    pub fn load_from_file(&mut self, config_file: &str) -> Result<()> {
+    /// If `verbose` is true, the method will print diagnostic messages for config options which
+    /// aren't implemented yet.
+    pub fn load_from_file(&mut self, config_file: &str, verbose: bool) -> Result<()> {
         let mut cfg_path = PathBuf::from(&self.inventory_path);
         cfg_path.push(config_file);
 
@@ -216,7 +222,7 @@ impl Config {
         {
             let kstr = serde_yaml::to_string(k)?;
             let kstr = kstr.trim();
-            self.set_option(&cfg_path, kstr, v)?;
+            self.set_option(&cfg_path, kstr, v, verbose)?;
         }
         self.compile_ignore_class_notfound_patterns()?;
         Ok(())
@@ -268,11 +274,18 @@ impl Config {
     }
 
     /// Creates a Config object based on the provided `inventory_path` and the config options
-    /// passed in the `config` Python dict.
+    /// passed in the `config` Python dict. If `verbose` is set to `true`, reclass-rs will print
+    /// diagnostic messages for unknown config options.
     ///
     /// Returns a `Config` object or raises a `ValueError`.
     #[classmethod]
-    fn from_dict(_cls: &PyType, inventory_path: &str, config: &PyDict) -> PyResult<Self> {
+    #[pyo3(signature = (inventory_path, config, verbose=false))]
+    fn from_dict(
+        _cls: &PyType,
+        inventory_path: &str,
+        config: &PyDict,
+        verbose: bool,
+    ) -> PyResult<Self> {
         let mut cfg = Config::new(Some(inventory_path), None, None, None).map_err(|e| {
             PyValueError::new_err(format!(
                 "Failed to initialize reclass-rs config object: {e}"
@@ -288,9 +301,10 @@ impl Config {
         for (k, v) in config {
             let kstr = k.extract::<&str>()?;
             let val: crate::types::Value = TryInto::try_into(v)?;
-            cfg.set_option(&cfg_path, kstr, &val.into()).map_err(|e| {
-                PyValueError::new_err(format!("Error while setting option {kstr}: {e}"))
-            })?;
+            cfg.set_option(&cfg_path, kstr, &val.into(), verbose)
+                .map_err(|e| {
+                    PyValueError::new_err(format!("Error while setting option {kstr}: {e}"))
+                })?;
         }
 
         Ok(cfg)
