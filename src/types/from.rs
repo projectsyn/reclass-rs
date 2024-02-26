@@ -1,4 +1,7 @@
 use super::{Mapping, Value};
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::{PyDict, PySequence};
 
 impl From<&str> for Value {
     /// Converts a string slice into a `Value::String`.
@@ -114,5 +117,52 @@ impl<'a, T: Clone + Into<Value>> From<&'a [T]> for Value {
     /// `Value`.
     fn from(value: &'a [T]) -> Self {
         Value::Sequence(value.iter().cloned().map(Into::into).collect())
+    }
+}
+
+impl TryFrom<&PyAny> for Value {
+    type Error = PyErr;
+
+    fn try_from(value: &PyAny) -> PyResult<Self> {
+        match value.get_type().name()? {
+            "str" => {
+                let v = value.extract::<&str>()?;
+                Ok(Self::String(v.to_string()))
+            }
+            "list" => {
+                let v = value.downcast::<PySequence>()?;
+                let mut items = vec![];
+                for it in v.iter()? {
+                    items.push(TryInto::try_into(it?)?);
+                }
+                Ok(Self::Sequence(items))
+            }
+            "dict" => {
+                let dict = value.downcast::<PyDict>()?;
+                let mut mapping = crate::types::Mapping::new();
+                for (k, v) in dict {
+                    let kv = TryInto::try_into(k)?;
+                    let vv = TryInto::try_into(v)?;
+                    mapping.insert(kv, vv).map_err(|e| {
+                        PyValueError::new_err(format!("Error inserting into mapping: {e}"))
+                    })?;
+                }
+                Ok(Self::Mapping(mapping))
+            }
+            "bool" => {
+                let v = value.extract::<bool>()?;
+                Ok(Self::Bool(v))
+            }
+            "int" | "float" => {
+                let v = value.extract::<f64>()?;
+                let n = serde_yaml::Number::from(v);
+                Ok(Self::Number(n))
+            }
+
+            _ => Err(PyValueError::new_err(format!(
+                "Conversion from Python type to reclass_rs::Value isn't implemented for <class '{}'>",
+                value.get_type().name()?
+            ))),
+        }
     }
 }
