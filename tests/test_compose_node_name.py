@@ -35,7 +35,7 @@ def test_no_compose_node_name():
 
 
 def test_compose_node_name_compat():
-    r = reclass_rs.Reclass.from_config(
+    r = reclass_rs.Reclass.from_config_file(
         "./tests/inventory-compose-node-name", "reclass-config.yml"
     )
     r.set_compat_flag(reclass_rs.CompatFlag.ComposeNodeNameLiteralDots)
@@ -63,7 +63,7 @@ def test_compose_node_name_compat():
 
 
 def test_compose_node_name():
-    r = reclass_rs.Reclass.from_config(
+    r = reclass_rs.Reclass.from_config_file(
         "./tests/inventory-compose-node-name", "reclass-config.yml"
     )
     assert r.config.compose_node_name
