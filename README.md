@@ -89,23 +89,15 @@ The benchmarks are implemented with `criterion`.
 ## Testing reclass-rs in Kapitan
 
 
-If you're using [Kapitan], you can test reclass-rs by installing `reclass-rs` in your Kapitan virtualenv:
-
-1. Install `reclass-rs` in your Kapitan virtualenv
+If you're using [Kapitan], you can use reclass-rs by installing Kapitan with the optional `reclass-rs` dependency and specifying `--inventory-backend=reclass-rs` when running Kapitan.
 
 ```
 KAPITAN_VENV=/path/to/your/kapitan/virtualenv
 source ${KAPITAN_VENV}/bin/activate
-pip install reclass-rs
+pip install kapitan[reclass-rs]
 ```
 
-2. Patch the Kapitan package in the virtualenv with the following command
-
-```
-patch -p1 -d $KAPITAN_VENV < hack/kapitan_0.32_reclass_rs.patch
-```
-
-Please note that we've only tested the patch against the Kapitan 0.32 release as published on PyPI.
+See the [upstream Kapitan docs](https://kapitan.dev/pages/inventory/reclass-rs/) for more details.
 
 ## Automated package version management
 
