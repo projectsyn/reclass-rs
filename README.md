@@ -44,23 +44,23 @@ Documentation on Reclass extensions introduced in the Kapicorp Reclass fork can 
 
 1. Create a local virtualenv for running Python tests and install [maturin] and pytest
 
-```
-python -m venv .venv
-source .venv/bin/activate
-pip install maturin pytest
-```
+    ```
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install maturin pytest
+    ```
 
 2. Build the reclass-rs Python library and install it in the virtualenv
 
-```
-maturin develop
-```
+    ```
+    maturin develop
+    ```
 
 3. Run Python tests
 
-```
-pytest
-```
+    ```
+    pytest
+    ```
 
 ## Rust development
 
