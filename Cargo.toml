@@ -25,7 +25,7 @@ rayon = "1.9.0"
 regex = "1.10.3"
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
-serde_yaml = "0.9.32"
+serde_yaml = "0.9.33"
 walkdir = "2.5.0"
 yaml-merge-keys = { version = "0.6.0", features = ["serde_yaml"] }
 
