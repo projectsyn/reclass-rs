@@ -1,0 +1,13 @@
+Open points:
+* Parser
+* expression execution
+** expression complexity is limited:
+   `$[ E ]` and `$[ E if cond ]` are valid inventory queries, 
+   where `E ::= "exports:" fieldExpr`
+   where `fieldExpr ::= <literal> ("." <literal>)*`
+   where `cond ::= comp | comp and cond | comp or cond`
+   where `comp ::= E == <literal> | E != <literal>`
+
+* We need to somehow process inventory queries outside of the parallelized section since we need to be able to access all nodes' exports
+* How can inv queries and reclass references interact in ValueLists? Is this even feasible in the multi-threaded model?
+** Most likely, reclass-rs won't support mixing reclass references and inventory queries for the same parameter
