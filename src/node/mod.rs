@@ -27,9 +27,15 @@ pub struct Node {
     /// Reclass parameters for this node as parsed from YAML
     #[serde(default, rename = "parameters")]
     params: serde_yaml::Mapping,
+    // Reclass exports for this node as parsed from YAML
+    #[serde(default, rename = "exports")]
+    raw_exports: serde_yaml::Mapping,
     /// Reclass parameters for this node converted into our own mapping type
     #[serde(skip)]
     parameters: Mapping,
+    /// Reclass exports for this node converted into our own mapping type
+    #[serde(skip)]
+    exports: Mapping,
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,
@@ -85,8 +91,9 @@ impl Node {
             .clone();
         n.params = p;
 
-        // Convert serde_yaml::Mapping into our own Mapping type
+        // Convert serde_yaml::Mapping fields into our own Mapping type
         n.parameters = n.params.clone().into();
+        n.exports = n.raw_exports.clone().into();
 
         Ok(n)
     }
@@ -216,6 +223,10 @@ impl Node {
 
         other.parameters.merge(&self.parameters)?;
         self.parameters = other.parameters.clone();
+
+        other.exports.merge(&self.exports)?;
+        self.exports = other.exports.clone();
+
         Ok(())
     }
 
@@ -291,6 +302,24 @@ impl Node {
         }
     }
 
+    /// Renders the Node's exports by interpolating Reclass references and flattening
+    /// ValueLists.
+    fn render_exports(&mut self) -> Result<()> {
+        let p = std::mem::take(&mut self.exports);
+        let mut f = Value::Mapping(p);
+        f.render(&self.parameters)?;
+        match f {
+            Value::Mapping(m) => {
+                self.exports = m;
+                Ok(())
+            }
+            _ => Err(anyhow!(
+                "Rendered exports are not a Mapping but a {}",
+                f.variant()
+            )),
+        }
+    }
+
     /// Load included classes (recursively), and merge parameters.
     ///
     /// Note that this method doesn't flatten overwritten parameters.
@@ -314,7 +343,10 @@ impl Node {
         base.render_impl(r, &mut seen, &mut root)?;
         // Then render ourselves into the rendered base and update ourselves with the result
         self.render_impl(r, &mut seen, &mut base)?;
-        self.render_parameters()
+        self.render_parameters()?;
+        self.render_exports()?;
+
+        Ok(())
     }
 }
 
