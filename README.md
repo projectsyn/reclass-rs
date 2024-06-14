@@ -44,23 +44,23 @@ Documentation on Reclass extensions introduced in the Kapicorp Reclass fork can 
 
 1. Create a local virtualenv for running Python tests and install [maturin] and pytest
 
-```
-python -m venv .venv
-source .venv/bin/activate
-pip install maturin pytest
-```
+    ```
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install maturin pytest
+    ```
 
 2. Build the reclass-rs Python library and install it in the virtualenv
 
-```
-maturin develop
-```
+    ```
+    maturin develop
+    ```
 
 3. Run Python tests
 
-```
-pytest
-```
+    ```
+    pytest
+    ```
 
 ## Rust development
 
@@ -93,17 +93,17 @@ If you're using [Kapitan], you can test reclass-rs by installing `reclass-rs` in
 
 1. Install `reclass-rs` in your Kapitan virtualenv
 
-```
-KAPITAN_VENV=/path/to/your/kapitan/virtualenv
-source ${KAPITAN_VENV}/bin/activate
-pip install reclass-rs
-```
+   ```
+   KAPITAN_VENV=/path/to/your/kapitan/virtualenv
+   source ${KAPITAN_VENV}/bin/activate
+   pip install reclass-rs
+   ```
 
 2. Patch the Kapitan package in the virtualenv with the following command
 
-```
-patch -p1 -d $KAPITAN_VENV < hack/kapitan_0.32_reclass_rs.patch
-```
+    ```
+    patch -p1 -d $KAPITAN_VENV < hack/kapitan_0.32_reclass_rs.patch
+    ```
 
 Please note that we've only tested the patch against the Kapitan 0.32 release as published on PyPI.
 
