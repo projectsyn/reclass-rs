@@ -177,7 +177,7 @@ impl NodeInfo {
     /// This method generates a PyDict which should be structured identically to Python Reclass's
     /// `nodeinfo` return value.
     pub(crate) fn as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
+        let dict = PyDict::new_bound(py);
         dict.set_item("__reclass__", self.reclass_as_dict(py)?)?;
         dict.set_item("applications", self.applications.clone().into_py(py))?;
         dict.set_item("classes", self.classes.clone().into_py(py))?;
@@ -189,7 +189,7 @@ impl NodeInfo {
 
     /// Returns the NodeInfo `meta` field as a PyDict
     fn reclass_as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
+        let dict = PyDict::new_bound(py);
         dict.set_item("node", self.reclass.node.clone().into_py(py))?;
         dict.set_item("name", self.reclass.name.clone().into_py(py))?;
         dict.set_item("uri", self.reclass.uri.clone().into_py(py))?;

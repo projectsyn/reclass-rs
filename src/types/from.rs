@@ -120,18 +120,18 @@ impl<'a, T: Clone + Into<Value>> From<&'a [T]> for Value {
     }
 }
 
-impl TryFrom<&PyAny> for Value {
+impl TryFrom<Bound<'_, PyAny>> for Value {
     type Error = PyErr;
 
-    fn try_from(value: &PyAny) -> PyResult<Self> {
-        match value.get_type().name()? {
+    fn try_from(value: Bound<'_, PyAny>) -> PyResult<Self> {
+        match value.get_type().name()?.to_str()? {
             "str" => {
                 let v = value.extract::<&str>()?;
                 Ok(Self::String(v.to_string()))
             }
             "list" => {
                 let v = value.downcast::<PySequence>()?;
-                let mut items = vec![];
+                let mut items: Vec<Value> = vec![];
                 for it in v.iter()? {
                     items.push(TryInto::try_into(it?)?);
                 }

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use crate::fsutil::to_lexical_normal;
 
 /// Flags to change reclass-rs behavior to be compaible with Python reclass
-#[pyclass]
+#[pyclass(eq, eq_int)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum CompatFlag {
     /// This flag enables Python Reclass-compatible rendering of fields `path` and `parts` in
@@ -137,19 +137,18 @@ impl Config {
         let vstr = vstr.trim();
         match k {
             "nodes_uri" => {
-                let npath = cfg_path
+                cfg_path
                     .with_file_name(vstr)
                     .to_str()
                     .ok_or(anyhow!("Can't create nodes path from config file"))?
-                    .to_owned();
-                self.nodes_path = npath;
+                    .clone_into(&mut self.nodes_path);
             }
             "classes_uri" => {
-                self.classes_path = cfg_path
+                cfg_path
                     .with_file_name(vstr)
                     .to_str()
                     .ok_or(anyhow!("Can't create nodes path from config file"))?
-                    .to_owned();
+                    .clone_into(&mut self.classes_path);
             }
             "ignore_class_notfound" => {
                 self.ignore_class_notfound = v.as_bool().ok_or(anyhow!(
@@ -281,9 +280,9 @@ impl Config {
     #[classmethod]
     #[pyo3(signature = (inventory_path, config, verbose=false))]
     fn from_dict(
-        _cls: &PyType,
+        _cls: &Bound<'_, PyType>,
         inventory_path: &str,
-        config: &PyDict,
+        config: &Bound<'_, PyDict>,
         verbose: bool,
     ) -> PyResult<Self> {
         let mut cfg = Config::new(Some(inventory_path), None, None, None).map_err(|e| {
