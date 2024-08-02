@@ -10,12 +10,12 @@ fn test_reclass() {
         let r = Reclass::new("./tests/inventory", "nodes", "classes", false)
             .unwrap()
             .into_py(py);
-        let locals = PyDict::new(py);
+        let locals = PyDict::new_bound(py);
         locals.set_item("r", r).unwrap();
-        py.run(
+        py.run_bound(
             r#"assert r and "Reclass" in str(type(r))"#,
             None,
-            Some(locals),
+            Some(&locals),
         )
         .unwrap();
     });

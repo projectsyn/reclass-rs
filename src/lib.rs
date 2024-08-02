@@ -295,7 +295,7 @@ impl Reclass {
     #[classmethod]
     #[pyo3(signature = (inventory_path, config_file, verbose=false))]
     fn from_config_file(
-        cls: &PyType,
+        cls: &Bound<'_, PyType>,
         inventory_path: &str,
         config_file: &str,
         verbose: bool,
@@ -311,7 +311,7 @@ impl Reclass {
     ///
     /// Returns a `Reclass` instance or raises a `ValueError`
     #[classmethod]
-    fn from_config(_cls: &PyType, config: Config) -> PyResult<Self> {
+    fn from_config(_cls: &Bound<'_, PyType>, config: Config) -> PyResult<Self> {
         let r = Self::new_from_config(config).map_err(|e| PyValueError::new_err(format!("{e}")))?;
         Ok(r)
     }
@@ -339,7 +339,7 @@ impl Reclass {
     /// Note that this method should only be called once and will print a diagnostic message if
     /// called again.
     #[classmethod]
-    pub fn set_thread_count(_cls: &PyType, count: usize) {
+    pub fn set_thread_count(_cls: &Bound<'_, PyType>, count: usize) {
         if let Err(e) = ThreadPoolBuilder::new().num_threads(count).build_global() {
             eprintln!("While initializing global thread pool: {e}");
         }
@@ -408,7 +408,7 @@ impl Default for Reclass {
 }
 
 #[pymodule]
-fn reclass_rs(_py: Python, m: &PyModule) -> PyResult<()> {
+fn reclass_rs(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register the top-level `Reclass` Python class which is used to configure the library
     m.add_class::<Reclass>()?;
     // Register the `Config` class and `CompatFlag` enum

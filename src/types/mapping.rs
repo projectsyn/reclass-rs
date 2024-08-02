@@ -356,7 +356,7 @@ impl Mapping {
 
     /// Converts the `Mapping` into a `PyDict`.
     pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new(py);
+        let dict = PyDict::new_bound(py);
 
         for (k, v) in self {
             let pyk = k.as_py_obj(py)?;
@@ -741,7 +741,7 @@ mod mapping_tests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let pym = m.as_py_dict(py).unwrap();
-            let m = pym.as_ref(py);
+            let m = pym.bind(py);
             assert_eq!(m.len(), 6);
             assert_eq!(format!("{:?}", m.keys()), "['a', 'b', 'c', 'd', 'e', 'f']");
             let a = m.get_item(&"a").unwrap().unwrap();
