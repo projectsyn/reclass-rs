@@ -3,8 +3,7 @@ use super::*;
 fn test_as_py_obj_null() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
-        let pyv = Value::Null.as_py_obj(py).unwrap();
-        let v = pyv.bind(py);
+        let v = Value::Null.as_py_obj(py).unwrap();
         assert!(v.is_none());
     });
 }
@@ -13,8 +12,7 @@ fn test_as_py_obj_null() {
 fn test_as_py_obj_bool() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
-        let pyb = Value::Bool(true).as_py_obj(py).unwrap();
-        let b = pyb.bind(py);
+        let b = Value::Bool(true).as_py_obj(py).unwrap();
         assert!(b.is_instance_of::<pyo3::types::PyBool>());
         assert!(b.downcast_exact::<pyo3::types::PyBool>().unwrap().is_true());
     });
@@ -27,13 +25,9 @@ fn test_as_py_obj_int() {
         let nums: Vec<Value> = vec![5.into(), (-2i64).into()];
         for n in nums {
             let pyn = n.as_py_obj(py).unwrap();
-            let n = pyn.bind(py);
-            assert!(n.is_instance_of::<pyo3::types::PyInt>());
-            assert!(n
-                .downcast_exact::<pyo3::types::PyInt>()
-                .unwrap()
-                .eq(n.into_py(py))
-                .unwrap());
+            let n = n.as_i64().unwrap();
+            assert!(pyn.is_instance_of::<pyo3::types::PyInt>());
+            assert!(pyn.downcast_exact::<pyo3::types::PyInt>().unwrap().eq(&n));
         }
     });
 }
@@ -43,14 +37,12 @@ fn test_as_py_obj_float() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
         let n: Value = 3.14.into();
-        let pyn = n.as_py_obj(py).unwrap();
-        let n = pyn.bind(py);
+        let n = n.as_py_obj(py).unwrap();
         assert!(n.is_instance_of::<pyo3::types::PyFloat>());
         assert!(n
             .downcast_exact::<pyo3::types::PyFloat>()
             .unwrap()
-            .eq(3.14.into_py(py))
-            .unwrap());
+            .eq(&3.14));
     });
 }
 
@@ -59,13 +51,12 @@ fn test_as_py_obj_sequence() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
         let s: Value = vec![1, 2, 3].into();
-        let pys = s.as_py_obj(py).unwrap();
-        let s = pys.bind(py);
+        let s = s.as_py_obj(py).unwrap();
         assert!(s.is_instance_of::<pyo3::types::PyList>());
         assert!(s
             .downcast_exact::<pyo3::types::PyList>()
             .unwrap()
-            .eq(pyo3::types::PyList::new_bound(py, vec![1, 2, 3]))
+            .eq(&vec![1, 2, 3])
             .unwrap());
     });
 }
@@ -74,10 +65,9 @@ fn test_as_py_obj_sequence() {
 fn test_as_py_obj_string() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
-        let pys = std::convert::Into::<Value>::into("hello, world")
+        let s = std::convert::Into::<Value>::into("hello, world")
             .as_py_obj(py)
             .unwrap();
-        let s = pys.bind(py);
         assert!(s.is_instance_of::<pyo3::types::PyString>());
         assert_eq!(
             s.downcast_exact::<pyo3::types::PyString>()

@@ -355,8 +355,8 @@ impl Mapping {
     }
 
     /// Converts the `Mapping` into a `PyDict`.
-    pub fn as_py_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new_bound(py);
+    pub fn as_py_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
 
         for (k, v) in self {
             let pyk = k.as_py_obj(py)?;
@@ -364,7 +364,7 @@ impl Mapping {
             dict.set_item(pyk, pyv)?;
         }
 
-        Ok(dict.into())
+        Ok(dict.into_pyobject(py)?)
     }
 
     /// Checks if the provided key is marked as constant.
@@ -740,17 +740,12 @@ mod mapping_tests {
         );
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let pym = m.as_py_dict(py).unwrap();
-            let m = pym.bind(py);
+            let m = m.as_py_dict(py).unwrap();
             assert_eq!(m.len(), 6);
             assert_eq!(format!("{:?}", m.keys()), "['a', 'b', 'c', 'd', 'e', 'f']");
             let a = m.get_item(&"a").unwrap().unwrap();
             assert!(a.is_instance_of::<pyo3::types::PyInt>());
-            assert!(a
-                .downcast_exact::<pyo3::types::PyInt>()
-                .unwrap()
-                .eq(1.into_py(py))
-                .unwrap());
+            assert!(a.downcast_exact::<pyo3::types::PyInt>().unwrap().eq(&1));
             let f = m.get_item(&"f").unwrap().unwrap();
             assert!(f.is_instance_of::<PyDict>());
             let f = f.downcast_exact::<PyDict>().unwrap();

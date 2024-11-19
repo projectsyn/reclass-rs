@@ -132,7 +132,7 @@ impl TryFrom<Bound<'_, PyAny>> for Value {
             "list" => {
                 let v = value.downcast::<PySequence>()?;
                 let mut items: Vec<Value> = vec![];
-                for it in v.iter()? {
+                for it in v.try_iter()? {
                     items.push(TryInto::try_into(it?)?);
                 }
                 Ok(Self::Sequence(items))

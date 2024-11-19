@@ -76,17 +76,17 @@ impl Inventory {
     ///
     /// The structure of the returned dict should match Python reclass the structure of the dict
     /// returned by Python reclass's `inventory()` method.
-    fn as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new_bound(py);
-        dict.set_item("applications", self.applications.clone().into_py(py))?;
-        dict.set_item("classes", self.classes.clone().into_py(py))?;
-        let nodes_dict = PyDict::new_bound(py);
+    fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+        dict.set_item("applications", self.applications.clone().into_pyobject(py)?)?;
+        dict.set_item("classes", self.classes.clone().into_pyobject(py)?)?;
+        let nodes_dict = PyDict::new(py);
         for (name, info) in &self.nodes {
             nodes_dict.set_item(name, info.as_dict(py)?)?;
         }
         dict.set_item("nodes", nodes_dict)?;
 
-        let reclass_dict = PyDict::new_bound(py);
+        let reclass_dict = PyDict::new(py);
         let ts = Local::now();
         reclass_dict.set_item("timestamp", ts.format("%c").to_string())?;
         dict.set_item("__reclass__", reclass_dict)?;

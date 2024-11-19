@@ -160,13 +160,13 @@ impl NodeInfo {
 
     /// Returns the NodeInfo `parameters` field as a PyDict
     #[getter]
-    fn parameters(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+    fn parameters<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         self.parameters.as_py_dict(py)
     }
 
     /// Returns the NodeInfo `exports` field as a PyDict
     #[getter]
-    fn exports(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+    fn exports<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         #[cfg(debug_assertions)]
         eprintln!("reclass_rs doesn't support exports yet!");
         self.exports.as_py_dict(py)
@@ -176,24 +176,30 @@ impl NodeInfo {
     ///
     /// This method generates a PyDict which should be structured identically to Python Reclass's
     /// `nodeinfo` return value.
-    pub(crate) fn as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new_bound(py);
+    pub(crate) fn as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
         dict.set_item("__reclass__", self.reclass_as_dict(py)?)?;
-        dict.set_item("applications", self.applications.clone().into_py(py))?;
-        dict.set_item("classes", self.classes.clone().into_py(py))?;
-        dict.set_item("environment", self.reclass.environment.clone().into_py(py))?;
+        dict.set_item("applications", self.applications.clone().into_pyobject(py)?)?;
+        dict.set_item("applications", self.applications.clone().into_pyobject(py)?)?;
+        dict.set_item(
+            "environment",
+            self.reclass.environment.clone().into_pyobject(py)?,
+        )?;
         dict.set_item("exports", self.exports(py)?)?;
         dict.set_item("parameters", self.parameters(py)?)?;
         Ok(dict.into())
     }
 
     /// Returns the NodeInfo `meta` field as a PyDict
-    fn reclass_as_dict(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
-        let dict = PyDict::new_bound(py);
-        dict.set_item("node", self.reclass.node.clone().into_py(py))?;
-        dict.set_item("name", self.reclass.name.clone().into_py(py))?;
-        dict.set_item("uri", self.reclass.uri.clone().into_py(py))?;
-        dict.set_item("environment", self.reclass.environment.clone().into_py(py))?;
+    fn reclass_as_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+        dict.set_item("node", self.reclass.node.clone().into_pyobject(py)?)?;
+        dict.set_item("name", self.reclass.name.clone().into_pyobject(py)?)?;
+        dict.set_item("uri", self.reclass.uri.clone().into_pyobject(py)?)?;
+        dict.set_item(
+            "environment",
+            self.reclass.environment.clone().into_pyobject(py)?,
+        )?;
         // Format time as strftime %c for Python compatibility
         dict.set_item(
             "timestamp",
