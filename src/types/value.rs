@@ -426,21 +426,21 @@ impl Value {
 
     /// Converts the `Value` into a `PyObject`.
     #[allow(clippy::missing_panics_doc)]
-    pub fn as_py_obj(&self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn as_py_obj<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let obj = match self {
-            Value::Literal(s) | Value::String(s) => s.into_py(py),
-            Value::Bool(b) => b.into_py(py),
+            Value::Literal(s) | Value::String(s) => s.into_pyobject(py)?.into_any(),
+            Value::Bool(b) => pyo3::types::PyBool::new(py, *b).to_owned().into_any(),
             Value::Number(n) => {
                 if n.is_i64() {
                     // NOTE(sg): We allow the missing panics doc because we already checked that
                     // `as_i64()` can't panic here.
-                    n.as_i64().unwrap().into_py(py)
+                    n.as_i64().unwrap().into_pyobject(py)?.into_any()
                 } else if n.is_u64() {
-                    n.as_u64().unwrap().into_py(py)
+                    n.as_u64().unwrap().into_pyobject(py)?.into_any()
                 } else if n.is_f64() {
-                    n.as_f64().unwrap().into_py(py)
+                    n.as_f64().unwrap().into_pyobject(py)?.into_any()
                 } else {
-                    Option::<()>::None.into_py(py)
+                    Option::<()>::None.into_pyobject(py)?.into_any()
                 }
             }
             Value::Sequence(s) => {
@@ -448,10 +448,10 @@ impl Value {
                 for v in s {
                     pyseq.push(v.as_py_obj(py)?);
                 }
-                pyseq.into_py(py)
+                pyseq.into_pyobject(py)?.into_any()
             }
-            Value::Mapping(m) => m.as_py_dict(py)?.into(),
-            Value::Null => Option::<()>::None.into_py(py),
+            Value::Mapping(m) => m.as_py_dict(py)?.into_any(),
+            Value::Null => Option::<()>::None.into_pyobject(py)?.into_any(),
             // ValueList should never get emitted to Python
             Value::ValueList(_) => unreachable!(),
         };

@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -9,11 +11,12 @@ fn test_reclass() {
     Python::with_gil(|py| {
         let r = Reclass::new("./tests/inventory", "nodes", "classes", false)
             .unwrap()
-            .into_py(py);
-        let locals = PyDict::new_bound(py);
+            .into_pyobject(py)
+            .unwrap();
+        let locals = PyDict::new(py);
         locals.set_item("r", r).unwrap();
-        py.run_bound(
-            r#"assert r and "Reclass" in str(type(r))"#,
+        py.run(
+            &CString::new(r#"assert r and "Reclass" in str(type(r))"#).unwrap(),
             None,
             Some(&locals),
         )
