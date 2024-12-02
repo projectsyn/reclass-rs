@@ -187,7 +187,7 @@ impl NodeInfo {
         )?;
         dict.set_item("exports", self.exports(py)?)?;
         dict.set_item("parameters", self.parameters(py)?)?;
-        Ok(dict.into())
+        Ok(dict)
     }
 
     /// Returns the NodeInfo `meta` field as a PyDict
@@ -205,6 +205,6 @@ impl NodeInfo {
             "timestamp",
             self.reclass.render_time.format("%c").to_string(),
         )?;
-        Ok(dict.into())
+        Ok(dict)
     }
 }

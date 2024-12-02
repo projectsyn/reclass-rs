@@ -56,7 +56,7 @@ impl std::fmt::Display for Value {
     ///   qux: [1,2,3,4.5]
     ///   zap: ~
     /// "#;
-
+    ///
     /// let v = Value::from(Mapping::from_str(input).unwrap());
     /// assert_eq!(
     ///     v.to_string(),

@@ -90,7 +90,7 @@ impl Inventory {
         let ts = Local::now();
         reclass_dict.set_item("timestamp", ts.format("%c").to_string())?;
         dict.set_item("__reclass__", reclass_dict)?;
-        Ok(dict.into())
+        Ok(dict)
     }
 }
 
