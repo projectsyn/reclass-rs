@@ -122,13 +122,13 @@ fn walk_entity_dir(
     kind: &EntityKind,
     root: &str,
     entity_map: &mut HashMap<String, EntityInfo>,
-    max_depth: usize,
+    compose_node_name: bool,
 ) -> Result<()> {
     let entity_root = to_lexical_absolute(&PathBuf::from(root))?;
 
     // We need to follow symlinks when walking the root directory, so that inventories which
     // contain symlinked directories are loaded correctly.
-    for entry in WalkDir::new(root).max_depth(max_depth).follow_links(true) {
+    for entry in WalkDir::new(root).follow_links(true) {
         let entry = entry?;
         // We use `entry.path()` here to get the symlink name for symlinked files.
         let ext = if let Some(ext) = entry.path().extension() {
@@ -164,18 +164,21 @@ fn walk_entity_dir(
                 "Failed to normalize entity {}",
                 entry.path().display()
             ))?;
-            let (cls, loc) = if kind == &EntityKind::Node && max_depth > 1 && cls.starts_with('_') {
-                // special case node paths starting with _ for compose-node-name
-                (
-                    cls.split(MAIN_SEPARATOR).last().ok_or(anyhow!(
-                        "Can't shorten node name for {}",
-                        entry.path().display()
-                    ))?,
-                    Path::new(""),
-                )
-            } else {
-                (cls, loc)
-            };
+            let (cls, loc) =
+                if kind == &EntityKind::Node && (cls.starts_with('_') || !compose_node_name) {
+                    // special case node paths starting with _ for compose-node-name and return
+                    // only base name for all nodes regardless of depth if compose-node-name isn't
+                    // enabled.
+                    (
+                        cls.split(MAIN_SEPARATOR).last().ok_or(anyhow!(
+                            "Can't shorten node name for {}",
+                            entry.path().display()
+                        ))?,
+                        Path::new(""),
+                    )
+                } else {
+                    (cls, loc)
+                };
             let cls = cls.replace(MAIN_SEPARATOR, ".");
             if let Some(prev) = entity_map.get(&cls) {
                 return err_duplicate_entity(kind, root, relpath, &cls, &prev.path);
@@ -227,16 +230,11 @@ impl Reclass {
     /// exist. Currently the only case where this can happen is when an inventory defines a node as
     /// both `<name>.yml` and `<name>.yaml`.
     fn discover_nodes(&mut self) -> Result<()> {
-        let depth = if self.config.compose_node_name {
-            usize::MAX
-        } else {
-            1
-        };
         walk_entity_dir(
             &EntityKind::Node,
             &self.config.nodes_path,
             &mut self.nodes,
-            depth,
+            self.config.compose_node_name,
         )
     }
 
@@ -250,7 +248,7 @@ impl Reclass {
             &EntityKind::Class,
             &self.config.classes_path,
             &mut self.classes,
-            usize::MAX,
+            true,
         )
     }
 
@@ -470,5 +468,37 @@ mod tests {
         assert_eq!(r.nodes["d"].path, PathBuf::from("d.yml"));
         assert_eq!(r.nodes["d1"].path, PathBuf::from("_d/d1.yml"));
         assert_eq!(r.nodes["d2"].path, PathBuf::from("_d/d/d2.yml"));
+    }
+
+    #[test]
+    fn test_reclass_discover_nodes_nested() {
+        let mut c = Config::new(Some("./tests/inventory-nested-nodes"), None, None, None).unwrap();
+        c.compose_node_name = false;
+        let r = Reclass::new_from_config(c).unwrap();
+        assert_eq!(r.nodes.len(), 4);
+        let mut nodes = r.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(nodes, vec!["a1", "b1", "c1", "d1"]);
+
+        assert_eq!(r.nodes["a1"].path, PathBuf::from("a/a1.yml"));
+        assert_eq!(r.nodes["b1"].path, PathBuf::from("b/b1.yml"));
+        assert_eq!(r.nodes["c1"].path, PathBuf::from("c/c1.yml"));
+        assert_eq!(r.nodes["d1"].path, PathBuf::from("_d/d1.yml"));
+    }
+
+    #[test]
+    fn test_reclass_discover_nodes_nested_composed() {
+        let mut c = Config::new(Some("./tests/inventory-nested-nodes"), None, None, None).unwrap();
+        c.compose_node_name = true;
+        let r = Reclass::new_from_config(c).unwrap();
+        assert_eq!(r.nodes.len(), 4);
+        let mut nodes = r.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(nodes, vec!["a.a1", "b.b1", "c.c1", "d1"]);
+
+        assert_eq!(r.nodes["a.a1"].path, PathBuf::from("a/a1.yml"));
+        assert_eq!(r.nodes["b.b1"].path, PathBuf::from("b/b1.yml"));
+        assert_eq!(r.nodes["c.c1"].path, PathBuf::from("c/c1.yml"));
+        assert_eq!(r.nodes["d1"].path, PathBuf::from("_d/d1.yml"));
     }
 }

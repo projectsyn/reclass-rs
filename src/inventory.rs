@@ -352,4 +352,114 @@ mod inventory_tests {
             Some(&sequence(&["a.1"]))
         );
     }
+
+    #[test]
+    fn test_render_nested_nodes() {
+        let mut c =
+            crate::Config::new(Some("./tests/inventory-nested-nodes"), None, None, None).unwrap();
+        c.compose_node_name = false;
+        let r = Reclass::new_from_config(c).unwrap();
+
+        let inv = Inventory::render(&r).unwrap();
+
+        let invabsdir = std::fs::canonicalize("./tests/inventory-nested-nodes").unwrap();
+        let invabsdir = invabsdir.to_str().unwrap();
+
+        let mut nodes = inv.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(nodes, vec!["a1", "b1", "c1", "d1"]);
+
+        for n in nodes {
+            let node = &inv.nodes[n];
+            assert_eq!(node.reclass.node, *n);
+            assert_eq!(node.reclass.name, *n);
+            let expected = node.parameters.get(&"nested".into()).unwrap();
+            let expected_full_name = expected.get(&"node_name".into()).unwrap();
+            let expected_short_name = expected.get(&"short_name".into()).unwrap();
+            let expected_path = expected.get(&"path".into()).unwrap();
+            let expected_parts = expected.get(&"parts".into()).unwrap();
+            let expected_uri_suffix = expected.get(&"uri_suffix".into()).unwrap();
+            assert_eq!(
+                node.reclass.uri,
+                format!(
+                    "yaml_fs://{invabsdir}/nodes/{}",
+                    expected_uri_suffix.as_str().unwrap()
+                )
+            );
+            let params_reclass_name = node
+                .parameters
+                .get(&"_reclass_".into())
+                .unwrap()
+                .get(&"name".into())
+                .unwrap();
+            assert_eq!(
+                params_reclass_name.get(&"full".into()),
+                Some(expected_full_name)
+            );
+            assert_eq!(
+                params_reclass_name.get(&"short".into()),
+                Some(expected_short_name)
+            );
+            assert_eq!(params_reclass_name.get(&"path".into()), Some(expected_path));
+            assert_eq!(
+                params_reclass_name.get(&"parts".into()),
+                Some(expected_parts)
+            )
+        }
+    }
+
+    #[test]
+    fn test_render_nested_nodes_composed() {
+        let mut c =
+            crate::Config::new(Some("./tests/inventory-nested-nodes"), None, None, None).unwrap();
+        c.compose_node_name = true;
+        let r = Reclass::new_from_config(c).unwrap();
+
+        let inv = Inventory::render(&r).unwrap();
+
+        let invabsdir = std::fs::canonicalize("./tests/inventory-nested-nodes").unwrap();
+        let invabsdir = invabsdir.to_str().unwrap();
+
+        let mut nodes = inv.nodes.keys().collect::<Vec<_>>();
+        nodes.sort();
+        assert_eq!(nodes, vec!["a.a1", "b.b1", "c.c1", "d1"]);
+
+        for n in nodes {
+            let node = &inv.nodes[n];
+            assert_eq!(node.reclass.node, *n);
+            assert_eq!(node.reclass.name, *n);
+            let expected = node.parameters.get(&"composed".into()).unwrap();
+            let expected_full_name = expected.get(&"node_name".into()).unwrap();
+            let expected_short_name = expected.get(&"short_name".into()).unwrap();
+            let expected_path = expected.get(&"path".into()).unwrap();
+            let expected_parts = expected.get(&"parts".into()).unwrap();
+            let expected_uri_suffix = expected.get(&"uri_suffix".into()).unwrap();
+            assert_eq!(
+                node.reclass.uri,
+                format!(
+                    "yaml_fs://{invabsdir}/nodes/{}",
+                    expected_uri_suffix.as_str().unwrap()
+                )
+            );
+            let params_reclass_name = node
+                .parameters
+                .get(&"_reclass_".into())
+                .unwrap()
+                .get(&"name".into())
+                .unwrap();
+            assert_eq!(
+                params_reclass_name.get(&"full".into()),
+                Some(expected_full_name)
+            );
+            assert_eq!(
+                params_reclass_name.get(&"short".into()),
+                Some(expected_short_name)
+            );
+            assert_eq!(params_reclass_name.get(&"path".into()), Some(expected_path));
+            assert_eq!(
+                params_reclass_name.get(&"parts".into()),
+                Some(expected_parts)
+            )
+        }
+    }
 }

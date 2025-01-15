@@ -1,0 +1,13 @@
+parameters:
+  composed:
+    node_name: b.b1
+    short_name: b1
+    path: b/b1
+    parts: ["b", "b1"]
+    uri_suffix: b/b1.yml
+  nested:
+    node_name: b1
+    short_name: b1
+    path: b1
+    parts: ["b1"]
+    uri_suffix: b/b1.yml
