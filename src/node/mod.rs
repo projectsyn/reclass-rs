@@ -48,7 +48,13 @@ impl Node {
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         let uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
-        let meta = NodeInfoMeta::new(name, name, &uri, nodeinfo.path.with_extension(""), "base");
+        // NOTE(sg): parts is only the name when compose-node-name isn't enabled
+        let meta_parts = if r.config.compose_node_name {
+            nodeinfo.path.with_extension("")
+        } else {
+            PathBuf::from(name)
+        };
+        let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, "base");
         Node::from_str(meta, None, &ncontents)
     }
 
