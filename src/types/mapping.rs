@@ -158,7 +158,7 @@ impl Mapping {
                     self.override_keys.insert(k.clone());
                 }
                 None => {}
-            };
+            }
             if force_const {
                 self.const_keys.insert(k.clone());
             }

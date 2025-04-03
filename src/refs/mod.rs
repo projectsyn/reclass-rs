@@ -411,7 +411,7 @@ fn parse_ref(input: &str) -> Result<Token, ParseError> {
             "Trailing data '{}' occurred when parsing '{}', this shouldn't happen! Parsed result: {}",
             uncons, input, token
         );
-    };
+    }
     Ok(token)
 }
 

@@ -104,13 +104,13 @@ impl Config {
             npath.push(p);
         } else {
             npath.push("nodes");
-        };
+        }
         let mut cpath = PathBuf::from(inventory_path);
         if let Some(p) = classes_path {
             cpath.push(p);
         } else {
             cpath.push("classes");
-        };
+        }
         if npath == cpath || npath.starts_with(&cpath) || cpath.starts_with(&npath) {
             return Err(anyhow!("Nodes and classes path must be non-overlapping."));
         }
@@ -198,7 +198,7 @@ impl Config {
                     );
                 }
             }
-        };
+        }
 
         Ok(())
     }

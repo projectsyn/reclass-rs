@@ -662,7 +662,7 @@ impl Value {
                 // to ensure that they don't construct nested ValueLists.
                 unreachable!("Encountered ValueList as merge target, this shouldn't happen!");
             }
-        };
+        }
         Ok(())
     }
 
