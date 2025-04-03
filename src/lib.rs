@@ -170,7 +170,7 @@ fn walk_entity_dir(
                     // only base name for all nodes regardless of depth if compose-node-name isn't
                     // enabled.
                     (
-                        cls.split(MAIN_SEPARATOR).last().ok_or(anyhow!(
+                        cls.split(MAIN_SEPARATOR).next_back().ok_or(anyhow!(
                             "Can't shorten node name for {}",
                             entry.path().display()
                         ))?,

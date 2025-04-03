@@ -73,7 +73,7 @@ impl NodeInfoMeta {
             vec![self
                 .parts
                 .iter()
-                .last()
+                .next_back()
                 .ok_or(anyhow!("Unable to extract last segment from node"))?
                 .to_str()
                 .ok_or(anyhow!("Unable to convert path segment to a string"))?]
