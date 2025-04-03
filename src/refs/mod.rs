@@ -283,21 +283,22 @@ impl std::fmt::Display for Token {
     ///
     /// `format!("{}", parse_ref(<input string>))` should result in the original input string.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn flatten(ts: &[Token]) -> String {
-            ts.iter().fold(String::new(), |mut st, t| {
-                st.push_str(&format!("{t}"));
-                st
-            })
+        fn flatten(f: &mut std::fmt::Formatter<'_>, ts: &[Token]) -> std::fmt::Result {
+            for t in ts {
+                write!(f, "{t}")?;
+            }
+            Ok(())
         }
         match self {
             Token::Literal(s) => {
                 write!(f, "{}", s.replace('\\', r"\\").replace('$', r"\$"))
             }
             Token::Ref(ts) => {
-                let refcontent = flatten(ts);
-                write!(f, "${{{refcontent}}}")
+                write!(f, "${{")?;
+                flatten(f, ts)?;
+                write!(f, "}}")
             }
-            Token::Combined(ts) => write!(f, "{}", flatten(ts)),
+            Token::Combined(ts) => flatten(f, ts),
         }
     }
 }
