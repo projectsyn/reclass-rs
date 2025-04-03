@@ -30,13 +30,14 @@ pub struct ResolveState {
 
 impl ResolveState {
     /// Pushes the provided index into the last element of current_keys as `[idx]`.
-    pub(crate) fn push_list_index(&mut self, idx: usize) {
+    pub(crate) fn push_list_index(&mut self, idx: usize) -> std::fmt::Result {
+        use std::fmt::Write;
         let mut kcount = self.current_keys.len();
         if kcount == 0 {
             self.current_keys.push(String::new());
             kcount = 1;
         }
-        self.current_keys[kcount - 1].push_str(&format!("[{idx}]"));
+        write!(&mut self.current_keys[kcount - 1], "[{idx}]")
     }
 
     /// Pushes mapping key into the `current_keys` list. If possible, the provided value is
