@@ -4,7 +4,10 @@ use std::str::FromStr;
 
 #[test]
 fn test_flattened_null() {
-    assert_eq!(Value::Null.flattened().unwrap(), Value::Null);
+    assert_eq!(
+        Value::Null.flattened(&mut ResolveState::default()).unwrap(),
+        Value::Null
+    );
 }
 
 macro_rules! test_flattened_simple {
@@ -14,7 +17,7 @@ macro_rules! test_flattened_simple {
             #[test]
             fn [<test_flattened_simple_ $variant:snake>]() {
                 let v = Value::$variant($val);
-                let f = v.flattened().unwrap();
+                let f = v.flattened(&mut ResolveState::default()).unwrap();
                 assert_eq!(f, $expected);
             }
             }
@@ -31,10 +34,14 @@ test_flattened_simple! {
 }
 
 #[test]
-#[should_panic(expected = "Can't flatten unparsed String, did you mean to call `rendered()`?")]
+#[should_panic(
+    expected = "In test: Can't flatten unparsed String, did you mean to call `rendered()`?"
+)]
 fn test_flattened_string() {
     let v = Value::String("foo".into());
-    v.flattened().unwrap();
+    let mut st = ResolveState::default();
+    st.push_mapping_key(&"test".into()).unwrap();
+    v.flattened(&mut st).unwrap();
 }
 
 #[test]
@@ -61,7 +68,7 @@ fn test_flattened_simple_value_list() {
         Value::Literal("foo".into()),
         Value::Literal("bar".into()),
     ]);
-    let f = v.flattened().unwrap();
+    let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_literal());
     assert_eq!(f, Value::Literal("bar".into()));
 }
@@ -73,7 +80,7 @@ fn test_flattened_mixed_value_list() {
         Value::Null,
         Value::Literal("bar".into()),
     ]);
-    let f = v.flattened().unwrap();
+    let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_literal());
     assert_eq!(f, Value::Literal("bar".into()));
 }
@@ -85,7 +92,7 @@ fn test_flattened_sequence_value_list() {
         Value::Sequence(vec!["baz".into(), "qux".into()]),
         Value::Sequence(vec!["foo".into()]),
     ]);
-    let f = v.flattened().unwrap();
+    let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert_eq!(
         f,
         Value::Sequence(vec![
@@ -106,7 +113,7 @@ fn test_flattened_mapping_value_list() {
             .into(),
         Mapping::from_str("{baz: baz, qux: qux}").unwrap().into(),
     ]);
-    let f = v.flattened().unwrap();
+    let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_mapping());
 
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
@@ -123,7 +130,7 @@ fn test_flattened_null_over_mapping() {
             .into(),
         Value::Null,
     ]);
-    let f = v.flattened().unwrap();
+    let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_null());
     assert_eq!(f, Value::Null);
 }
@@ -134,7 +141,7 @@ fn test_flattened_null_over_sequence() {
         Value::Sequence(vec!["foo".into(), "bar".into()]),
         Value::Null,
     ]);
-    let f = v.flattened().unwrap();
+    let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_null());
     assert_eq!(f, Value::Null);
 }
@@ -145,7 +152,7 @@ fn test_flattened_map_over_sequence_error() {
         Value::Sequence(vec!["foo".into(), "bar".into()]),
         Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
     ]);
-    let f = v.flattened();
+    let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 
@@ -155,7 +162,7 @@ fn test_flattened_map_over_simple_value_error() {
         Value::Bool(true),
         Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
     ]);
-    let f = v.flattened();
+    let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 
@@ -165,7 +172,7 @@ fn test_flattened_sequence_over_map_error() {
         Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
         Value::Sequence(vec!["foo".into(), "bar".into()]),
     ]);
-    let f = v.flattened();
+    let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 
@@ -175,7 +182,7 @@ fn test_flattened_sequence_over_simple_value_error() {
         Value::Bool(true),
         Value::Sequence(vec!["foo".into(), "bar".into()]),
     ]);
-    let f = v.flattened();
+    let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 

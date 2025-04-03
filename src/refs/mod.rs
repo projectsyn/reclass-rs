@@ -104,6 +104,11 @@ impl ResolveState {
             "While looking up key '{key}' in reference '{r}' for parameter '{current_key}': {msg}"
         )
     }
+
+    pub(crate) fn render_flattening_error(&self, msg: &str) -> anyhow::Error {
+        let current_key = self.current_key();
+        anyhow!("In {current_key}: {msg}")
+    }
 }
 
 /// Maximum allowed recursion depth for Token::resolve(). We're fairly conservative with the value,
@@ -348,7 +353,7 @@ fn interpolate_string_or_valuelist(
                 i.push(v);
             }
             // Finally we flatten the resulting ValueList into a single Value.
-            Value::ValueList(i).flattened()
+            Value::ValueList(i).flattened(state)
         }
         // Do nothing for other types
         _ => Ok(v.clone()),

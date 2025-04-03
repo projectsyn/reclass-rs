@@ -405,13 +405,13 @@ impl Mapping {
     ///
     /// Used in `Value::flattened()` to preserve const and override key information when flattening
     /// Mapping values.
-    pub(super) fn flattened(&self) -> Result<Self> {
+    pub(super) fn flattened(&self, state: &mut ResolveState) -> Result<Self> {
         let mut res = Self::new();
         for (k, v) in self {
             // Propagate key properties to the resulting mapping by using `insert_impl()`.
             res.insert_impl(
                 k.clone(),
-                v.flattened()?,
+                v.flattened(state)?,
                 self.is_const(k),
                 self.is_override(k),
             )?;
@@ -436,7 +436,7 @@ impl Mapping {
             let mut st = state.clone();
             st.push_mapping_key(k)?;
             let mut v = v.interpolate(root, &mut st)?;
-            v.flatten()?;
+            v.flatten(&mut st)?;
             // Propagate key properties to the resulting mapping by using `insert_impl()`.
             res.insert_impl(k.clone(), v, self.is_const(k), self.is_override(k))?;
         }

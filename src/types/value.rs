@@ -575,7 +575,7 @@ impl Value {
                     // done with a layer, any references that we saw there have been successfully
                     // resolved, and don't matter for the next layer we're interpolating).
                     let mut st = state.clone();
-                    r.merge(v.interpolate(root, &mut st)?)?;
+                    r.merge(v.interpolate(root, &mut st)?, &mut st)?;
                 }
                 // Depending on the structure of the ValueList, we may end up with a final
                 // interpolated Value which contains more ValueLists due to mapping merges. Such
@@ -601,7 +601,7 @@ impl Value {
     ///
     /// Note that this method will call [`Value::flatten()`] after merging two Mappings to ensure
     /// that the resulting Value doesn't contain any `ValueList` elements.
-    fn merge(&mut self, other: Self) -> Result<()> {
+    fn merge(&mut self, other: Self, state: &mut ResolveState) -> Result<()> {
         if other.is_null() {
             // Any value can be replaced by null,
             let _prev = std::mem::replace(self, other);
@@ -610,7 +610,7 @@ impl Value {
 
         // If `other` is a ValueList, flatten it before trying to merge
         let other = if other.is_value_list() {
-            other.flattened()?
+            other.flattened(state)?
         } else {
             other
         };
@@ -624,21 +624,31 @@ impl Value {
             Self::Mapping(m) => match other {
                 // merge mapping and mapping
                 Self::Mapping(other) => m.merge(&other)?,
-                _ => return Err(anyhow!("Can't merge {} over mapping", other.variant())),
+                _ => {
+                    return Err(state.render_flattening_error(&format!(
+                        "Can't merge {} over mapping",
+                        other.variant()
+                    )))
+                }
             },
             Self::Sequence(s) => match other {
                 // merge sequence and sequence
                 Self::Sequence(mut other) => s.append(&mut other),
-                _ => return Err(anyhow!("Can't merge {} over sequence", other.variant())),
+                _ => {
+                    return Err(state.render_flattening_error(&format!(
+                        "Can't merge {} over sequence",
+                        other.variant()
+                    )))
+                }
             },
             Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {
                 if other.is_mapping() || other.is_sequence() {
                     // We can't merge simple non-null types over mappings or sequences
-                    return Err(anyhow!(
+                    return Err(state.render_flattening_error(&format!(
                         "Can't merge {} over {}",
                         other.variant(),
                         self.variant()
-                    ));
+                    )));
                 }
                 // overwrite self with the value that's being merged
                 let _prev = std::mem::replace(self, other);
@@ -666,7 +676,7 @@ impl Value {
     ///
     /// Note that we don't recommend calling `flattened()` on arbitrary Values. Users should always
     /// prefer calling [`Value::rendered()`] or one of the in-place variations of that method.
-    pub(crate) fn flattened(&self) -> Result<Self> {
+    pub(crate) fn flattened(&self, state: &mut ResolveState) -> Result<Self> {
         match self {
             // Flatten ValueList by iterating over its elements and merging each element into a
             // base Value.
@@ -674,25 +684,25 @@ impl Value {
                 // NOTE(sg): Empty ValueLists get flattened to Value::Null
                 let mut base = Value::Null;
                 for v in l {
-                    base.merge(v.clone())?;
+                    base.merge(v.clone(), state)?;
                 }
                 Ok(base)
             }
             // Flatten Mapping by flattening each value and inserting it into a new Mapping.
-            Self::Mapping(m) => Ok(Self::Mapping(m.flattened()?)),
+            Self::Mapping(m) => Ok(Self::Mapping(m.flattened(state)?)),
             // Flatten Sequence by flattening each element and inserting it into a new Sequence
             Self::Sequence(s) => {
                 let mut n = Vec::with_capacity(s.len());
                 for v in s {
-                    n.push(v.flattened()?);
+                    n.push(v.flattened(state)?);
                 }
                 Ok(Self::Sequence(n))
             }
             // Simple values are flattened as themselves
             Self::Null | Self::Bool(_) | Self::Literal(_) | Self::Number(_) => Ok(self.clone()),
             // Flattening an unparsed string is an error
-            Self::String(_) => Err(anyhow!(
-                "Can't flatten unparsed String, did you mean to call `rendered()`?"
+            Self::String(_) => Err(state.render_flattening_error(
+                "Can't flatten unparsed String, did you mean to call `rendered()`?",
             )),
         }
     }
@@ -700,8 +710,8 @@ impl Value {
     /// Flattens the Value in-place.
     ///
     /// See [`Value::flattened()`] for details.
-    pub(super) fn flatten(&mut self) -> Result<()> {
-        let _prev = std::mem::replace(self, self.flattened()?);
+    pub(super) fn flatten(&mut self, state: &mut ResolveState) -> Result<()> {
+        let _prev = std::mem::replace(self, self.flattened(state)?);
         Ok(())
     }
 
@@ -718,7 +728,7 @@ impl Value {
         let mut v = self
             .interpolate(root, &mut state)
             .map_err(|e| anyhow!("While resolving references: {e}"))?;
-        v.flatten()?;
+        v.flatten(&mut state)?;
         Ok(v)
     }
 
