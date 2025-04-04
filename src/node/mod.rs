@@ -48,13 +48,14 @@ impl Node {
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         let uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
+        let npath = nodeinfo.path.with_extension("");
         // NOTE(sg): parts is only the name when compose-node-name isn't enabled
         let meta_parts = if r.config.compose_node_name {
-            nodeinfo.path.with_extension("")
+            npath.clone()
         } else {
             PathBuf::from(name)
         };
-        let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, "base");
+        let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, npath, "base");
         Node::from_str(meta, None, &ncontents)
     }
 
@@ -295,10 +296,9 @@ impl Node {
     /// Note that this method doesn't flatten overwritten parameters.
     pub fn render(&mut self, r: &Reclass) -> Result<()> {
         let mut base = Node {
-            // NOTE(sg): We initialize a base node with our classes to start the class rendering
-            // process.  This roughly corresponds to Python reclass's
-            // `_get_class_mappings_entity()`.
-            classes: self.classes.clone(),
+            // NOTE(sg): Similar to Python reclass, we initialize the base node with any classes
+            // that are included via the `class_mappings` configuration parameter.
+            classes: r.config.get_class_mappings(&self.meta),
             ..Default::default()
         };
         // NOTE(sg): We merge the `_reclass_` meta parameter into the base node before starting
