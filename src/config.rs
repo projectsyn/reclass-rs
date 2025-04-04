@@ -1,14 +1,16 @@
 use anyhow::{anyhow, Result};
+use glob::Pattern;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use regex::RegexSet;
+use regex::{Regex, RegexSet};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use crate::fsutil::to_lexical_normal;
+use crate::list::{List, UniqueList};
 
 /// Flags to change reclass-rs behavior to be compaible with Python reclass
 #[pyclass(eq, eq_int)]
@@ -70,6 +72,28 @@ pub struct Config {
     ignore_class_notfound_regexset: RegexSet,
     #[pyo3(get)]
     pub compatflags: HashSet<CompatFlag>,
+    #[pyo3(get)]
+    pub class_mappings_match_path: bool,
+    #[pyo3(get)]
+    pub class_mappings: Vec<String>,
+    // TODO(sg): Figure out if there's a robust way to ensure that we retain ordering of
+    // `class_mappings` while precompiling patterns and regexes.
+}
+
+fn parse_class_mapping(cmspec: &String) -> Result<(&str, Vec<&str>)> {
+    let mut parts = cmspec.split_whitespace();
+    let pat = parts.next().ok_or(anyhow!(""))?;
+    let pat = if pat.starts_with("\\*") {
+        pat.strip_prefix('\\').unwrap()
+    } else {
+        pat
+    };
+    let classes = parts.collect::<Vec<&str>>();
+    if classes.len() == 0 {
+        return Err(anyhow!(""));
+    }
+
+    Ok((pat, classes))
 }
 
 impl Config {
@@ -123,6 +147,8 @@ impl Config {
             ignore_class_notfound_regexp: vec![".*".to_string()],
             ignore_class_notfound_regexset: RegexSet::new([".*"])?,
             compatflags: HashSet::new(),
+            class_mappings: Vec::new(),
+            class_mappings_match_path: false,
         })
     }
 
@@ -191,6 +217,24 @@ impl Config {
                     }
                 }
             }
+            "class_mappings_match_path" => {
+                self.class_mappings_match_path = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'class_mappings_match_path' to be a boolean"
+                ))?;
+            }
+            "class_mappings" => {
+                let cmlist = v.as_sequence().ok_or(anyhow!(
+                    "Expected value of config key 'class_mappings' to be a list"
+                ))?;
+                self.class_mappings = cmlist
+                    .into_iter()
+                    .map(|v| {
+                        v.as_str().map(|v| v.to_owned()).ok_or(anyhow!(
+                            "Expected entry of config key 'class_mappings' to be a string"
+                        ))
+                    })
+                    .collect::<Result<Vec<String>>>()?;
+            }
             _ => {
                 if verbose {
                     eprintln!(
@@ -241,6 +285,30 @@ impl Config {
 
     pub(crate) fn is_class_ignored(&self, cls: &str) -> bool {
         self.ignore_class_notfound && self.ignore_class_notfound_regexset.is_match(cls)
+    }
+
+    pub(crate) fn get_class_mappings(&self, node: &str) -> Result<UniqueList> {
+        let mut mapped_cls = UniqueList::new();
+        if self.class_mappings.len() > 0 {
+            eprintln!("using {node} for class mappings");
+            for cmspec in &self.class_mappings {
+                let (pat, classes) = parse_class_mapping(cmspec)?;
+                if pat.starts_with('/') {
+                    todo!("Regex node patterns for class mappings NYI")
+                } else {
+                    //TODO(sg): precompile the patterns/regexes
+                    let p = Pattern::new(pat)
+                        .map_err(|e| anyhow!("While compiling glob pattern {pat}: {e}"))?;
+                    if p.matches(node) {
+                        for c in classes {
+                            eprintln!("including class {c} for {node} based on {pat}");
+                            mapped_cls.append_if_new(c.to_owned());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(mapped_cls)
     }
 
     fn compile_ignore_class_notfound_patterns(&mut self) -> Result<()> {
@@ -396,5 +464,29 @@ mod tests {
         assert!(cfg.ignore_class_notfound_regexset.is_match("thefooer"));
         assert!(cfg.ignore_class_notfound_regexset.is_match("baring"));
         assert!(!cfg.ignore_class_notfound_regexset.is_match("bazzer"));
+    }
+
+    #[test]
+    fn test_config_parse_class_mappings() {
+        let mut cfg =
+            Config::new(Some("./tests/inventory-class-mapping"), None, None, None).unwrap();
+        cfg.load_from_file("reclass-config.yml", false).unwrap();
+        assert!(cfg.class_mappings_match_path);
+        let expected_mappings = vec![
+            ("*", vec!["common"]),
+            ("*", vec!["defaults"]),
+            ("test/*", vec!["cluster.test"]),
+            ("production/*", vec!["cluster.production"]),
+            ("test.*", vec!["composed.test"]),
+            ("production.*", vec!["composed.production"]),
+        ];
+        let mappings = cfg
+            .class_mappings
+            .iter()
+            .map(parse_class_mapping)
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        dbg!(&mappings);
+        assert_eq!(mappings, expected_mappings);
     }
 }
