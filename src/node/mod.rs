@@ -54,8 +54,17 @@ impl Node {
         } else {
             PathBuf::from(name)
         };
+        let npath = nodeinfo.path.with_extension("");
+        let matchname = if r.config.class_mappings_match_path {
+            npath
+                .to_str()
+                .ok_or(anyhow!("Failed to convert node path to string"))?
+        } else {
+            name
+        };
+        let mapped_cls = r.config.get_class_mappings(matchname);
         let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, "base");
-        Node::from_str(meta, None, &ncontents)
+        Node::from_str(meta, None, &ncontents, Some(mapped_cls))
     }
 
     /// Initializes a `Node` struct from a string.
@@ -63,14 +72,19 @@ impl Node {
     /// The given string is parsed as YAML. Parameter `npath` is interpreted as the node's location
     /// in the class hierarchy. If the parameter is `None`, relative includes are treated as
     /// relative to `classes_path`.
-    pub fn from_str(meta: NodeInfoMeta, npath: Option<PathBuf>, ncontents: &str) -> Result<Self> {
+    pub fn from_str(
+        meta: NodeInfoMeta,
+        npath: Option<PathBuf>,
+        ncontents: &str,
+        mapped_cls: Option<UniqueList>,
+    ) -> Result<Self> {
         let mut n: Node = serde_yaml::from_str(ncontents)?;
         n.own_loc = npath;
         n.meta = meta;
 
         // Transform any relative class names to absolute class names, based on the new node's
         // `own_loc`.
-        let mut classes = UniqueList::with_capacity(n.classes.len());
+        let mut classes = mapped_cls.unwrap_or(UniqueList::with_capacity(n.classes.len()));
         for cls in n.classes.items_iter() {
             classes.append_if_new(n.abs_class_name(cls)?);
         }
@@ -192,7 +206,7 @@ impl Node {
         let ccontents = std::fs::read_to_string(invpath.canonicalize()?)?;
         meta.uri = format!("yaml_fs://{}", invpath.canonicalize()?.display());
         Ok(Some(
-            Node::from_str(meta, Some(classinfo.loc.clone()), &ccontents)
+            Node::from_str(meta, Some(classinfo.loc.clone()), &ccontents, None)
                 .map_err(|e| anyhow!("Deserializing {cls}: {e}"))?,
         ))
     }
@@ -368,7 +382,7 @@ mod node_tests {
             bar: bar
         "#;
 
-        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node, None).unwrap();
         assert_eq!(
             n.classes,
             UniqueList::from(vec!["foo".to_owned(), "bar".to_owned()])
@@ -396,7 +410,7 @@ mod node_tests {
           fooer:
             <<: *foo
         "#;
-        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node, None).unwrap();
         let expected = r#"
         foo:
           bar: bar
@@ -417,7 +431,7 @@ mod node_tests {
             bar:
               <<: *foo
         "#;
-        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node, None).unwrap();
         let expected = r#"
         foo:
           bar: bar
@@ -443,7 +457,7 @@ mod node_tests {
             - <<: *a
             - <<: *b
         "#;
-        let n = Node::from_str(NodeInfoMeta::default(), None, node).unwrap();
+        let n = Node::from_str(NodeInfoMeta::default(), None, node, None).unwrap();
         let expected = r#"
         a:
           a: a
