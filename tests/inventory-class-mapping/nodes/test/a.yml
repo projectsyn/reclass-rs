@@ -10,6 +10,8 @@ parameters:
     baz:
       enabled: true
       experimental: true
+    regex: true
+    regex_test: true
 
   expected_compose_node_no_match_path:
     common:

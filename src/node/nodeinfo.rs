@@ -14,6 +14,8 @@ use crate::types::{Mapping, Value};
 pub struct NodeInfoMeta {
     /// Inventory path of node
     parts: PathBuf,
+    /// Unmodified inventory path of node (without file extension)
+    npath: PathBuf,
     /// Original node name
     #[pyo3(get)]
     pub node: String,
@@ -33,14 +35,22 @@ pub struct NodeInfoMeta {
 
 impl Default for NodeInfoMeta {
     fn default() -> Self {
-        Self::new("", "", "", PathBuf::new(), "")
+        Self::new("", "", "", PathBuf::new(), PathBuf::new(), "")
     }
 }
 
 impl NodeInfoMeta {
-    pub fn new(node: &str, name: &str, uri: &str, parts: PathBuf, environment: &str) -> Self {
+    pub fn new(
+        node: &str,
+        name: &str,
+        uri: &str,
+        parts: PathBuf,
+        npath: PathBuf,
+        environment: &str,
+    ) -> Self {
         Self {
             parts,
+            npath,
             node: node.into(),
             name: name.into(),
             uri: uri.into(),
@@ -108,6 +118,19 @@ impl NodeInfoMeta {
         pmeta.insert("name".into(), Value::Mapping(namedata))?;
 
         Ok(pmeta)
+    }
+
+    /// Return the class's name or path depending on whether config option
+    /// `class_mappings_match_path` is set or not
+    pub(crate) fn class_mappings_match_name(&self, cfg: &Config) -> Result<&str> {
+        let matchname = if cfg.class_mappings_match_path {
+            self.npath
+                .to_str()
+                .ok_or(anyhow!("Failed to convert node path to string"))?
+        } else {
+            &self.name
+        };
+        Ok(matchname)
     }
 }
 
