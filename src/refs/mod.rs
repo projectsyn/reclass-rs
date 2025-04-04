@@ -30,13 +30,14 @@ pub struct ResolveState {
 
 impl ResolveState {
     /// Pushes the provided index into the last element of current_keys as `[idx]`.
-    pub(crate) fn push_list_index(&mut self, idx: usize) {
+    pub(crate) fn push_list_index(&mut self, idx: usize) -> std::fmt::Result {
+        use std::fmt::Write;
         let mut kcount = self.current_keys.len();
         if kcount == 0 {
             self.current_keys.push(String::new());
             kcount = 1;
         }
-        self.current_keys[kcount - 1].push_str(&format!("[{idx}]"));
+        write!(&mut self.current_keys[kcount - 1], "[{idx}]")
     }
 
     /// Pushes mapping key into the `current_keys` list. If possible, the provided value is
@@ -283,21 +284,22 @@ impl std::fmt::Display for Token {
     ///
     /// `format!("{}", parse_ref(<input string>))` should result in the original input string.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn flatten(ts: &[Token]) -> String {
-            ts.iter().fold(String::new(), |mut st, t| {
-                st.push_str(&format!("{t}"));
-                st
-            })
+        fn flatten(f: &mut std::fmt::Formatter<'_>, ts: &[Token]) -> std::fmt::Result {
+            for t in ts {
+                write!(f, "{t}")?;
+            }
+            Ok(())
         }
         match self {
             Token::Literal(s) => {
                 write!(f, "{}", s.replace('\\', r"\\").replace('$', r"\$"))
             }
             Token::Ref(ts) => {
-                let refcontent = flatten(ts);
-                write!(f, "${{{refcontent}}}")
+                write!(f, "${{")?;
+                flatten(f, ts)?;
+                write!(f, "}}")
             }
-            Token::Combined(ts) => write!(f, "{}", flatten(ts)),
+            Token::Combined(ts) => flatten(f, ts),
         }
     }
 }
@@ -411,7 +413,7 @@ fn parse_ref(input: &str) -> Result<Token, ParseError> {
             "Trailing data '{}' occurred when parsing '{}', this shouldn't happen! Parsed result: {}",
             uncons, input, token
         );
-    };
+    }
     Ok(token)
 }
 

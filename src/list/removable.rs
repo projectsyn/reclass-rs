@@ -107,7 +107,7 @@ impl List for RemovableList {
             // Finally, insert item if neither condition applies and the item
             // isn't present in the list yet.
             self.items.push(item);
-        };
+        }
     }
 
     /// Merges other into self, consuming other

@@ -554,7 +554,7 @@ impl Value {
                     // Sequence either, since there's no potential to start recursing again, if
                     // we've fully interpolated a Sequence.
                     let mut st = state.clone();
-                    st.push_list_index(idx);
+                    st.push_list_index(idx)?;
                     let e = it.interpolate(root, &mut st)?;
                     seq.push(e);
                 }
@@ -662,7 +662,7 @@ impl Value {
                 // to ensure that they don't construct nested ValueLists.
                 unreachable!("Encountered ValueList as merge target, this shouldn't happen!");
             }
-        };
+        }
         Ok(())
     }
 
