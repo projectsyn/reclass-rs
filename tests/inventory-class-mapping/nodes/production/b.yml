@@ -1,5 +1,8 @@
 parameters:
   expected_match_path:
+    common:
+      foo: foo
+      bar: bar
     foo:
       enabled: true
     bar:
@@ -7,7 +10,24 @@ parameters:
       experimental: true
     baz:
       enabled: false
-  expected_no_match_path:
+    regex: true
+    regex_production: true
+
+  expected_compose_node_no_match_path:
+    common:
+      foo: foo
+      bar: bar
+    foo:
+      enabled: true
+    bar:
+      enabled: false
+    composed:
+      production: true
+
+  expected_no_compose_node_no_match_path:
+    common:
+      foo: foo
+      bar: bar
     foo:
       enabled: true
     bar:
