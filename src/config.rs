@@ -180,14 +180,24 @@ pub struct Config {
     /// Whether to treat nested files in `nodes_path` as node definitions
     #[pyo3(get)]
     pub compose_node_name: bool,
-    /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
+    /// List of regex patterns for which to ignore included classes which don't exist (yet)
+    ///
+    /// If no values are provided in this parameter, classes matching `.*` are ignored if
+    /// `ignore_class_notfound=true`.
     #[pyo3(get)]
     ignore_class_notfound_regexp: Vec<String>,
     ignore_class_notfound_regexset: RegexSet,
+    /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
     #[pyo3(get)]
     pub compatflags: HashSet<CompatFlag>,
+    /// Whether to match the nodes' paths in the inventory when applying entries in
+    /// `class_mappings`.
+    ///
+    /// Defaults to `false`.
     #[pyo3(get)]
     pub class_mappings_match_path: bool,
+    /// Class mappings provides a mechanism to include one or more classes by default in all nodes
+    /// which match a glob or regex pattern.
     #[pyo3(get)]
     pub class_mappings: Vec<String>,
     // NOTE(sg): we need to preserve the order of class mappings since the order in the config
