@@ -310,8 +310,10 @@ impl Node {
     pub fn render(&mut self, r: &Reclass) -> Result<()> {
         let mut base = Node {
             // NOTE(sg): We initialize a base node with our classes to start the class rendering
-            // process.  This roughly corresponds to Python reclass's
-            // `_get_class_mappings_entity()`.
+            // process.  In contrast to Python reclass, we don't have an explicit method
+            // `_get_class_mappings_entity()`. Instead, we directly include any classes
+            // that are included via the `class_mappings` parameter in `Node::parse()` before
+            // actually parsing the Node with `Node::from_str()`.
             classes: self.classes.clone(),
             ..Default::default()
         };
