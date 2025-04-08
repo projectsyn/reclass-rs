@@ -14,5 +14,6 @@ class_mappings:
   - test.*           composed.test
   - production.*     composed.production
   - /(test|production)\/.*/ regex.params regex.\\1
+  - /(test)\/.*/ regex.rust-${1}
 
 # TODO(sg): test regex, multiple class includes for single pattern

@@ -12,6 +12,7 @@ parameters:
       experimental: true
     regex: true
     regex_test: true
+    rust_regex_ref: true
 
   expected_compose_node_no_match_path:
     common:
