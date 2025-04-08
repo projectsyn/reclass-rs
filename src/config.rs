@@ -599,6 +599,7 @@ mod tests {
                 "/(test|production)\\/.*/",
                 vec!["regex.params", "regex.\\\\1"],
             ),
+            ("/(test)\\/.*/", vec!["regex.rust-${1}"]),
         ];
         let mappings = cfg
             .class_mappings
