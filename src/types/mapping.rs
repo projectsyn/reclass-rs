@@ -442,6 +442,14 @@ impl Mapping {
         }
         Ok(res)
     }
+
+    pub(super) fn resolve_exports(&self, exports: &Self) -> Result<Self> {
+        let mut res = Self::default();
+        for (k, v) in self {
+            res.insert(k.clone(), v.resolve_exports(exports)?)?;
+        }
+        Ok(res)
+    }
 }
 
 impl From<serde_yaml::Mapping> for Mapping {
