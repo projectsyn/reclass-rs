@@ -180,7 +180,7 @@ impl NodeInfo {
         let dict = PyDict::new(py);
         dict.set_item("__reclass__", self.reclass_as_dict(py)?)?;
         dict.set_item("applications", self.applications.clone().into_pyobject(py)?)?;
-        dict.set_item("applications", self.applications.clone().into_pyobject(py)?)?;
+        dict.set_item("classes", self.classes.clone().into_pyobject(py)?)?;
         dict.set_item(
             "environment",
             self.reclass.environment.clone().into_pyobject(py)?,
