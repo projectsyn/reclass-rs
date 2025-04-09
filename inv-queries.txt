@@ -11,3 +11,5 @@ Open points:
 * We need to somehow process inventory queries outside of the parallelized section since we need to be able to access all nodes' exports
 * How can inv queries and reclass references interact in ValueLists? Is this even feasible in the multi-threaded model?
 ** Most likely, reclass-rs won't support mixing reclass references and inventory queries for the same parameter
+* Inv query parsing must happen together with ref parsing, otherwise escapes can't be detected anymore.
+** Use https://github.com/kapicorp/reclass/blob/eeb5aab98610c46f0f9aca91ee4447846a20fa3e/reclass/values/parser_funcs.py#L103-L168 as guideline to extend `src/refs/parser.rs`
