@@ -320,6 +320,21 @@ impl Node {
         }
     }
 
+    fn resolve_exports(&mut self) -> Result<()> {
+        let p = Value::Mapping(std::mem::take(&mut self.parameters));
+        let r = p.resolve_exports(&self.exports)?;
+        match r {
+            Value::Mapping(m) => {
+                self.parameters = m;
+                Ok(())
+            }
+            _ => Err(anyhow!(
+                "Rendered exports are not a Mapping but a {}",
+                r.variant()
+            )),
+        }
+    }
+
     /// Load included classes (recursively), and merge parameters.
     ///
     /// Note that this method doesn't flatten overwritten parameters.
@@ -345,6 +360,7 @@ impl Node {
         self.render_impl(r, &mut seen, &mut base)?;
         self.render_parameters()?;
         self.render_exports()?;
+        self.resolve_exports()?;
 
         Ok(())
     }

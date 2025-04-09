@@ -10,6 +10,7 @@
 mod config;
 mod fsutil;
 mod inventory;
+mod invqueries;
 mod list;
 mod node;
 mod refs;
