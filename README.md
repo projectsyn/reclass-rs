@@ -23,6 +23,10 @@ The implementation currently supports the following features of Kapicorp Reclass
 * Loading Reclass configuration options from `reclass-config.yaml`
 * The Reclass option `componse_node_name`
   * reclass-rs provides a non-compatible mode for `compose_node_name` which preserves literal dots in node names
+* The Reclass options `class_mappings` and `class_mappings_match_path`
+  * reclass-rs transparently rewrites backreferences in mapped classes to work with Rust's `regex` crate
+  * Users are free to use either `\\1` (the Python variant) or `${1}` (the native Rust variant) when using backreferences in mapped classes
+  * Please note that some Python regex patterns may not be supported by the Rust `regex` crate
 
 The following Kapicorp Reclass features aren't supported:
 
