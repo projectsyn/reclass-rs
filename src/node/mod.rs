@@ -298,7 +298,7 @@ impl Node {
         let mut base = Node {
             // NOTE(sg): Similar to Python reclass, we initialize the base node with any classes
             // that are included via the `class_mappings` configuration parameter.
-            classes: r.config.get_class_mappings(&self.meta),
+            classes: r.config.get_class_mappings(&self.meta)?,
             ..Default::default()
         };
         // NOTE(sg): We merge the `_reclass_` meta parameter into the base node before starting

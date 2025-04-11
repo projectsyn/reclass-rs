@@ -584,6 +584,7 @@ mod inventory_tests {
 
         let inv = Inventory::render(&r).unwrap();
 
+        dbg!(&inv.nodes[&"test.a".to_owned()]);
         class_mappings_validate_a(&inv.nodes[&"test.a".to_owned()], &c);
         class_mappings_validate_b(&inv.nodes[&"production.b".to_owned()], &c);
     }
