@@ -15,3 +15,5 @@ class_mappings:
   - production.*     composed.production
   - /(test|production)\/.*/ regex.params regex.\\1
   - /(test)\/.*/ regex.rust-${1}
+  - /^test(?!.*-stg-test).*/  cluster.test
+  - /^test.*-stg-test.*/      cluster.staging
