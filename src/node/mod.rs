@@ -62,7 +62,7 @@ impl Node {
         } else {
             name
         };
-        let mapped_cls = r.config.get_class_mappings(matchname);
+        let mapped_cls = r.config.get_class_mappings(matchname)?;
         let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, "base");
         Node::from_str(meta, None, &ncontents, Some(mapped_cls))
     }

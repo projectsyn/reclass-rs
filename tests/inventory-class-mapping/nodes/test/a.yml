@@ -21,7 +21,10 @@ parameters:
     foo:
       enabled: true
     bar:
-      enabled: false
+      enabled: true
+    baz:
+      enabled: true
+      experimental: true
     composed:
       test: true
 

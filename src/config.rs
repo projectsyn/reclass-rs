@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
+use fancy_regex::Regex;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use regex::{Regex, RegexSet};
+use regex::RegexSet;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
@@ -138,10 +139,10 @@ impl ClassMapping {
         })
     }
 
-    fn append_if_matches(&self, node: &str, mapped_cls: &mut UniqueList) {
+    fn append_if_matches(&self, node: &str, mapped_cls: &mut UniqueList) -> Result<()> {
         // INVARIANT: glob or regex must be some by construction in Self::new()
         if let Some(re) = self.regex.as_ref() {
-            if let Some(cap) = re.captures(node) {
+            if let Some(cap) = re.captures(node)? {
                 for c in &self.classes {
                     let mut cls = String::new();
                     cap.expand(c, &mut cls);
@@ -156,6 +157,7 @@ impl ClassMapping {
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -404,12 +406,12 @@ impl Config {
         Ok(())
     }
 
-    pub(crate) fn get_class_mappings(&self, node: &str) -> UniqueList {
+    pub(crate) fn get_class_mappings(&self, node: &str) -> Result<UniqueList> {
         let mut mapped_cls = UniqueList::new();
         for cm in &self.class_mappings_patterns {
-            cm.append_if_matches(node, &mut mapped_cls);
+            cm.append_if_matches(node, &mut mapped_cls)?;
         }
-        mapped_cls
+        Ok(mapped_cls)
     }
 
     fn compile_class_mapping_patterns(&mut self) -> Result<()> {
@@ -597,6 +599,8 @@ mod tests {
                 vec!["regex.params", "regex.\\\\1"],
             ),
             ("/(test)\\/.*/", vec!["regex.rust-${1}"]),
+            ("/^test(?!.*-stg-test).*/", vec!["cluster.test"]),
+            ("/^test.*-stg-test.*/", vec!["cluster.staging"]),
         ];
         let mappings = cfg
             .class_mappings
