@@ -528,6 +528,38 @@ mod inventory_tests {
         }
     }
 
+    fn class_mappings_validate_c(n: &NodeInfo, c: &crate::Config) {
+        let expected = match (c.compose_node_name, c.class_mappings_match_path) {
+            (false, false) => n
+                .parameters
+                .get(&"expected_no_compose_node_no_match_path".into())
+                .unwrap(),
+            (false, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
+            (true, false) => n
+                .parameters
+                .get(&"expected_compose_node_no_match_path".into())
+                .unwrap(),
+            (true, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
+        }
+        .as_mapping()
+        .unwrap();
+
+        let expected_keys = expected.as_map().keys().collect::<HashSet<_>>();
+        let param_keys = n
+            .parameters
+            .as_map()
+            .keys()
+            .filter(|k| {
+                let ks = k.as_str().unwrap();
+                !(ks.starts_with("expected_") || ks == "_reclass_")
+            })
+            .collect::<HashSet<_>>();
+        assert_eq!(param_keys, expected_keys);
+        for (k, v) in expected {
+            assert_eq!(n.parameters.get(k), Some(v), "key {k}");
+        }
+    }
+
     #[test]
     fn test_inventory_class_mappings_match_path_no_compose_names() {
         let mut c =
@@ -541,6 +573,7 @@ mod inventory_tests {
 
         class_mappings_validate_a(&inv.nodes[&"a".to_owned()], &c);
         class_mappings_validate_b(&inv.nodes[&"b".to_owned()], &c);
+        class_mappings_validate_c(&inv.nodes[&"c".to_owned()], &c);
     }
 
     #[test]
@@ -556,6 +589,7 @@ mod inventory_tests {
 
         class_mappings_validate_a(&inv.nodes[&"test.a".to_owned()], &c);
         class_mappings_validate_b(&inv.nodes[&"production.b".to_owned()], &c);
+        class_mappings_validate_c(&inv.nodes[&"test.c".to_owned()], &c);
     }
 
     #[test]
@@ -571,6 +605,7 @@ mod inventory_tests {
 
         class_mappings_validate_a(&inv.nodes[&"a".to_owned()], &c);
         class_mappings_validate_b(&inv.nodes[&"b".to_owned()], &c);
+        class_mappings_validate_c(&inv.nodes[&"c".to_owned()], &c);
     }
 
     #[test]
@@ -587,5 +622,6 @@ mod inventory_tests {
         dbg!(&inv.nodes[&"test.a".to_owned()]);
         class_mappings_validate_a(&inv.nodes[&"test.a".to_owned()], &c);
         class_mappings_validate_b(&inv.nodes[&"production.b".to_owned()], &c);
+        class_mappings_validate_c(&inv.nodes[&"test.c".to_owned()], &c);
     }
 }

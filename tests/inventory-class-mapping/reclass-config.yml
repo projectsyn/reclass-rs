@@ -17,3 +17,4 @@ class_mappings:
   - /(test)\/.*/ regex.rust-${1}
   - /^test(?!.*-stg-test).*/  cluster.test
   - /^test.*-stg-test.*/      cluster.staging
+  - /.*c$/                    class1 class2

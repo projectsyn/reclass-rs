@@ -604,6 +604,7 @@ mod tests {
             ("/(test)\\/.*/", vec!["regex.rust-${1}"]),
             ("/^test(?!.*-stg-test).*/", vec!["cluster.test"]),
             ("/^test.*-stg-test.*/", vec!["cluster.staging"]),
+            ("/.*c$/", vec!["class1", "class2"]),
         ];
         let mappings = cfg
             .class_mappings
