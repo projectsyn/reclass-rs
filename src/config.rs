@@ -140,6 +140,11 @@ impl ClassMapping {
         })
     }
 
+    /// This function appends the classes defined for the current `ClassMapping` to the passed
+    /// `UniqueList` if the passed `node` str matches the glob or regex pattern.
+    ///
+    /// NOTE: this function expects that `node` is the node name or path depending on
+    /// `class_mappings_match_path` and won't modify the passed string.
     fn append_if_matches(&self, node: &str, mapped_cls: &mut UniqueList) -> Result<()> {
         // INVARIANT: glob or regex must be some by construction in Self::new()
         if let Some(re) = self.regex.as_ref() {
@@ -407,6 +412,11 @@ impl Config {
         Ok(())
     }
 
+    /// This function returns a list of classes to include based on the passed NodeInfo.
+    ///
+    /// The function uses `NodeInfo::class_mappings_match_name()` to determine the node name for
+    /// matching class_mappings patterns. That function takes into account
+    /// `class_mappings_match_path`.
     pub(crate) fn get_class_mappings(&self, node: &NodeInfoMeta) -> Result<UniqueList> {
         let mut mapped_cls = UniqueList::new();
         let matchname = node.class_mappings_match_name(self)?;
