@@ -305,6 +305,11 @@ impl Config {
                     PyValueError::new_err(format!("Error while setting option {kstr}: {e}"))
                 })?;
         }
+        cfg.compile_ignore_class_notfound_patterns().map_err(|e| {
+            PyValueError::new_err(format!(
+                "Error while compiling class_notfound_regexp patterns: {e}"
+            ))
+        })?;
 
         Ok(cfg)
     }
