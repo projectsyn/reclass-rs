@@ -8,7 +8,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use crate::fsutil::to_lexical_normal;
 use crate::list::{List, UniqueList};
@@ -98,9 +98,8 @@ fn parse_class_mapping(cmspec: &str) -> Result<(&str, Vec<&str>)> {
 }
 
 fn replace_regex_backrefs(s: &str) -> String {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| Regex::new(r"\\\\(\d+)").unwrap());
-    re.replace_all(s, r"$${$1}").into_owned()
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\\\\(\d+)").unwrap());
+    RE.replace_all(s, r"$${$1}").into_owned()
 }
 
 impl ClassMapping {
