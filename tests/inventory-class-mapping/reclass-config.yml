@@ -1,0 +1,20 @@
+# Add reclass-config.yml for Kapitan/Python reclass
+nodes_uri: nodes
+classes_uri: classes
+allow_none_override: true
+compose_node_name: false
+class_mappings_match_path: true
+
+# Automatically assign classes to targets according to their path
+class_mappings:
+  - \*               common
+  - "*               defaults"
+  - test/*           cluster.test
+  - production/*     cluster.production
+  - test.*           composed.test
+  - production.*     composed.production
+  - /(test|production)\/.*/ regex.params regex.\\1
+  - /(test)\/.*/ regex.rust-${1}
+  - /^test(?!.*-stg-test).*/  cluster.test
+  - /^test.*-stg-test.*/      cluster.staging
+  - /.*c$/                    class1 class2

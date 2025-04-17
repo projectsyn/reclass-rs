@@ -1,0 +1,38 @@
+parameters:
+  expected_match_path:
+    common:
+      foo: foo
+      bar: bar
+    foo:
+      enabled: true
+    bar:
+      enabled: true
+    baz:
+      enabled: true
+      experimental: true
+    regex: true
+    regex_test: true
+    rust_regex_ref: true
+
+  expected_compose_node_no_match_path:
+    common:
+      foo: foo
+      bar: bar
+    foo:
+      enabled: true
+    bar:
+      enabled: true
+    baz:
+      enabled: true
+      experimental: true
+    composed:
+      test: true
+
+  expected_no_compose_node_no_match_path:
+    common:
+      foo: foo
+      bar: bar
+    foo:
+      enabled: true
+    bar:
+      enabled: false
