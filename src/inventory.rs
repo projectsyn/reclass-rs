@@ -470,12 +470,11 @@ mod inventory_tests {
                 .parameters
                 .get(&"expected_no_compose_node_no_match_path".into())
                 .unwrap(),
-            (false, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
             (true, false) => n
                 .parameters
                 .get(&"expected_compose_node_no_match_path".into())
                 .unwrap(),
-            (true, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
+            (_, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
         }
         .as_mapping()
         .unwrap();
@@ -502,12 +501,11 @@ mod inventory_tests {
                 .parameters
                 .get(&"expected_no_compose_node_no_match_path".into())
                 .unwrap(),
-            (false, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
             (true, false) => n
                 .parameters
                 .get(&"expected_compose_node_no_match_path".into())
                 .unwrap(),
-            (true, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
+            (_, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
         }
         .as_mapping()
         .unwrap();
@@ -534,12 +532,11 @@ mod inventory_tests {
                 .parameters
                 .get(&"expected_no_compose_node_no_match_path".into())
                 .unwrap(),
-            (false, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
             (true, false) => n
                 .parameters
                 .get(&"expected_compose_node_no_match_path".into())
                 .unwrap(),
-            (true, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
+            (_, true) => n.parameters.get(&"expected_match_path".into()).unwrap(),
         }
         .as_mapping()
         .unwrap();
