@@ -48,12 +48,17 @@ impl TryFrom<&str> for CompatFlag {
     }
 }
 
+#[derive(Clone, Debug)]
+enum Pattern {
+    Glob(glob::Pattern),
+    Regex(Regex),
+}
+
 #[derive(Debug, Clone)]
 struct ClassMapping {
     pat: String,
     classes: Vec<String>,
-    glob: Option<glob::Pattern>,
-    regex: Option<Regex>,
+    pattern: Pattern,
 }
 
 impl std::fmt::Display for ClassMapping {
@@ -62,15 +67,11 @@ impl std::fmt::Display for ClassMapping {
     }
 }
 
-// INVARIANT: one of glob and regex must be Some(_). To ensure the invariant is upheld, we
-// implement our own `Default::default()` which creates a ClassMapping that matches all nodes but
-// adds no classes.
 impl Default for ClassMapping {
     fn default() -> Self {
         Self {
             pat: "*".to_owned(),
-            glob: Some(glob::Pattern::new("*").unwrap()),
-            regex: None,
+            pattern: Pattern::Glob(glob::Pattern::new("*").unwrap()),
             classes: Vec::new(),
         }
     }
@@ -105,7 +106,7 @@ fn replace_regex_backrefs(s: &str) -> String {
 impl ClassMapping {
     fn new(cmspec: &str) -> Result<Self> {
         let (pat, classes) = parse_class_mapping(cmspec)?;
-        let (glob, regex) = if pat.starts_with('/') {
+        let pattern = if pat.starts_with('/') {
             if pat
                 .chars()
                 .next_back()
@@ -119,20 +120,18 @@ impl ClassMapping {
             if p.is_empty() {
                 return Err(anyhow!("empty regex patterns are not supported"));
             }
-            (None, Some(Regex::new(p)?))
+            Pattern::Regex(
+                Regex::new(p).map_err(|e| anyhow!("While compiling regex pattern {pat}: {e}"))?,
+            )
         } else {
-            (
-                Some(
-                    glob::Pattern::new(pat)
-                        .map_err(|e| anyhow!("While compiling glob pattern {pat}: {e}"))?,
-                ),
-                None,
+            Pattern::Glob(
+                glob::Pattern::new(pat)
+                    .map_err(|e| anyhow!("While compiling glob pattern {pat}: {e}"))?,
             )
         };
         Ok(Self {
             pat: pat.to_owned(),
-            glob,
-            regex,
+            pattern,
             classes: classes
                 .iter()
                 .map(|&s| replace_regex_backrefs(s))
@@ -146,20 +145,21 @@ impl ClassMapping {
     /// NOTE: this function expects that `node` is the node name or path depending on
     /// `class_mappings_match_path` and won't modify the passed string.
     fn append_if_matches(&self, node: &str, mapped_cls: &mut UniqueList) -> Result<()> {
-        // INVARIANT: glob or regex must be some by construction in Self::new()
-        if let Some(re) = self.regex.as_ref() {
-            if let Some(cap) = re.captures(node)? {
-                for c in &self.classes {
-                    let mut cls = String::new();
-                    cap.expand(c, &mut cls);
-                    mapped_cls.append_if_new(cls);
+        match &self.pattern {
+            Pattern::Regex(re) => {
+                if let Some(cap) = re.captures(node)? {
+                    for c in &self.classes {
+                        let mut cls = String::new();
+                        cap.expand(c, &mut cls);
+                        mapped_cls.append_if_new(cls);
+                    }
                 }
             }
-        } else {
-            let glob = self.glob.as_ref().unwrap();
-            if glob.matches(node) {
-                for c in &self.classes {
-                    mapped_cls.append_if_new(c.clone());
+            Pattern::Glob(glob) => {
+                if glob.matches(node) {
+                    for c in &self.classes {
+                        mapped_cls.append_if_new(c.clone());
+                    }
                 }
             }
         }
