@@ -263,13 +263,13 @@ impl Node {
 
             // render class so we pick up further classes included in it
             c.render_impl(r, seen, root)?;
-            // NOTE(sg): we don't need to merge here, since we've already mergeed into root as part
+            // NOTE(sg): we don't need to merge here, since we've already merged into root as part
             // of the recursive call to `render_impl()`
 
             seen.push(cls.to_string());
         }
 
-        // merge root into self, then update self with merged values
+        // merge self into root, then update self with merged values
         self.merge_into(root)
     }
 
@@ -309,7 +309,10 @@ impl Node {
 
         let mut seen = vec![];
         let mut root = Node::default();
+        // First render base (i.e. mapped classes) into an empty Node, and update base with the
+        // result
         base.render_impl(r, &mut seen, &mut root)?;
+        // Then render ourselves into the rendered base and update ourselves with the result
         self.render_impl(r, &mut seen, &mut base)?;
         self.render_parameters()
     }
