@@ -364,7 +364,7 @@ impl Node {
         self.render_impl(r, &mut seen, &mut base)?;
         self.render_parameters(&r.config.get_render_opts())?;
         self.render_exports(&r.config.get_render_opts())?;
-        self.resolve_exports()?;
+        //self.resolve_exports()?;
 
         Ok(())
     }
