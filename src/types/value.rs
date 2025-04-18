@@ -523,6 +523,7 @@ impl Value {
     pub(crate) fn interpolate(
         &self,
         root: &Mapping,
+        exports: &Mapping,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Self> {
@@ -532,7 +533,7 @@ impl Value {
                 // them. The result of `Token::render()` can be an arbitrary Value, except for
                 // `Value::String()`, since `render()` will recursively call `interpolate()`.
                 if let Some(token) = Token::parse(s)? {
-                    token.render(root, state, opts)?
+                    token.render(root, exports, state, opts)?
                 } else {
                     // If Token::parse() returns None, we can be sure that there's no references
                     // int the String, and just return the string as a `Value::Literal`.
@@ -540,7 +541,7 @@ impl Value {
                 }
             }
             // Mappings are interpolated by calling `Mapping::interpolate()`.
-            Self::Mapping(m) => Self::Mapping(m.interpolate(root, state, opts)?),
+            Self::Mapping(m) => Self::Mapping(m.interpolate(root, exports, state, opts)?),
             Self::Sequence(s) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
@@ -552,7 +553,7 @@ impl Value {
                     // we've fully interpolated a Sequence.
                     let mut st = state.clone();
                     st.push_list_index(idx)?;
-                    let e = it.interpolate(root, &mut st, opts)?;
+                    let e = it.interpolate(root, exports, &mut st, opts)?;
                     seq.push(e);
                 }
                 Self::Sequence(seq)
@@ -572,7 +573,7 @@ impl Value {
                     // done with a layer, any references that we saw there have been successfully
                     // resolved, and don't matter for the next layer we're interpolating).
                     let mut st = state.clone();
-                    let iv = v.interpolate(root, &mut st, opts);
+                    let iv = v.interpolate(root, exports, &mut st, opts);
 
                     let v = if let Err(e) = &iv
                         && opts.ignore_overwritten_missing_references
@@ -594,7 +595,7 @@ impl Value {
                 // once `Token::render()` doesn't produce new `Value::String()`.
                 // For this interpolation, we need to actually update the resolution state, so we
                 // pass in the `state` which we were called with.
-                r.interpolate(root, state, opts)?
+                r.interpolate(root, exports, state, opts)?
             }
             // No special handling necessary for interpolating Value::ResolveError
             _ => self.clone(),
@@ -773,10 +774,10 @@ impl Value {
     /// The method first interpolates any Reclass references found in the Value by looking up the
     /// reference keys in `root`. After all references have been interpolated, the method flattens
     /// any remaining ValueLists and returns the final "flattened" value.
-    pub fn rendered(&self, root: &Mapping, opts: &RenderOpts) -> Result<Self> {
+    pub fn rendered(&self, root: &Mapping, exports: &Mapping, opts: &RenderOpts) -> Result<Self> {
         let mut state = ResolveState::default();
         let mut v = self
-            .interpolate(root, &mut state, opts)
+            .interpolate(root, exports, &mut state, opts)
             .map_err(|e| anyhow!("While resolving references: {e}"))?;
         v.flatten(&mut state, opts)?;
         Ok(v)
@@ -785,8 +786,8 @@ impl Value {
     /// Renders the Value in-place.
     ///
     /// See [`Value::rendered()`] for details.
-    pub fn render(&mut self, root: &Mapping, opts: &RenderOpts) -> Result<()> {
-        let _prev = std::mem::replace(self, self.rendered(root, opts)?);
+    pub fn render(&mut self, root: &Mapping, exports: &Mapping, opts: &RenderOpts) -> Result<()> {
+        let _prev = std::mem::replace(self, self.rendered(root, exports, opts)?);
         Ok(())
     }
 
@@ -794,14 +795,14 @@ impl Value {
     /// Returns an error when called for a Value variant other than `Value::Mapping`.
     ///
     /// See [`Value::rendered()`] for details on how Reclass references are rendered.
-    pub fn render_with_self(&mut self, opts: &RenderOpts) -> Result<()> {
+    pub fn render_with_self(&mut self, exports: &Mapping, opts: &RenderOpts) -> Result<()> {
         let m = self.as_mapping().ok_or_else(|| {
             anyhow!(
                 "Can't render {} with itself as the parameter source",
                 self.variant()
             )
         })?;
-        let n = self.rendered(m, opts)?;
+        let n = self.rendered(m, exports, opts)?;
         let _prev = std::mem::replace(self, n);
         Ok(())
     }

@@ -163,6 +163,7 @@ impl Token {
     pub fn render(
         &self,
         params: &Mapping,
+        exports: &Mapping,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Value> {
@@ -170,11 +171,11 @@ impl Token {
             // handle value refs (i.e. refs where the full value of the key is replaced)
             // We call `interpolate()` after `resolve()` to ensure that we fully interpolate all
             // references if the result of `resolve()` is a complex Value (Mapping or Sequence).
-            self.resolve(params, state, opts)?
-                .interpolate(params, state, opts)
+            self.resolve(params, exports, state, opts)?
+                .interpolate(params, exports, state, opts)
         } else {
             Ok(Value::Literal(
-                self.resolve(params, state, opts)?.raw_string()?,
+                self.resolve(params, exports, state, opts)?.raw_string()?,
             ))
         }
     }
@@ -184,6 +185,7 @@ impl Token {
     fn resolve(
         &self,
         params: &Mapping,
+        exports: &Mapping,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Value> {
@@ -191,7 +193,7 @@ impl Token {
             // Literal tokens can be directly turned into `Value::Literal`
             Self::Literal(s) => Ok(Value::Literal(s.clone())),
             Self::Combined(tokens) => {
-                let res = interpolate_token_slice(tokens, params, state, opts)?;
+                let res = interpolate_token_slice(tokens, params, exports, state, opts)?;
                 // The result of `interpolate_token_slice()` for a `Token::Combined()` can't result
                 // in more unresolved refs since we iterate over each segment until there's no
                 // Value::String() left, so we return a Value::Literal().
@@ -216,7 +218,7 @@ impl Token {
                 // Construct flattened ref path by resolving any potential nested references in the
                 // Ref's Vec<Token>.
                 let (path, default) = extract_path_and_default(
-                    interpolate_token_slice(parts, params, state, opts)?,
+                    interpolate_token_slice(parts, params, exports, state, opts)?,
                     "::",
                 );
 
@@ -260,7 +262,7 @@ impl Token {
                     // value into `newv` so we don't have to worry about the order in which
                     // individual references are resolved, and always do value lookups on
                     // resolved references.
-                    newv = interpolate_string_or_valuelist(v, params, state, opts)?;
+                    newv = interpolate_string_or_valuelist(v, params, exports, state, opts)?;
                     // at this point, newv should never be a Value::String or Value::ValueList.
                     debug_assert!(!newv.is_string() && !newv.is_value_list());
                     // Do lookup in interpolated value, return error if interpolated value doesn't
@@ -321,11 +323,13 @@ impl Token {
                 // `Value::ValueList`. This ensures that the returned Value will never contain
                 // further references. Here, we want to continue tracking the state normally.
                 while v.is_string() || v.is_value_list() {
-                    v = v.interpolate(params, state, opts)?;
+                    v = v.interpolate(params, exports, state, opts)?;
                 }
                 Ok(v)
             }
-            _ => todo!(),
+            Self::InvQuery(s) => Ok(Value::Literal(
+                s.iter().fold("".to_owned(), |s, v| format!("{s}{v}")),
+            )),
         }
     }
 }
@@ -351,7 +355,12 @@ impl std::fmt::Display for Token {
                 write!(f, "}}")
             }
             Token::Combined(ts) => flatten(f, ts),
-            _ => todo!(),
+            Token::InvQuery(ss) => {
+                for s in ss {
+                    write!(f, "{s}")?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -361,6 +370,7 @@ impl std::fmt::Display for Token {
 fn interpolate_token_slice(
     tokens: &[Token],
     params: &Mapping,
+    exports: &Mapping,
     state: &mut ResolveState,
     opts: &RenderOpts,
 ) -> Result<String> {
@@ -373,9 +383,9 @@ fn interpolate_token_slice(
         // Each individual ref can still be part of a loop, so we make a fresh copy of the input
         // state before resolving each element.
         let mut st = state.clone();
-        let mut v = t.resolve(params, &mut st, opts)?;
+        let mut v = t.resolve(params, exports, &mut st, opts)?;
         while v.is_string() {
-            v = v.interpolate(params, &mut st, opts)?;
+            v = v.interpolate(params, exports, &mut st, opts)?;
         }
         res.push_str(&v.raw_string()?);
     }
@@ -385,12 +395,13 @@ fn interpolate_token_slice(
 fn interpolate_string_or_valuelist(
     v: &Value,
     params: &Mapping,
+    exports: &Mapping,
     state: &mut ResolveState,
     opts: &RenderOpts,
 ) -> Result<Value> {
     match v {
         // For Value::String, we can simply call `interpolate()` on the value.
-        Value::String(_) => v.interpolate(params, state, opts),
+        Value::String(_) => v.interpolate(params, exports, state, opts),
         // For Value::ValueList, we interpolate each layer, and flatten the resulting layers into a
         // single Value.  We don't use `interpolate()` here, since we only want to flatten the
         // resulting ValueList here.
@@ -402,7 +413,7 @@ fn interpolate_string_or_valuelist(
                 // stretched across layers.
                 let mut st = state.clone();
                 let v = if v.is_string() {
-                    v.interpolate(params, &mut st, opts)?
+                    v.interpolate(params, exports, &mut st, opts)?
                 } else {
                     v.clone()
                 };

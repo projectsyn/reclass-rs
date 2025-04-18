@@ -8,7 +8,7 @@ fn test_resolve_ref_str() {
 
     let mut state = ResolveState::default();
     let v = token
-        .resolve(&params, &mut state, &RenderOpts::default())
+        .resolve(&params, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("bar".into()));
 }
@@ -20,7 +20,7 @@ fn test_resolve_ref_val() {
 
     let mut state = ResolveState::default();
     let v = token
-        .resolve(&params, &mut state, &RenderOpts::default())
+        .resolve(&params, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Bool(true));
 }
@@ -32,7 +32,7 @@ fn test_resolve_literal() {
 
     let mut state = ResolveState::default();
     let v = token
-        .resolve(&params, &mut state, &RenderOpts::default())
+        .resolve(&params, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
@@ -47,7 +47,7 @@ fn test_resolve_combined() {
 
     let mut state = ResolveState::default();
     let v = token
-        .resolve(&params, &mut state, &RenderOpts::default())
+        .resolve(&params, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foobar".into()));
 }
@@ -62,7 +62,7 @@ fn test_resolve_combined_2() {
 
     let mut state = ResolveState::default();
     let v = token
-        .resolve(&params, &mut state, &RenderOpts::default())
+        .resolve(&params, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foobaz".into()));
 }
@@ -81,7 +81,7 @@ fn test_resolve_combined_3() {
 
     let mut state = ResolveState::default();
     let v = token
-        .resolve(&params, &mut state, &RenderOpts::default())
+        .resolve(&params, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foo${bar}".into()));
 }
@@ -126,7 +126,7 @@ fn test_resolve() {
     let mut state = ResolveState::default();
     assert_eq!(
         reftoken
-            .resolve(&p, &mut state, &RenderOpts::default())
+            .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
             .unwrap(),
         Value::Literal("foo".into())
     );
@@ -139,7 +139,7 @@ fn test_resolve_subkey() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
@@ -151,7 +151,7 @@ fn test_resolve_nested() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
@@ -169,7 +169,7 @@ fn test_resolve_nested_subkey() {
     let reftoken = parse_ref(&"${bar:${foo:bar}}").unwrap();
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foo".to_string()));
 }
@@ -187,7 +187,7 @@ fn test_resolve_kapitan_secret_ref() {
     dbg!(&reftoken);
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("?{vaultkv:foo/bar/baz/qux}".to_string()));
 }
@@ -204,7 +204,7 @@ fn test_resolve_escaped_ref() {
     let reftoken = parse_ref("\\${PROJECT_LABEL}").unwrap();
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("${PROJECT_LABEL}".to_string()));
 }
@@ -220,7 +220,7 @@ fn test_resolve_mapping_value() {
     let reftoken = parse_ref("${foo}").unwrap();
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(
         v,
@@ -239,7 +239,7 @@ fn test_resolve_mapping_embedded() {
     let reftoken = parse_ref("foo: ${foo}").unwrap();
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(
         v,
@@ -260,7 +260,7 @@ fn test_resolve_recursive_error() {
 
     let mut state = ResolveState::default();
     let _v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
 }
 
@@ -276,7 +276,7 @@ fn test_resolve_recursive_error_2() {
 
     let mut state = ResolveState::default();
     let _v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
 }
 
@@ -292,7 +292,7 @@ fn test_resolve_nested_recursive_error() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     // nested recursive error doesn't raise an error in `resolve()` anymore
     let mut expected = Mapping::new();
@@ -317,7 +317,7 @@ fn test_resolve_ref_default_value() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("bar".into()));
 }
@@ -332,7 +332,7 @@ fn test_resolve_missingref_default_value() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("fallback".into()));
 }
@@ -344,7 +344,7 @@ fn test_resolve_missingref_default_value_int() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, 3.into());
 }
@@ -356,7 +356,7 @@ fn test_resolve_missingref_default_value_inf() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, f64::INFINITY.into());
 }
@@ -368,7 +368,7 @@ fn test_resolve_missingref_default_value_quoted_string() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal(".inf".into()));
 }
@@ -380,7 +380,7 @@ fn test_resolve_missingref_default_value_quoted_empty_string() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("".into()));
 }
@@ -395,7 +395,7 @@ fn test_resolve_missingref_default_value_null_empty() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Null);
 }
@@ -407,7 +407,7 @@ fn test_resolve_missingref_default_value_null_tilde() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Null);
 }
@@ -419,7 +419,7 @@ fn test_resolve_missingref_default_value_null() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Null);
 }
@@ -431,7 +431,7 @@ fn test_resolve_missingref_default_value_bool() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Bool(true));
 }
@@ -443,7 +443,7 @@ fn test_resolve_missingref_default_value_literal_sequence() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let expected = Value::Sequence(vec![1.into(), 2.into()]);
     assert_eq!(v, expected);
@@ -456,7 +456,7 @@ fn test_resolve_missingref_default_value_literal_sequence_mixed() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let expected = Value::Sequence(vec![1.into(), "2".into()]);
     assert_eq!(v, expected);
@@ -477,7 +477,7 @@ fn test_resolve_missingref_default_value_literal_sequence_escapedref() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let expected = Value::Sequence(vec!["bar".into(), "${bar}".into()]);
     assert_eq!(v, expected);
@@ -497,7 +497,7 @@ fn test_resolve_missingref_default_value_literal_mapping() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let m = Mapping::new();
     let expected = Value::Mapping(m);
@@ -518,7 +518,7 @@ fn test_resolve_missingref_default_value_literal_mapping_2() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let mut m = Mapping::new();
     m.insert("a".into(), "a".into()).unwrap();
@@ -540,7 +540,7 @@ fn test_resolve_missingref_default_value_literal_mapping_with_ref() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let mut m = Mapping::new();
     m.insert("a".into(), "bar".into()).unwrap();
@@ -562,7 +562,7 @@ fn test_resolve_missingref_default_value_literal_quoted_mapping_with_ref() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("{a: bar}".into()));
 }
@@ -578,7 +578,7 @@ fn test_resolve_missingref_default_value_escaped_ref() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("${bar}".into()));
 }
@@ -593,7 +593,7 @@ fn test_resolve_missingref_default_value_ref() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("bar".into()));
 }
@@ -609,7 +609,7 @@ fn test_resolve_missingref_default_value_ref_complex_value() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     let mut m = Mapping::new();
     m.insert("foo".into(), "bar".into()).unwrap();
@@ -626,7 +626,7 @@ fn test_resolve_missingref_default_value_ref_bool() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Bool(false));
 }
@@ -645,7 +645,7 @@ fn test_resolve_missingref_default_value_parse_error() {
 
     let mut state = ResolveState::default();
     let _v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
 }
 
@@ -659,7 +659,7 @@ fn test_resolve_missingref_default_value_missingref() {
 
     let mut state = ResolveState::default();
     let _v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
 }
 
@@ -680,7 +680,7 @@ fn test_resolve_missingref_default_value_nested_ref() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
@@ -695,7 +695,7 @@ fn test_resolve_nested_missingref_default_value_missingref_default_value() {
 
     let mut state = ResolveState::default();
     let v = reftoken
-        .resolve(&p, &mut state, &RenderOpts::default())
+        .resolve(&p, &Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap();
     assert_eq!(v, Value::Literal("default".into()));
 }

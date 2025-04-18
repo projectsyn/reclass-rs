@@ -463,6 +463,7 @@ impl Mapping {
     pub(super) fn interpolate(
         &self,
         root: &Self,
+        exports: &Self,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Self> {
@@ -477,7 +478,7 @@ impl Mapping {
             // don't and the whole interpolation is aborted.
             let mut st = state.clone();
             st.push_mapping_key(k)?;
-            let iv = v.interpolate(root, &mut st, opts);
+            let iv = v.interpolate(root, exports, &mut st, opts);
             let v = if let Err(e) = iv {
                 // convert interpolation errors into `Value::ResolveError` when interpolating
                 // Mapping
