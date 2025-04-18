@@ -2,6 +2,7 @@ mod parser;
 
 use crate::{
     config::RenderOpts,
+    invqueries::Query,
     types::{Mapping, Value},
 };
 use anyhow::{Result, anyhow};
@@ -18,7 +19,7 @@ pub enum Token {
     /// A parsed input string which is composed of one or more references, potentially with
     /// interspersed non-reference sections.
     Combined(Vec<Token>),
-    InvQuery(Vec<String>),
+    InvQuery(String),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -327,9 +328,11 @@ impl Token {
                 }
                 Ok(v)
             }
-            Self::InvQuery(s) => Ok(Value::Literal(
-                s.iter().fold("".to_owned(), |s, v| format!("{s}{v}")),
-            )),
+            Self::InvQuery(s) => {
+                // TODO(sg): error handling + resolve state
+                let q = Query::parse(s)?;
+                Ok(q.resolve(exports)?)
+            }
         }
     }
 }
@@ -355,11 +358,10 @@ impl std::fmt::Display for Token {
                 write!(f, "}}")
             }
             Token::Combined(ts) => flatten(f, ts),
-            Token::InvQuery(ss) => {
-                for s in ss {
-                    write!(f, "{s}")?;
-                }
-                Ok(())
+            Token::InvQuery(s) => {
+                write!(f, "$[")?;
+                write!(f, "{s}")?;
+                write!(f, "]")
             }
         }
     }

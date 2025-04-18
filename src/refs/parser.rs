@@ -278,7 +278,12 @@ fn export(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
         "export",
         map(
             delimited(inv_open, many1(inv_string), inv_close),
-            |tokens| Token::InvQuery(tokens),
+            |tokens| {
+                Token::InvQuery(tokens.into_iter().fold(String::new(), |mut s, t| {
+                    s.push_str(&t);
+                    s
+                }))
+            },
         ),
     )
     .parse(input)
@@ -755,7 +760,7 @@ mod test_parser_funcs {
         let refstr = r#"$[foo:bar]"#;
         assert_eq!(
             parse_ref(&refstr),
-            Ok(("", Token::InvQuery(vec!["foo:bar".to_owned()])))
+            Ok(("", Token::InvQuery("foo:bar".to_owned())))
         )
     }
 
@@ -769,7 +774,7 @@ mod test_parser_funcs {
                 "",
                 Token::Combined(vec![
                     Token::literal_from_str("\\"),
-                    Token::InvQuery(vec!["foo:bar".to_owned()])
+                    Token::InvQuery("foo:bar".to_owned())
                 ])
             ))
         )
@@ -780,7 +785,7 @@ mod test_parser_funcs {
         let refstr = r#"$[ ${foo:bar} ]"#;
         assert_eq!(
             parse_ref(&refstr),
-            Ok(("", Token::InvQuery(vec![" ${foo:bar} ".to_owned()])))
+            Ok(("", Token::InvQuery(" ${foo:bar} ".to_owned())))
         )
     }
 }
