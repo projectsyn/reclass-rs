@@ -18,6 +18,7 @@ pub enum Token {
     /// A parsed input string which is composed of one or more references, potentially with
     /// interspersed non-reference sections.
     Combined(Vec<Token>),
+    InvQuery(Vec<String>),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -324,6 +325,7 @@ impl Token {
                 }
                 Ok(v)
             }
+            _ => todo!(),
         }
     }
 }
@@ -349,6 +351,7 @@ impl std::fmt::Display for Token {
                 write!(f, "}}")
             }
             Token::Combined(ts) => flatten(f, ts),
+            _ => todo!(),
         }
     }
 }

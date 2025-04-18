@@ -44,17 +44,13 @@ fn inv_open(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     context("inv_open", tag("$[")).parse(input)
 }
 
+fn inv_close(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+    context("inv_close", tag("]")).parse(input)
+}
+
 fn ref_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context("ref_escape_open", preceded(tag("\\"), ref_open)),
-        String::from,
-    )
-    .parse(input)
-}
-
-fn inv_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
-    map(
-        context("inv_escape_open", preceded(tag("\\"), inv_open)),
         String::from,
     )
     .parse(input)
@@ -68,11 +64,30 @@ fn ref_escape_close(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     .parse(input)
 }
 
+fn inv_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(
+        context("inv_escape_open", preceded(tag("\\"), inv_open)),
+        String::from,
+    )
+    .parse(input)
+}
+
+fn inv_escape_close(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(
+        context("inv_escape_close", preceded(tag("\\"), inv_close)),
+        String::from,
+    )
+    .parse(input)
+}
+
 fn double_escape(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context(
             "double_escape",
-            (tag(r"\\"), peek(alt((ref_open, ref_close)))),
+            (
+                tag(r"\\"),
+                peek(alt((ref_open, inv_open, ref_close, inv_close))),
+            ),
         ),
         |_| r"\".to_string(),
     )
@@ -84,12 +99,19 @@ fn ref_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
     map(
         context(
             "ref_not_open",
-            (
-                not(tag("${")),
-                not(tag("\\${")),
-                not(tag("\\\\${")),
-                not(tag("\\$[")),
-            ),
+            (not(tag("${")), not(tag("\\${")), not(tag("\\\\${"))),
+        ),
+        |_| (),
+    )
+    .parse(input)
+}
+
+fn inv_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
+    // don't advance parse position, just check for inv_open variants
+    map(
+        context(
+            "inv_not_open",
+            (not(tag("$[")), not(tag("\\$[")), not(tag("\\\\$["))),
         ),
         |_| (),
     )
@@ -140,7 +162,6 @@ fn ref_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
                 double_escape,
                 ref_escape_open,
                 ref_escape_close,
-                inv_escape_open,
                 ref_content,
             ))),
         ),
@@ -175,7 +196,9 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         context(
             "text",
             alt((
-                map(many1(none_of("${}\\")), |ch| ch.iter().collect::<String>()),
+                map(many1(none_of("${}[]\\")), |ch| {
+                    ch.iter().collect::<String>()
+                }),
                 map(take(1usize), std::string::ToString::to_string),
             )),
         )
@@ -185,8 +208,11 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     fn content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         context(
             "content",
-            map(many1((ref_not_open, text)), |strings| {
-                strings.iter().map(|((), s)| s.clone()).collect::<String>()
+            map(many1((ref_not_open, inv_not_open, text)), |strings| {
+                strings
+                    .iter()
+                    .map(|((), (), s)| s.clone())
+                    .collect::<String>()
             }),
         )
         .parse(input)
@@ -199,9 +225,72 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     .parse(input)
 }
 
+/// Parses a section of the input inside an inventory query
+/// this is WIP
+fn inv_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    fn inv_not_close(input: &str) -> IResult<&str, (), VerboseError<&str>> {
+        // don't advance parse position, just check for inv_close variants
+        map(
+            context(
+                "inv_not_close",
+                (not(tag("]")), not(tag("\\]")), not(tag("\\\\]"))),
+            ),
+            |((), (), ())| (),
+        )
+        .parse(input)
+    }
+
+    fn inv_text(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+        context(
+            "inv_text",
+            map(many1(none_of("]")), |chars| {
+                chars.into_iter().collect::<String>()
+            }),
+        )
+        .parse(input)
+    }
+
+    map(
+        context("inv_content", (inv_not_close, inv_text)),
+        |((), s)| s,
+    )
+    .parse(input)
+}
+
+fn inv_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(
+        context(
+            "inv_string",
+            many1(alt((
+                double_escape,
+                inv_escape_open,
+                inv_escape_close,
+                inv_content,
+            ))),
+        ),
+        |s| s.join(""),
+    )
+    .parse(input)
+}
+
+fn export(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
+    context(
+        "export",
+        map(
+            delimited(inv_open, many1(inv_string), inv_close),
+            |tokens| Token::InvQuery(tokens),
+        ),
+    )
+    .parse(input)
+}
+
 /// Parses either a Reclass reference or a section of the input with no references
 fn item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
-    context("item", alt((reference, map(string, Token::Literal)))).parse(input)
+    context(
+        "item",
+        alt((reference, export, map(string, Token::Literal))),
+    )
+    .parse(input)
 }
 
 /// Parses a string containing zero or more Reclass references
@@ -666,7 +755,7 @@ mod test_parser_funcs {
         let refstr = r#"$[foo:bar]"#;
         assert_eq!(
             parse_ref(&refstr),
-            Ok(("", Token::literal_from_str(r"$[foo:bar]")))
+            Ok(("", Token::InvQuery(vec!["foo:bar".to_owned()])))
         )
     }
 
@@ -676,7 +765,13 @@ mod test_parser_funcs {
         let refstr = r#"\\$[foo:bar]"#;
         assert_eq!(
             parse_ref(&refstr),
-            Ok(("", Token::literal_from_str(r"\$[foo:bar]")))
+            Ok((
+                "",
+                Token::Combined(vec![
+                    Token::literal_from_str("\\"),
+                    Token::InvQuery(vec!["foo:bar".to_owned()])
+                ])
+            ))
         )
     }
 }
