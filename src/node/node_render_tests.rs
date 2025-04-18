@@ -19,7 +19,7 @@ fn expected_params(nodename: &str, yaml: &str) -> Mapping {
     let mut expected = Mapping::from_str(yaml).unwrap();
     expected.merge(&reclass).unwrap();
     let mut expected = Value::Mapping(expected);
-    expected.render(&Mapping::new()).unwrap();
+    expected.render(&Mapping::new(), &Mapping::new()).unwrap();
     expected.as_mapping().unwrap().clone()
 }
 
@@ -36,7 +36,7 @@ fn test_render_n1() {
         RemovableList::from(vec!["app1".to_owned(), "app2".to_owned()])
     );
 
-    n.render(&r).unwrap();
+    n.render(&r, &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n1",
@@ -60,7 +60,7 @@ fn test_render_n2() {
     assert_eq!(n.classes, UniqueList::from(vec!["nested.cls1".to_owned()]));
     assert_eq!(n.applications, RemovableList::from(vec![]));
 
-    n.render(&r).unwrap();
+    n.render(&r, &Mapping::new()).unwrap();
 
     assert_eq!(
         n.classes,
@@ -84,7 +84,7 @@ fn test_render_n2() {
 fn test_render_n3() {
     let r = make_reclass();
     let mut n = Node::parse(&r, "n3").unwrap();
-    n.render(&r).unwrap();
+    n.render(&r, &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n3",
@@ -110,7 +110,7 @@ fn test_render_n4() {
     let r = make_reclass();
 
     let mut n = Node::parse(&r, "n4").unwrap();
-    n.render(&r).unwrap();
+    n.render(&r, &Mapping::new()).unwrap();
     assert_eq!(
         n.classes,
         UniqueList::from(vec!["cls8".into(), "${qux}".into(), "cls7".into()])
@@ -134,7 +134,7 @@ fn test_render_n4() {
 #[test]
 fn test_render_n5() {
     let r = make_reclass();
-    let n = r.render_node("n5").unwrap();
+    let n = r.render_node("n5", &Mapping::new()).unwrap();
 
     assert_eq!(n.reclass.name, "n5");
     assert_eq!(n.classes, vec!["cls9".to_string(), "cls10".to_string()]);
@@ -159,7 +159,7 @@ fn test_render_n5() {
 #[test]
 fn test_render_n6() {
     let r = make_reclass();
-    let n = r.render_node("n6").unwrap();
+    let n = r.render_node("n6", &Mapping::new()).unwrap();
 
     assert_eq!(n.reclass.name, "n6");
     assert_eq!(n.classes, vec!["cls9".to_string(), "cls11".to_string()]);
@@ -191,7 +191,7 @@ fn test_render_n6() {
 #[test]
 fn test_render_n7() {
     let r = make_reclass();
-    let n = r.render_node("n7").unwrap();
+    let n = r.render_node("n7", &Mapping::new()).unwrap();
 
     assert_eq!(n.reclass.name, "n7");
     assert_eq!(n.classes, vec!["cls9".to_string()]);
@@ -214,7 +214,7 @@ fn test_render_n7() {
 #[test]
 fn test_render_n8() {
     let r = make_reclass();
-    let n = r.render_node("n8").unwrap();
+    let n = r.render_node("n8", &Mapping::new()).unwrap();
 
     assert_eq!(n.reclass.name, "n8");
     assert_eq!(
@@ -237,7 +237,7 @@ fn test_render_n8() {
 #[test]
 fn test_render_n9() {
     let r = make_reclass();
-    let n = r.render_node("n9").unwrap();
+    let n = r.render_node("n9", &Mapping::new()).unwrap();
 
     assert_eq!(n.reclass.name, "n9");
     // TODO(sg): check what the expected value here is
@@ -275,7 +275,7 @@ fn test_render_n9() {
 #[test]
 fn test_render_n10() {
     let r = make_reclass();
-    let n = r.render_node("n10").unwrap();
+    let n = r.render_node("n10", &Mapping::new()).unwrap();
 
     assert_eq!(n.reclass.name, "n10");
     // TODO(sg): check what the expected value here is
@@ -301,7 +301,7 @@ fn test_render_n10() {
 #[test]
 fn test_render_n11() {
     let r = make_reclass();
-    let n = r.render_node("n11").unwrap();
+    let n = r.render_node("n11", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n11",
@@ -320,7 +320,7 @@ fn test_render_n11() {
 #[test]
 fn test_render_n12() {
     let r = make_reclass();
-    let n = r.render_node("n12").unwrap();
+    let n = r.render_node("n12", &Mapping::new()).unwrap();
 
     // # Parameters
     // from cls9
@@ -350,7 +350,7 @@ fn test_render_n12() {
 #[test]
 fn test_render_n13() {
     let r = make_reclass();
-    let n = r.render_node("n13").unwrap();
+    let n = r.render_node("n13", &Mapping::new()).unwrap();
 
     // # Parameters
     // from cls9
@@ -387,7 +387,7 @@ fn test_render_n13() {
 #[test]
 fn test_render_n14() {
     let r = make_reclass();
-    let n = r.render_node("n14").unwrap();
+    let n = r.render_node("n14", &Mapping::new()).unwrap();
 
     // # Parameters
     let expected = expected_params(
@@ -412,7 +412,7 @@ fn test_render_n14() {
 #[test]
 fn test_render_n15() {
     let r = make_reclass();
-    let n = r.render_node("n15").unwrap();
+    let n = r.render_node("n15", &Mapping::new()).unwrap();
 
     // # Parameters
     let expected = expected_params(
@@ -434,7 +434,7 @@ fn test_render_n15() {
 #[test]
 fn test_render_n16() {
     let r = make_reclass();
-    let n = r.render_node("n16").unwrap();
+    let n = r.render_node("n16", &Mapping::new()).unwrap();
 
     // # Parameters
     let expected = expected_params(
@@ -452,7 +452,7 @@ fn test_render_n16() {
 #[test]
 fn test_render_n17() {
     let r = make_reclass();
-    let n = r.render_node("n17").unwrap();
+    let n = r.render_node("n17", &Mapping::new()).unwrap();
 
     // # Parameters
     // from ${baz}
@@ -463,7 +463,7 @@ fn test_render_n17() {
 #[test]
 fn test_render_n18() {
     let r = Reclass::new("./tests/inventory", "nodes", "classes", true).unwrap();
-    let n = r.render_node("n18").unwrap();
+    let n = r.render_node("n18", &Mapping::new()).unwrap();
 
     // # Parameters
     let expected = expected_params(
@@ -484,7 +484,7 @@ fn test_render_n18() {
 #[test]
 fn test_render_n19() {
     let r = make_reclass();
-    let n = r.render_node("n19").unwrap();
+    let n = r.render_node("n19", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n19",
@@ -504,7 +504,7 @@ fn test_render_n19() {
 #[test]
 fn test_render_n20() {
     let r = make_reclass();
-    let n = r.render_node("n20").unwrap();
+    let n = r.render_node("n20", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n20",
@@ -528,7 +528,7 @@ fn test_render_n20() {
 #[test]
 fn test_render_n21() {
     let r = make_reclass();
-    let n = r.render_node("n21").unwrap();
+    let n = r.render_node("n21", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n21",
@@ -551,7 +551,7 @@ fn test_render_n21() {
 #[test]
 fn test_render_n22() {
     let r = make_reclass();
-    let n = r.render_node("n22").unwrap();
+    let n = r.render_node("n22", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n22",
@@ -576,7 +576,7 @@ fn test_render_n22() {
 #[test]
 fn test_render_n23() {
     let r = make_reclass();
-    let n = r.render_node("n23").unwrap();
+    let n = r.render_node("n23", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n23",
@@ -597,7 +597,7 @@ fn test_render_n23() {
 #[test]
 fn test_render_n24() {
     let r = make_reclass();
-    let n = r.render_node("n24").unwrap();
+    let n = r.render_node("n24", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n24",
@@ -614,7 +614,7 @@ fn test_render_n24() {
 #[test]
 fn test_render_n25() {
     let r = make_reclass();
-    let n = r.render_node("n25").unwrap();
+    let n = r.render_node("n25", &Mapping::new()).unwrap();
 
     let expected = expected_params(
         "n25",

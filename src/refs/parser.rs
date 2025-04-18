@@ -759,4 +759,13 @@ mod test_parser_funcs {
             ))
         )
     }
+
+    #[test]
+    fn test_parse_inventory_query_with_nested_reference() {
+        let refstr = r#"$[ ${foo:bar} ]"#;
+        assert_eq!(
+            parse_ref(&refstr),
+            Ok(("", Token::InvQuery(vec![" ${foo:bar} ".to_owned()])))
+        )
+    }
 }

@@ -32,6 +32,7 @@ use config::{CompatFlag, Config};
 use fsutil::to_lexical_absolute;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
+use types::Mapping;
 
 const SUPPORTED_YAML_EXTS: [&str; 2] = ["yml", "yaml"];
 
@@ -88,6 +89,8 @@ pub struct Reclass {
     classes: HashMap<String, EntityInfo>,
     /// List of discovered Reclass nodes in `nodes_path`
     nodes: HashMap<String, EntityInfo>,
+    /// Pre-rendered exports
+    exports: Mapping,
 }
 
 fn err_duplicate_entity(
@@ -220,6 +223,7 @@ impl Reclass {
             config,
             classes: HashMap::new(),
             nodes: HashMap::new(),
+            exports: Mapping::new(),
         };
         r.discover_nodes()
             .map_err(|e| anyhow!("Error while discovering nodes: {e}"))?;
@@ -256,10 +260,21 @@ impl Reclass {
         )
     }
 
+    fn render_exports(&self) -> Result<Mapping> {
+        let mut res = Mapping::new();
+        for n in self.nodes.keys() {
+            let n = Node::parse(self, n)?;
+            let m = n.merged(self)?;
+            let e = m.get_exports()?;
+            res.merge(&e)?;
+        }
+        Ok(res)
+    }
+
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
-    pub fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
+    pub fn render_node(&self, nodename: &str, exports: &Mapping) -> Result<NodeInfo> {
         let mut n = Node::parse(self, nodename)?;
-        n.render(self)?;
+        n.render(self, exports)?;
         Ok(NodeInfo::from(n))
     }
 
@@ -324,7 +339,11 @@ impl Reclass {
 
     /// Returns the rendered data for the node with the provided name if it exists.
     pub fn nodeinfo(&self, nodename: &str) -> PyResult<NodeInfo> {
-        self.render_node(nodename)
+        //TODO(sg): figure out if we can do partial exports when rendering a single node if there's
+        //errors when rendering some nodes' exports.
+        //NOTE(sg): this API isn't available in the same way in the Python reclass implementation
+        let exports = self.render_exports().unwrap_or(Mapping::new());
+        self.render_node(nodename, &exports)
             .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))
     }
 

@@ -26,11 +26,12 @@ pub struct Inventory {
 impl Inventory {
     /// Renders the full inventory for the given Reclass config.
     pub fn render(r: &Reclass) -> Result<Self> {
+        let exports = r.render_exports()?;
         // Render all nodes
         let infos: Vec<_> = r
             .nodes
             .par_iter()
-            .map(|(name, _)| (name, { r.render_node(name) }))
+            .map(|(name, _)| (name, { r.render_node(name, &exports) }))
             .collect();
 
         // Generate `Inventory` from the rendered nodes

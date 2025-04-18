@@ -16,7 +16,7 @@ mod nodeinfo;
 pub(crate) use nodeinfo::*;
 
 /// Represents a Reclass node or class
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct Node {
     /// List of Reclass applications for this node
     #[serde(default)]
@@ -242,7 +242,7 @@ impl Node {
                     // `raw_string()` to ensure no spurious quotes are injected.
                     let mut state = ResolveState::default();
                     clstoken
-                        .render(&root.parameters, &mut state)?
+                        .render(&root.parameters, &r.exports, &mut state)?
                         .raw_string()?
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
@@ -286,10 +286,10 @@ impl Node {
 
     /// Renders the Node's parameters by interpolating Reclass references and flattening
     /// ValueLists.
-    fn render_parameters(&mut self) -> Result<()> {
+    fn render_parameters(&mut self, exports: &Mapping) -> Result<()> {
         let p = std::mem::take(&mut self.parameters);
         let mut f = Value::Mapping(p);
-        f.render_with_self()?;
+        f.render_with_self(exports)?;
         match f {
             Value::Mapping(m) => {
                 self.parameters = m;
@@ -307,7 +307,8 @@ impl Node {
     fn render_exports(&mut self) -> Result<()> {
         let p = std::mem::take(&mut self.exports);
         let mut f = Value::Mapping(p);
-        f.render(&self.parameters)?;
+        // We pass an empty exports when rendering exports
+        f.render(&self.parameters, &Mapping::new())?;
         match f {
             Value::Mapping(m) => {
                 self.exports = m;
@@ -338,7 +339,16 @@ impl Node {
     /// Load included classes (recursively), and merge parameters.
     ///
     /// Note that this method doesn't flatten overwritten parameters.
-    pub fn render(&mut self, r: &Reclass) -> Result<()> {
+    pub fn render(&mut self, r: &Reclass, exports: &Mapping) -> Result<()> {
+        let res = self.merged(r)?;
+        let _s = std::mem::replace(self, res);
+        self.render_parameters(exports)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn merged(&self, r: &Reclass) -> Result<Self> {
+        let mut res = self.clone();
         let mut base = Node {
             // NOTE(sg): Similar to Python reclass, we initialize the base node with any classes
             // that are included via the `class_mappings` configuration parameter.
@@ -356,13 +366,19 @@ impl Node {
         // First render base (i.e. mapped classes) into an empty Node, and update base with the
         // result
         base.render_impl(r, &mut seen, &mut root)?;
-        // Then render ourselves into the rendered base and update ourselves with the result
-        self.render_impl(r, &mut seen, &mut base)?;
-        self.render_parameters()?;
-        self.render_exports()?;
-        //self.resolve_exports()?;
+        res.render_impl(r, &mut seen, &mut base)?;
+        res.render_exports()?;
+        Ok(res)
+    }
 
-        Ok(())
+    pub(crate) fn get_exports(&self) -> Result<Mapping> {
+        let mut res = Mapping::new();
+        for (k, v) in self.exports.as_map() {
+            let mut kmap = Mapping::new();
+            kmap.insert(Value::String(self.meta.name.clone()), v.clone())?;
+            res.insert(k.clone(), Value::Mapping(kmap))?;
+        }
+        Ok(res)
     }
 }
 
