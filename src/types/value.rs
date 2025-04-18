@@ -8,7 +8,6 @@ use std::mem;
 
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
-use crate::invqueries::Query;
 use crate::refs::{ResolveState, Token};
 
 /// Represents a YAML value in a form suitable for processing Reclass parameters.
@@ -760,31 +759,6 @@ impl Value {
         let n = self.rendered(m, exports)?;
         let _prev = std::mem::replace(self, n);
         Ok(())
-    }
-
-    pub fn resolve_exports(&self, exports: &Mapping) -> Result<Self> {
-        match self {
-            Value::Mapping(m) => Ok(Value::Mapping(m.resolve_exports(exports)?)),
-            Value::Sequence(l) => {
-                let mut res = vec![];
-                for v in l {
-                    res.push(v.resolve_exports(exports)?);
-                }
-                Ok(Value::Sequence(res))
-            }
-            Value::Literal(s) => {
-                if let Some(q) = Query::parse(s)? {
-                    Ok(q.resolve(exports)?)
-                } else {
-                    Ok(Value::Literal(s.clone()))
-                }
-            }
-            Value::String(_) | Value::ValueList(_) => Err(anyhow!(concat!(
-                "Resolving exports isn't supported for values ",
-                "with potentially unresolved references"
-            ))),
-            _ => Ok(self.clone()),
-        }
     }
 }
 
