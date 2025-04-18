@@ -360,7 +360,7 @@ impl Node {
         self.render_impl(r, &mut seen, &mut base)?;
         self.render_parameters()?;
         self.render_exports()?;
-        self.resolve_exports()?;
+        //self.resolve_exports()?;
 
         Ok(())
     }
