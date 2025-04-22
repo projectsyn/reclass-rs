@@ -3,6 +3,7 @@ mod parser;
 use crate::{
     invqueries::Query,
     types::{Mapping, Value},
+    Exports,
 };
 use anyhow::{anyhow, Result};
 use nom::error::{convert_error, VerboseError};
@@ -156,7 +157,7 @@ impl Token {
     pub fn render(
         &self,
         params: &Mapping,
-        exports: &Mapping,
+        exports: &Exports,
         state: &mut ResolveState,
     ) -> Result<Value> {
         if self.is_ref() {
@@ -177,7 +178,7 @@ impl Token {
     fn resolve(
         &self,
         params: &Mapping,
-        exports: &Mapping,
+        exports: &Exports,
         state: &mut ResolveState,
     ) -> Result<Value> {
         match self {
@@ -336,7 +337,7 @@ impl std::fmt::Display for Token {
 fn interpolate_token_slice(
     tokens: &[Token],
     params: &Mapping,
-    exports: &Mapping,
+    exports: &Exports,
     state: &mut ResolveState,
 ) -> Result<String> {
     // Iterate through each element of the Vec, and call Token::resolve() on each element.
@@ -360,7 +361,7 @@ fn interpolate_token_slice(
 fn interpolate_string_or_valuelist(
     v: &Value,
     params: &Mapping,
-    exports: &Mapping,
+    exports: &Exports,
     state: &mut ResolveState,
 ) -> Result<Value> {
     match v {

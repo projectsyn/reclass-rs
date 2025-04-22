@@ -3,7 +3,10 @@ use anyhow::{anyhow, Result};
 use parser::parse_query;
 use serde_yaml::Number;
 
-use crate::types::{Mapping, Value};
+use crate::{
+    types::{Mapping, Value},
+    Exports,
+};
 
 mod parser;
 
@@ -13,7 +16,7 @@ enum Expression {
 }
 
 impl Expression {
-    fn evaluate(&self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
+    fn evaluate(&self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
         match self {
             Self::Expr(o, rem) => {
                 let res = o.evaluate(exports, ignore_errors)?;
@@ -60,7 +63,7 @@ impl Test {
         }
     }
 
-    fn evaluate(&self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
+    fn evaluate(&self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
         match self {
             Self::Eq(a, b) => a.eval_eq(b, exports, ignore_errors),
             Self::Neq(a, b) => a.eval_neq(b, exports, ignore_errors),
@@ -76,7 +79,7 @@ enum Item {
 }
 
 impl Item {
-    fn value(&self, exports: &Mapping, ignore_errors: bool) -> Result<Option<Value>> {
+    fn value(&self, exports: &Exports, ignore_errors: bool) -> Result<Option<Value>> {
         match self {
             Self::Obj(k) => {
                 if let Some((ktype, kpath)) = k.split_once(":") {
@@ -88,7 +91,7 @@ impl Item {
                     dbg!(&exports);
                     match ktype {
                         "exports" => {
-                            let v = exports.get(&k0.into());
+                            let v = exports.exports.get(&k0.into());
                             if ignore_errors && v.is_none() {
                                 return Ok(None);
                             }
@@ -122,7 +125,7 @@ impl Item {
         }
     }
 
-    fn eval_eq(&self, other: &Self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
+    fn eval_eq(&self, other: &Self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
         // TODO(sg): figure out how to properly propagate missing values on `ignore_errors`
         // what's the semantics of ignore_errors, do we silently skip the output for failing
         // lookups?
@@ -131,7 +134,7 @@ impl Item {
         Ok(sv == ov)
     }
 
-    fn eval_neq(&self, other: &Self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
+    fn eval_neq(&self, other: &Self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
         let sv = self.value(exports, ignore_errors)?;
         let ov = other.value(exports, ignore_errors)?;
         Ok(sv != ov)
@@ -161,7 +164,7 @@ impl Query {
     // key2:
     //  node1: value2
     //  node2: value2
-    pub(crate) fn resolve(&self, exports: &Mapping) -> Result<Value> {
+    pub(crate) fn resolve(&self, exports: &Exports) -> Result<Value> {
         if let Some(var) = &self.var {
             let o = Item::Obj(var.clone());
             let mut r = Mapping::new();
@@ -182,9 +185,15 @@ impl Query {
 
             Ok(Value::Mapping(r))
         } else {
-            // for queries without a value, we return all nodes for which the expression evaluates
-            // to true.
-            todo!("inv query expressions without value NYI");
+            let mut r = vec![];
+            if let Some(e) = self.expr.as_ref() {
+                for n in &exports.nodes {
+                    if e.evaluate(exports, self.ignore_errors)? {
+                        r.push(n.clone().into());
+                    }
+                }
+            }
+            Ok(Value::Sequence(r))
         }
     }
 }
@@ -192,6 +201,7 @@ impl Query {
 #[cfg(test)]
 mod invqueries_test {
     use super::Query;
+    use crate::exports::Exports;
     use crate::types::{Mapping, Value};
 
     #[test]
@@ -206,8 +216,11 @@ mod invqueries_test {
                 .insert(n.into(), Value::String("bar".to_owned()))
                 .unwrap();
         }
-        let mut exports = Mapping::new();
-        exports.insert("foo".into(), Value::Mapping(m)).unwrap();
+        let mut exports = Exports::default();
+        exports
+            .exports
+            .insert("foo".into(), Value::Mapping(m))
+            .unwrap();
         let v = q.resolve(&exports).unwrap();
 
         assert_eq!(v, Value::Mapping(expected));

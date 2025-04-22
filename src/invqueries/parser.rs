@@ -228,4 +228,15 @@ mod tests {
         assert_eq!(q.all_envs, true);
         assert_eq!(q.ignore_errors, true);
     }
+
+    #[test]
+    fn parse_no_value_expr() {
+        let qstr = "if exports:foo == bar";
+        let q = parse_query(qstr).unwrap();
+        assert_eq!(q.qstr, qstr);
+        assert_eq!(q.var, None);
+        assert!(q.expr.is_some());
+        assert_eq!(q.all_envs, false);
+        assert_eq!(q.ignore_errors, false);
+    }
 }

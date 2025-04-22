@@ -9,6 +9,7 @@ use std::mem;
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
 use crate::refs::{ResolveState, Token};
+use crate::Exports;
 
 /// Represents a YAML value in a form suitable for processing Reclass parameters.
 #[derive(Clone, Debug, PartialEq)]
@@ -531,7 +532,7 @@ impl Value {
     pub(crate) fn interpolate(
         &self,
         root: &Mapping,
-        exports: &Mapping,
+        exports: &Exports,
         state: &mut ResolveState,
     ) -> Result<Self> {
         Ok(match self {
@@ -728,7 +729,7 @@ impl Value {
     /// The method first interpolates any Reclass references found in the Value by looking up the
     /// reference keys in `root`. After all references have been interpolated, the method flattens
     /// any remaining ValueLists and returns the final "flattened" value.
-    pub fn rendered(&self, root: &Mapping, exports: &Mapping) -> Result<Self> {
+    pub fn rendered(&self, root: &Mapping, exports: &Exports) -> Result<Self> {
         let mut state = ResolveState::default();
         let mut v = self
             .interpolate(root, exports, &mut state)
@@ -740,7 +741,7 @@ impl Value {
     /// Renders the Value in-place.
     ///
     /// See [`Value::rendered()`] for details.
-    pub fn render(&mut self, root: &Mapping, exports: &Mapping) -> Result<()> {
+    pub fn render(&mut self, root: &Mapping, exports: &Exports) -> Result<()> {
         let _prev = std::mem::replace(self, self.rendered(root, exports)?);
         Ok(())
     }
@@ -749,7 +750,7 @@ impl Value {
     /// Returns an error when called for a Value variant other than `Value::Mapping`.
     ///
     /// See [`Value::rendered()`] for details on how Reclass references are rendered.
-    pub fn render_with_self(&mut self, exports: &Mapping) -> Result<()> {
+    pub fn render_with_self(&mut self, exports: &Exports) -> Result<()> {
         let m = self.as_mapping().ok_or_else(|| {
             anyhow!(
                 "Can't render {} with itself as the parameter source",

@@ -4,5 +4,7 @@ parameters:
 
   nodes: $[ exports:node ]
 
+  n2_nodes: $[ if exports:node == n2 ]
+
 exports:
   node: n2
