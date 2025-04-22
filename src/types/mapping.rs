@@ -425,7 +425,7 @@ impl Mapping {
     /// The method looks up reference values in parameter `root`. After interpolation of each
     /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
-    pub(super) fn interpolate(
+    pub(crate) fn interpolate(
         &self,
         root: &Self,
         exports: &Self,

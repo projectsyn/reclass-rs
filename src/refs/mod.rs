@@ -295,7 +295,7 @@ impl Token {
             Self::InvQuery(s) => {
                 // TODO(sg): error handling + resolve state
                 let q = Query::parse(s)?;
-                Ok(q.resolve(exports)?)
+                q.resolve(exports)
             }
         }
     }
