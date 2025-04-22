@@ -6,7 +6,7 @@ use nom::{
     combinator::{all_consuming, map, map_res, recognize},
     multi::{many0, many1},
     number::complete::double,
-    sequence::{preceded, tuple},
+    sequence::{preceded, terminated, tuple},
     IResult,
 };
 
@@ -56,8 +56,15 @@ fn or(input: &str) -> IResult<&str, Operator> {
     map(tag_no_case("OR"), |_| Operator::Or)(input)
 }
 
+fn whitespace(input: &str) -> IResult<&str, &str> {
+    recognize(many1(one_of(" \t")))(input)
+}
+
 fn options(input: &str) -> IResult<&str, Vec<QueryOption>> {
-    many0(alt((ignore_errors, all_envs)))(input)
+    many0(alt((
+        terminated(ignore_errors, whitespace),
+        terminated(all_envs, whitespace),
+    )))(input)
 }
 
 fn operator_test(input: &str) -> IResult<&str, Operator> {
@@ -88,8 +95,6 @@ fn expritem(input: &str) -> IResult<&str, Item> {
 }
 
 fn single_test(input: &str) -> IResult<&str, Test> {
-    dbg!("single_test");
-    dbg!(&input);
     map_res(
         tuple((
             expritem,
@@ -101,24 +106,17 @@ fn single_test(input: &str) -> IResult<&str, Test> {
 }
 
 fn additional_test(input: &str) -> IResult<&str, (Operator, Test)> {
-    dbg!(&input);
-    tuple((operator_logical, single_test))(input)
+    tuple((operator_logical, preceded(whitespace, single_test)))(input)
 }
 
 fn expr_var(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)> {
-    dbg!(&input);
     map_res(all_consuming(obj), |o| match o {
         Item::Obj(v) => Ok((Some(v), None)),
         _ => Err(anyhow!("expr_var should only match Item::Obj, got {o:?}")),
     })(input)
 }
 
-fn whitespace(input: &str) -> IResult<&str, &str> {
-    recognize(many1(one_of(" \t")))(input)
-}
-
 fn expr_test(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)> {
-    dbg!(&input);
     map_res(
         all_consuming(tuple((
             obj,
@@ -137,9 +135,12 @@ fn expr_test(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)>
 }
 
 fn expr_list_test(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)> {
-    dbg!(&input);
     map(
-        all_consuming(tuple((begin_if, single_test, many0(additional_test)))),
+        all_consuming(tuple((
+            begin_if,
+            preceded(whitespace, single_test),
+            many0(preceded(whitespace, additional_test)),
+        ))),
         |(_, t, ts)| {
             let expr = Expression::Expr(t, ts);
             (None, Some(expr))
@@ -193,5 +194,38 @@ mod tests {
         assert!(q.expr.is_some());
         assert_eq!(q.all_envs, false);
         assert_eq!(q.ignore_errors, false);
+    }
+
+    #[test]
+    fn parse_option_all_envs() {
+        let qstr = "+AllEnvs exports:foo";
+        let q = parse_query(qstr).unwrap();
+        assert_eq!(q.qstr, qstr);
+        assert_eq!(q.var, Some("exports:foo".to_owned()));
+        assert!(q.expr.is_none());
+        assert_eq!(q.all_envs, true);
+        assert_eq!(q.ignore_errors, false);
+    }
+
+    #[test]
+    fn parse_option_ignore_errors() {
+        let qstr = "+IgnoreErrors exports:foo";
+        let q = parse_query(qstr).unwrap();
+        assert_eq!(q.qstr, qstr);
+        assert_eq!(q.var, Some("exports:foo".to_owned()));
+        assert!(q.expr.is_none());
+        assert_eq!(q.all_envs, false);
+        assert_eq!(q.ignore_errors, true);
+    }
+
+    #[test]
+    fn parse_options_multi() {
+        let qstr = "+IgnoreErrors +AllEnvs +IgnoreErrors exports:foo";
+        let q = parse_query(qstr).unwrap();
+        assert_eq!(q.qstr, qstr);
+        assert_eq!(q.var, Some("exports:foo".to_owned()));
+        assert!(q.expr.is_none());
+        assert_eq!(q.all_envs, true);
+        assert_eq!(q.ignore_errors, true);
     }
 }
