@@ -24,6 +24,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use rayon::ThreadPoolBuilder;
+use refs::ResolveState;
 use std::collections::HashMap;
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use walkdir::WalkDir;
@@ -267,7 +268,15 @@ impl Reclass {
             let mut state = ResolveState::default();
             res.merge(&e, &mut state, &self.config.get_render_opts())?;
         }
-        Ok(res)
+        let mut v = types::Value::Mapping(res);
+        v.render(&Mapping::new(), &Mapping::new())?;
+        let m = match v {
+            types::Value::Mapping(m) => m,
+            _ => {
+                return Err(anyhow!("Mapping got converted to {}", v.variant()));
+            }
+        };
+        Ok(m)
     }
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
