@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use nom::{
     branch::alt,
     bytes::complete::{tag, tag_no_case},
-    character::complete::{digit1, none_of},
-    combinator::{all_consuming, map, map_res},
+    character::complete::{digit1, none_of, one_of},
+    combinator::{all_consuming, map, map_res, recognize},
     multi::{many0, many1},
     number::complete::double,
     sequence::{preceded, tuple},
@@ -69,39 +69,63 @@ fn operator_logical(input: &str) -> IResult<&str, Operator> {
 }
 
 fn begin_if(input: &str) -> IResult<&str, &str> {
+    dbg!(&input);
     tag_no_case("IF")(input)
 }
 
 fn obj(input: &str) -> IResult<&str, Item> {
-    map(many1(none_of(" \t")), |cs| {
-        Item::Obj(cs.iter().collect::<String>())
+    dbg!("obj");
+    dbg!(&input);
+    map(recognize(many1(none_of(" \t"))), |s: &str| {
+        Item::Obj(s.to_owned())
     })(input)
 }
 
 fn expritem(input: &str) -> IResult<&str, Item> {
+    dbg!("expritem");
+    dbg!(&input);
     alt((integer, real, obj))(input)
 }
 
 fn single_test(input: &str) -> IResult<&str, Test> {
-    map_res(tuple((expritem, operator_test, expritem)), |(a, op, b)| {
-        Test::make(op, a, b)
-    })(input)
+    dbg!("single_test");
+    dbg!(&input);
+    map_res(
+        tuple((
+            expritem,
+            preceded(whitespace, operator_test),
+            preceded(whitespace, expritem),
+        )),
+        |(a, op, b)| Test::make(op, a, b),
+    )(input)
 }
 
 fn additional_test(input: &str) -> IResult<&str, (Operator, Test)> {
+    dbg!(&input);
     tuple((operator_logical, single_test))(input)
 }
 
 fn expr_var(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)> {
+    dbg!(&input);
     map_res(all_consuming(obj), |o| match o {
         Item::Obj(v) => Ok((Some(v), None)),
         _ => Err(anyhow!("expr_var should only match Item::Obj, got {o:?}")),
     })(input)
 }
 
+fn whitespace(input: &str) -> IResult<&str, &str> {
+    recognize(many1(one_of(" \t")))(input)
+}
+
 fn expr_test(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)> {
+    dbg!(&input);
     map_res(
-        all_consuming(tuple((obj, begin_if, single_test, many0(additional_test)))),
+        all_consuming(tuple((
+            obj,
+            preceded(whitespace, begin_if),
+            preceded(whitespace, single_test),
+            many0(preceded(whitespace, additional_test)),
+        ))),
         |(v, _, t, ts)| {
             let Item::Obj(var) = v else {
                 return Err(anyhow!("Expected value to be an Item::Obj, got {v:?}"));
@@ -113,6 +137,7 @@ fn expr_test(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)>
 }
 
 fn expr_list_test(input: &str) -> IResult<&str, (Option<String>, Option<Expression>)> {
+    dbg!(&input);
     map(
         all_consuming(tuple((begin_if, single_test, many0(additional_test)))),
         |(_, t, ts)| {
@@ -142,4 +167,31 @@ pub(super) fn parse_query(s: &str) -> Result<Query> {
         all_envs,
         ignore_errors,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_query;
+
+    #[test]
+    fn parse_simple() {
+        let qstr = "exports:foo";
+        let q = parse_query(qstr).unwrap();
+        assert_eq!(q.qstr, qstr);
+        assert_eq!(q.var, Some("exports:foo".to_owned()));
+        assert!(q.expr.is_none());
+        assert_eq!(q.all_envs, false);
+        assert_eq!(q.ignore_errors, false);
+    }
+
+    #[test]
+    fn parse_simple_expr() {
+        let qstr = "exports:foo if exports:foo == bar";
+        let q = parse_query(qstr).unwrap();
+        assert_eq!(q.qstr, qstr);
+        assert_eq!(q.var, Some("exports:foo".to_owned()));
+        assert!(q.expr.is_some());
+        assert_eq!(q.all_envs, false);
+        assert_eq!(q.ignore_errors, false);
+    }
 }

@@ -17,6 +17,7 @@ impl Expression {
         match self {
             Self::Expr(o, rem) => {
                 let res = o.evaluate(exports, ignore_errors)?;
+                dbg!(&res);
                 for (op, operation) in rem {
                     match op {
                         Operator::And => res && operation.evaluate(exports, ignore_errors)?,
@@ -79,8 +80,12 @@ impl Item {
         match self {
             Self::Obj(k) => {
                 if let Some((ktype, kpath)) = k.split_once(":") {
+                    dbg!(&ktype);
+                    dbg!(&kpath);
                     let mut kparts = kpath.split(":");
                     let k0 = kparts.next().ok_or(anyhow!("expected at least one key"))?;
+                    dbg!(&k0);
+                    dbg!(&exports);
                     match ktype {
                         "exports" => {
                             let v = exports.get(&k0.into());
@@ -108,7 +113,7 @@ impl Item {
                     match &v[..] {
                         "true" => Ok(Some(Value::Bool(true))),
                         "false" => Ok(Some(Value::Bool(true))),
-                        _ => Err(anyhow!("Unexpected literal {k}")),
+                        _ => Ok(Some(Value::Literal(v))),
                     }
                 }
             }
@@ -133,61 +138,78 @@ impl Item {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Query {
     qstr: String,
     var: Option<String>,
     expr: Option<Expression>,
-    // TODO(sg): figure out what these do and implement them
+    // TODO(sg): figure out what these really do and implement them correctly
     all_envs: bool,
     ignore_errors: bool,
 }
 
 impl Query {
     pub(crate) fn parse(s: &str) -> Result<Self> {
-        parse_query(s).map_err(|e| anyhow!("Error while parsing inventory query: {}", e))
+        let q = s.trim();
+        parse_query(q).map_err(|e| anyhow!("Error while parsing inventory query: {}", e))
     }
 
+    // exports has structure
+    // key1:
+    //  node1: value1
+    //  node2: value1
+    // key2:
+    //  node1: value2
+    //  node2: value2
     pub(crate) fn resolve(&self, exports: &Mapping) -> Result<Value> {
         if let Some(var) = &self.var {
             let o = Item::Obj(var.clone());
-            let mut v = Mapping::new();
-            for (n, n_exports) in exports.as_map() {
-                let n_exports = n_exports.as_mapping().ok_or(anyhow!(
-                    "expected exports to be mapping for {n}, got {}",
-                    n_exports.variant()
-                ))?;
+            let mut r = Mapping::new();
+            if let Some(v) = o.value(exports, self.ignore_errors)? {
                 if let Some(e) = self.expr.as_ref() {
-                    //  TODO(sg): do we resolve exports in expr with only our own exports? or with all
-                    //  of them?
-                    if !e.evaluate(n_exports, self.ignore_errors)? {
-                        continue;
+                    for (n, nv) in v
+                        .as_mapping()
+                        .ok_or(anyhow!("expected inv query result to be a mapping"))?
+                    {
+                        if e.evaluate(exports, self.ignore_errors)? {
+                            r.insert(n.clone(), nv.clone()).unwrap();
+                        }
                     }
+                } else {
+                    return Ok(v);
                 }
-                let n_v = o.value(n_exports, self.ignore_errors)?;
-                if let Some(n_v) = n_v {
-                    v.insert(n.clone(), n_v)?;
-                }
-            }
-            Ok(Value::Mapping(v))
+            };
+
+            Ok(Value::Mapping(r))
         } else {
             // for queries without a value, we return all nodes for which the expression evaluates
             // to true.
-            let mut v = vec![];
-            for (n, n_exports) in exports.as_map() {
-                let n_exports = n_exports.as_mapping().ok_or(anyhow!(
-                    "expected exports to be mapping for {n}, got {}",
-                    n_exports.variant()
-                ))?;
-                if let Some(e) = self.expr.as_ref() {
-                    //  TODO(sg): do we resolve exports in expr with only our own exports? or with all
-                    //  of them?
-                    if !e.evaluate(n_exports, self.ignore_errors)? {
-                        continue;
-                    }
-                }
-                v.push(n.clone());
-            }
-            Ok(Value::Sequence(v))
+            todo!("inv query expressions without value NYI");
         }
+    }
+}
+
+#[cfg(test)]
+mod invqueries_test {
+    use super::Query;
+    use crate::types::{Mapping, Value};
+
+    #[test]
+    fn test_resolve_simple_1() {
+        let qstr = " exports:foo ";
+        let q = Query::parse(qstr).unwrap();
+        let mut m = Mapping::new();
+        let mut expected = Mapping::new();
+        for n in ["n1", "n2", "n3"] {
+            m.insert(n.into(), "bar".into()).unwrap();
+            expected
+                .insert(n.into(), Value::String("bar".to_owned()))
+                .unwrap();
+        }
+        let mut exports = Mapping::new();
+        exports.insert("foo".into(), Value::Mapping(m)).unwrap();
+        let v = q.resolve(&exports).unwrap();
+
+        assert_eq!(v, Value::Mapping(expected));
     }
 }

@@ -622,4 +622,14 @@ mod inventory_tests {
         class_mappings_validate_b(&inv.nodes[&"production.b".to_owned()], &c);
         class_mappings_validate_c(&inv.nodes[&"test.c".to_owned()], &c);
     }
+
+    #[test]
+    fn test_inventory_inv_queries() {
+        let mut c =
+            crate::Config::new(Some("./tests/inventory-inv-queries"), None, None, None).unwrap();
+        let r = Reclass::new_from_config(c).unwrap();
+        let inv = Inventory::render(&r).unwrap();
+
+        dbg!(&inv);
+    }
 }
