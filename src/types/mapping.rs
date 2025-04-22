@@ -11,6 +11,7 @@ use std::hash::{Hash, Hasher};
 use super::value::Value;
 use super::KeyPrefix;
 use crate::refs::ResolveState;
+use crate::Exports;
 
 /// Represents a YAML mapping in a form suitable to manage Reclass parameters.
 ///
@@ -428,7 +429,7 @@ impl Mapping {
     pub(crate) fn interpolate(
         &self,
         root: &Self,
-        exports: &Self,
+        exports: &Exports,
         state: &mut ResolveState,
     ) -> Result<Self> {
         let mut res = Self::new();

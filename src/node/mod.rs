@@ -5,6 +5,7 @@ use std::path::PathBuf;
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::exports::Exports;
 use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
@@ -242,7 +243,7 @@ impl Node {
                     // `raw_string()` to ensure no spurious quotes are injected.
                     let mut state = ResolveState::default();
                     clstoken
-                        .render(&root.parameters, &r.exports, &mut state)?
+                        .render(&root.parameters, &Exports::default(), &mut state)?
                         .raw_string()?
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
@@ -286,7 +287,7 @@ impl Node {
 
     /// Renders the Node's parameters by interpolating Reclass references and flattening
     /// ValueLists.
-    fn render_parameters(&mut self, exports: &Mapping) -> Result<()> {
+    fn render_parameters(&mut self, exports: &Exports) -> Result<()> {
         let p = std::mem::take(&mut self.parameters);
         let mut f = Value::Mapping(p);
         f.render_with_self(exports)?;
@@ -308,7 +309,7 @@ impl Node {
         let p = std::mem::take(&mut self.exports);
         let mut f = Value::Mapping(p);
         // We pass an empty exports when rendering exports
-        f.render(&self.parameters, &Mapping::new())?;
+        f.render(&self.parameters, &Exports::default())?;
         match f {
             Value::Mapping(m) => {
                 self.exports = m;
@@ -324,7 +325,7 @@ impl Node {
     /// Load included classes (recursively), and merge parameters.
     ///
     /// Note that this method doesn't flatten overwritten parameters.
-    pub fn render(&mut self, r: &Reclass, exports: &Mapping) -> Result<()> {
+    pub fn render(&mut self, r: &Reclass, exports: &Exports) -> Result<()> {
         let res = self.merged(r)?;
         let _s = std::mem::replace(self, res);
         self.render_parameters(exports)?;
