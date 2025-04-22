@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use fancy_regex::Regex;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
@@ -7,8 +8,11 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use crate::fsutil::to_lexical_normal;
+use crate::list::{List, UniqueList};
+use crate::NodeInfoMeta;
 
 /// Flags to change reclass-rs behavior to be compaible with Python reclass
 #[pyclass(eq, eq_int)]
@@ -44,6 +48,124 @@ impl TryFrom<&str> for CompatFlag {
     }
 }
 
+#[derive(Clone, Debug)]
+enum Pattern {
+    Glob(glob::Pattern),
+    Regex(Regex),
+}
+
+#[derive(Debug, Clone)]
+struct ClassMapping {
+    pat: String,
+    classes: Vec<String>,
+    pattern: Pattern,
+}
+
+impl std::fmt::Display for ClassMapping {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.pat, self.classes.join(" "))
+    }
+}
+
+impl Default for ClassMapping {
+    fn default() -> Self {
+        Self {
+            pat: "*".to_owned(),
+            pattern: Pattern::Glob(glob::Pattern::new("*").unwrap()),
+            classes: Vec::new(),
+        }
+    }
+}
+
+fn parse_class_mapping(cmspec: &str) -> Result<(&str, Vec<&str>)> {
+    let mut parts = cmspec.split_whitespace();
+    let pat = parts
+        .next()
+        .ok_or(anyhow!("Expected '<Pattern> <classes>'"))?;
+    // unescape leading '*' for glob patterns. Leading '*' needs to be escaped to avoid YAML
+    // parsing issues unless strings are explicitly wrapped in quotes.
+    let pat = if pat.starts_with("\\*") {
+        pat.strip_prefix('\\').unwrap()
+    } else {
+        pat
+    };
+    let classes = parts.collect::<Vec<&str>>();
+    if classes.is_empty() {
+        return Err(anyhow!("No classes mapped for {pat}"));
+    }
+
+    Ok((pat, classes))
+}
+
+fn replace_regex_backrefs(s: &str) -> String {
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\\\\(\d+)").unwrap());
+    RE.replace_all(s, r"$${$1}").into_owned()
+}
+
+impl ClassMapping {
+    fn new(cmspec: &str) -> Result<Self> {
+        let (pat, classes) = parse_class_mapping(cmspec)?;
+        let pattern = if pat.starts_with('/') {
+            if pat
+                .chars()
+                .next_back()
+                .ok_or(anyhow!("Regex pattern is empty?"))?
+                != '/'
+            {
+                return Err(anyhow!("Expected regex pattern to be enclosed in `/`"));
+            }
+            // Strip enclosing '/' from pattern if pattern starts and ends with '/'
+            let p = &pat[1..pat.len() - 1];
+            if p.is_empty() {
+                return Err(anyhow!("empty regex patterns are not supported"));
+            }
+            Pattern::Regex(
+                Regex::new(p).map_err(|e| anyhow!("While compiling regex pattern {pat}: {e}"))?,
+            )
+        } else {
+            Pattern::Glob(
+                glob::Pattern::new(pat)
+                    .map_err(|e| anyhow!("While compiling glob pattern {pat}: {e}"))?,
+            )
+        };
+        Ok(Self {
+            pat: pat.to_owned(),
+            pattern,
+            classes: classes
+                .iter()
+                .map(|&s| replace_regex_backrefs(s))
+                .collect::<Vec<String>>(),
+        })
+    }
+
+    /// This function appends the classes defined for the current `ClassMapping` to the passed
+    /// `UniqueList` if the passed `node` str matches the glob or regex pattern.
+    ///
+    /// NOTE: this function expects that `node` is the node name or path depending on
+    /// `class_mappings_match_path` and won't modify the passed string.
+    fn append_if_matches(&self, node: &str, mapped_cls: &mut UniqueList) -> Result<()> {
+        match &self.pattern {
+            Pattern::Regex(re) => {
+                if let Some(cap) = re.captures(node)? {
+                    for c in &self.classes {
+                        let mut cls = String::new();
+                        cap.expand(c, &mut cls);
+                        mapped_cls.append_if_new(cls);
+                    }
+                }
+            }
+            Pattern::Glob(glob) => {
+                if glob.matches(node) {
+                    for c in &self.classes {
+                        mapped_cls.append_if_new(c.clone());
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[pyclass]
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -64,12 +186,30 @@ pub struct Config {
     /// Whether to treat nested files in `nodes_path` as node definitions
     #[pyo3(get)]
     pub compose_node_name: bool,
-    /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
+    /// List of regex patterns for which to ignore included classes which don't exist (yet)
+    ///
+    /// If no values are provided in this parameter, classes matching `.*` are ignored if
+    /// `ignore_class_notfound=true`.
     #[pyo3(get)]
     ignore_class_notfound_regexp: Vec<String>,
     ignore_class_notfound_regexset: RegexSet,
+    /// Python Reclass compatibility flags. See `CompatFlag` for available flags.
     #[pyo3(get)]
     pub compatflags: HashSet<CompatFlag>,
+    /// Whether to match the nodes' paths in the inventory when applying entries in
+    /// `class_mappings`.
+    ///
+    /// Defaults to `false`.
+    #[pyo3(get)]
+    pub class_mappings_match_path: bool,
+    /// Class mappings provides a mechanism to include one or more classes by default in all nodes
+    /// which match a glob or regex pattern.
+    #[pyo3(get)]
+    pub class_mappings: Vec<String>,
+    // NOTE(sg): we need to preserve the order of class mappings since the order in the config
+    // determines the order in which classes are included and class include order can be
+    // semantically relevant depending on the contents of each included class.
+    class_mappings_patterns: Vec<ClassMapping>,
 }
 
 impl Config {
@@ -123,6 +263,9 @@ impl Config {
             ignore_class_notfound_regexp: vec![".*".to_string()],
             ignore_class_notfound_regexset: RegexSet::new([".*"])?,
             compatflags: HashSet::new(),
+            class_mappings: Vec::new(),
+            class_mappings_patterns: Vec::new(),
+            class_mappings_match_path: false,
         })
     }
 
@@ -191,6 +334,24 @@ impl Config {
                     }
                 }
             }
+            "class_mappings_match_path" => {
+                self.class_mappings_match_path = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'class_mappings_match_path' to be a boolean"
+                ))?;
+            }
+            "class_mappings" => {
+                let cmlist = v.as_sequence().ok_or(anyhow!(
+                    "Expected value of config key 'class_mappings' to be a list"
+                ))?;
+                self.class_mappings = cmlist
+                    .iter()
+                    .map(|v| {
+                        v.as_str().map(ToOwned::to_owned).ok_or(anyhow!(
+                            "Expected entry of config key 'class_mappings' to be a string"
+                        ))
+                    })
+                    .collect::<Result<Vec<String>>>()?;
+            }
             _ => {
                 if verbose {
                     eprintln!(
@@ -224,6 +385,7 @@ impl Config {
             self.set_option(&cfg_path, kstr, v, verbose)?;
         }
         self.compile_ignore_class_notfound_patterns()?;
+        self.compile_class_mapping_patterns()?;
         Ok(())
     }
 
@@ -246,6 +408,29 @@ impl Config {
     fn compile_ignore_class_notfound_patterns(&mut self) -> Result<()> {
         self.ignore_class_notfound_regexset = RegexSet::new(&self.ignore_class_notfound_regexp)
             .map_err(|e| anyhow!("while compiling ignore_class_notfound regex patterns: {e}"))?;
+        Ok(())
+    }
+
+    /// This function returns a list of classes to include based on the passed NodeInfo.
+    ///
+    /// The function uses `NodeInfo::class_mappings_match_name()` to determine the node name for
+    /// matching class_mappings patterns. That function takes into account
+    /// `class_mappings_match_path`.
+    pub(crate) fn get_class_mappings(&self, node: &NodeInfoMeta) -> Result<UniqueList> {
+        let mut mapped_cls = UniqueList::new();
+        let matchname = node.class_mappings_match_name(self)?;
+        for cm in &self.class_mappings_patterns {
+            cm.append_if_matches(matchname, &mut mapped_cls)?;
+        }
+        Ok(mapped_cls)
+    }
+
+    fn compile_class_mapping_patterns(&mut self) -> Result<()> {
+        self.class_mappings_patterns = self
+            .class_mappings
+            .iter()
+            .map(|s| ClassMapping::new(&s[..]))
+            .collect::<Result<Vec<_>>>()?;
         Ok(())
     }
 
@@ -308,6 +493,11 @@ impl Config {
         cfg.compile_ignore_class_notfound_patterns().map_err(|e| {
             PyValueError::new_err(format!(
                 "Error while compiling class_notfound_regexp patterns: {e}"
+            ))
+        })?;
+        cfg.compile_class_mapping_patterns().map_err(|e| {
+            PyValueError::new_err(format!(
+                "Error while compiling class_mappings patterns: {e}"
             ))
         })?;
 
@@ -401,5 +591,63 @@ mod tests {
         assert!(cfg.ignore_class_notfound_regexset.is_match("thefooer"));
         assert!(cfg.ignore_class_notfound_regexset.is_match("baring"));
         assert!(!cfg.ignore_class_notfound_regexset.is_match("bazzer"));
+    }
+
+    #[test]
+    fn test_config_parse_class_mappings() {
+        let mut cfg =
+            Config::new(Some("./tests/inventory-class-mapping"), None, None, None).unwrap();
+        cfg.load_from_file("reclass-config.yml", false).unwrap();
+        assert!(cfg.class_mappings_match_path);
+        let expected_mappings = vec![
+            ("*", vec!["common"]),
+            ("*", vec!["defaults"]),
+            ("test/*", vec!["cluster.test"]),
+            ("production/*", vec!["cluster.production"]),
+            ("test.*", vec!["composed.test"]),
+            ("production.*", vec!["composed.production"]),
+            (
+                "/(test|production)\\/.*/",
+                vec!["regex.params", "regex.\\\\1"],
+            ),
+            ("/(test)\\/.*/", vec!["regex.rust-${1}"]),
+            ("/^test(?!.*-stg-test).*/", vec!["cluster.test"]),
+            ("/^test.*-stg-test.*/", vec!["cluster.staging"]),
+            ("/.*c$/", vec!["class1", "class2"]),
+        ];
+        let mappings = cfg
+            .class_mappings
+            .iter()
+            .map(|s| parse_class_mapping(&s[..]))
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        dbg!(&mappings);
+        assert_eq!(mappings, expected_mappings);
+    }
+
+    #[test]
+    fn test_replace_regex_backrefs_none_single() {
+        let classes = vec![
+            ("foo", "foo"),
+            ("foo.bar", "foo.bar"),
+            ("foo-\\\\1", "foo-${1}"),
+            ("foo-\\\\1234.bar", "foo-${1234}.bar"),
+            ("foo-\\\\12f", "foo-${12}f"),
+        ];
+        for (c, e) in &classes {
+            let r = replace_regex_backrefs(c);
+            assert_eq!(&r, e);
+        }
+    }
+    #[test]
+    fn test_replace_regex_backrefs_multiple() {
+        let classes = vec![
+            ("foo-\\\\1\\\\2", "foo-${1}${2}"),
+            ("foo-\\\\1234.\\\\1", "foo-${1234}.${1}"),
+        ];
+        for (c, e) in &classes {
+            let r = replace_regex_backrefs(c);
+            assert_eq!(&r, e);
+        }
     }
 }

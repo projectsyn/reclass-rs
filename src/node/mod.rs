@@ -48,13 +48,14 @@ impl Node {
         let ncontents = std::fs::read_to_string(invpath.canonicalize()?)?;
 
         let uri = format!("yaml_fs://{}", to_lexical_absolute(&invpath)?.display());
+        let npath = nodeinfo.path.with_extension("");
         // NOTE(sg): parts is only the name when compose-node-name isn't enabled
         let meta_parts = if r.config.compose_node_name {
-            nodeinfo.path.with_extension("")
+            npath.clone()
         } else {
             PathBuf::from(name)
         };
-        let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, "base");
+        let meta = NodeInfoMeta::new(name, name, &uri, meta_parts, npath, "base");
         Node::from_str(meta, None, &ncontents)
     }
 
@@ -262,13 +263,13 @@ impl Node {
 
             // render class so we pick up further classes included in it
             c.render_impl(r, seen, root)?;
-            // NOTE(sg): we don't need to merge here, since we've already mergeed into root as part
+            // NOTE(sg): we don't need to merge here, since we've already merged into root as part
             // of the recursive call to `render_impl()`
 
             seen.push(cls.to_string());
         }
 
-        // merge root into self, then update self with merged values
+        // merge self into root, then update self with merged values
         self.merge_into(root)
     }
 
@@ -295,10 +296,9 @@ impl Node {
     /// Note that this method doesn't flatten overwritten parameters.
     pub fn render(&mut self, r: &Reclass) -> Result<()> {
         let mut base = Node {
-            // NOTE(sg): We initialize a base node with our classes to start the class rendering
-            // process.  This roughly corresponds to Python reclass's
-            // `_get_class_mappings_entity()`.
-            classes: self.classes.clone(),
+            // NOTE(sg): Similar to Python reclass, we initialize the base node with any classes
+            // that are included via the `class_mappings` configuration parameter.
+            classes: r.config.get_class_mappings(&self.meta)?,
             ..Default::default()
         };
         // NOTE(sg): We merge the `_reclass_` meta parameter into the base node before starting
@@ -309,7 +309,10 @@ impl Node {
 
         let mut seen = vec![];
         let mut root = Node::default();
+        // First render base (i.e. mapped classes) into an empty Node, and update base with the
+        // result
         base.render_impl(r, &mut seen, &mut root)?;
+        // Then render ourselves into the rendered base and update ourselves with the result
         self.render_impl(r, &mut seen, &mut base)?;
         self.render_parameters()
     }
