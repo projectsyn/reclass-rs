@@ -7,6 +7,7 @@ use yaml_merge_keys::merge_keys_serde;
 
 use crate::Reclass;
 use crate::config::RenderOpts;
+use crate::exports::Exports;
 use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
@@ -248,7 +249,7 @@ impl Node {
                     clstoken
                         .render(
                             &root.parameters,
-                            &r.exports,
+                            &Exports::default(),
                             &mut state,
                             &r.config.get_render_opts(),
                         )?
@@ -295,7 +296,7 @@ impl Node {
 
     /// Renders the Node's parameters by interpolating Reclass references and flattening
     /// ValueLists.
-    fn render_parameters(&mut self, exports: &Mapping, opts: &RenderOpts) -> Result<()> {
+    fn render_parameters(&mut self, exports: &Exports, opts: &RenderOpts) -> Result<()> {
         let p = std::mem::take(&mut self.parameters);
         let mut f = Value::Mapping(p);
         f.render_with_self(exports, opts)?;
@@ -317,7 +318,7 @@ impl Node {
         let p = std::mem::take(&mut self.exports);
         let mut f = Value::Mapping(p);
         // We pass an empty exports when rendering exports
-        f.render(&self.parameters, &Mapping::new(), opts)?;
+        f.render(&self.parameters, &Exports::default(), opts)?;
         match f {
             Value::Mapping(m) => {
                 self.exports = m;
@@ -333,7 +334,7 @@ impl Node {
     /// Load included classes (recursively), and merge parameters.
     ///
     /// Note that this method doesn't flatten overwritten parameters.
-    pub fn render(&mut self, r: &Reclass, exports: &Mapping) -> Result<()> {
+    pub fn render(&mut self, r: &Reclass, exports: &Exports) -> Result<()> {
         let res = self.merged(r)?;
         let _s = std::mem::replace(self, res);
         self.render_parameters(exports, &r.config.get_render_opts())?;

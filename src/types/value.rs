@@ -8,6 +8,7 @@ use std::mem;
 
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
+use crate::Exports;
 use crate::config::RenderOpts;
 use crate::refs::{ResolveState, Token};
 
@@ -522,7 +523,7 @@ impl Value {
     pub(crate) fn interpolate(
         &self,
         root: &Mapping,
-        exports: &Mapping,
+        exports: &Exports,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Self> {
@@ -773,7 +774,7 @@ impl Value {
     /// The method first interpolates any Reclass references found in the Value by looking up the
     /// reference keys in `root`. After all references have been interpolated, the method flattens
     /// any remaining ValueLists and returns the final "flattened" value.
-    pub fn rendered(&self, root: &Mapping, exports: &Mapping, opts: &RenderOpts) -> Result<Self> {
+    pub fn rendered(&self, root: &Mapping, exports: &Exports, opts: &RenderOpts) -> Result<Self> {
         let mut state = ResolveState::default();
         let mut v = self
             .interpolate(root, exports, &mut state, opts)
@@ -785,7 +786,7 @@ impl Value {
     /// Renders the Value in-place.
     ///
     /// See [`Value::rendered()`] for details.
-    pub fn render(&mut self, root: &Mapping, exports: &Mapping, opts: &RenderOpts) -> Result<()> {
+    pub fn render(&mut self, root: &Mapping, exports: &Exports, opts: &RenderOpts) -> Result<()> {
         let _prev = std::mem::replace(self, self.rendered(root, exports, opts)?);
         Ok(())
     }
@@ -794,7 +795,7 @@ impl Value {
     /// Returns an error when called for a Value variant other than `Value::Mapping`.
     ///
     /// See [`Value::rendered()`] for details on how Reclass references are rendered.
-    pub fn render_with_self(&mut self, exports: &Mapping, opts: &RenderOpts) -> Result<()> {
+    pub fn render_with_self(&mut self, exports: &Exports, opts: &RenderOpts) -> Result<()> {
         let m = self.as_mapping().ok_or_else(|| {
             anyhow!(
                 "Can't render {} with itself as the parameter source",

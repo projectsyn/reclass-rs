@@ -5,7 +5,12 @@ use std::str::FromStr;
 impl Mapping {
     pub(super) fn render(&self, root: &Self) -> Result<Self> {
         let mut state = ResolveState::default();
-        self.interpolate(root, &Mapping::new(), &mut state, &RenderOpts::default())
+        self.interpolate(
+            root,
+            &Exports::default(),
+            &mut state,
+            &RenderOpts::default(),
+        )
     }
 }
 
@@ -14,7 +19,7 @@ fn sequence_literal(v: Vec<Value>) -> Value {
     Value::Sequence(v)
         .interpolate(
             &Mapping::new(),
-            &Mapping::new(),
+            &Exports::default(),
             &mut state,
             &RenderOpts::default(),
         )
@@ -517,7 +522,7 @@ fn test_merge_interpolate_loop() {
         .unwrap();
 
     let mut v = Value::from(p);
-    v.render_with_self(&Mapping::new(), &RenderOpts::default())
+    v.render_with_self(&Exports::default(), &RenderOpts::default())
         .unwrap();
 }
 
@@ -537,7 +542,7 @@ fn test_interpolate_sequence_loop() {
     let base = Mapping::from_str(base).unwrap();
 
     let mut v = Value::from(base);
-    v.render_with_self(&Mapping::new(), &RenderOpts::default())
+    v.render_with_self(&Exports::default(), &RenderOpts::default())
         .unwrap();
 }
 
@@ -560,7 +565,7 @@ fn test_interpolate_nested_mapping_loop() {
     let m = Mapping::from_str(m).unwrap();
 
     let mut v = Value::from(m);
-    v.render_with_self(&Mapping::new(), &RenderOpts::default())
+    v.render_with_self(&Exports::default(), &RenderOpts::default())
         .unwrap();
 }
 
@@ -580,6 +585,6 @@ fn test_interpolate_depth_exceeded() {
     });
     map.insert("baz".into(), refstr.into()).unwrap();
     let mut v = Value::from(map);
-    v.render_with_self(&Mapping::new(), &RenderOpts::default())
+    v.render_with_self(&Exports::default(), &RenderOpts::default())
         .unwrap();
 }

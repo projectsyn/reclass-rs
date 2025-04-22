@@ -10,6 +10,7 @@ use std::hash::{Hash, Hasher};
 
 use super::KeyPrefix;
 use super::value::Value;
+use crate::Exports;
 use crate::config::RenderOpts;
 use crate::refs::ResolveState;
 
@@ -463,7 +464,7 @@ impl Mapping {
     pub(crate) fn interpolate(
         &self,
         root: &Self,
-        exports: &Self,
+        exports: &Exports,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Self> {

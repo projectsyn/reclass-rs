@@ -1,6 +1,7 @@
 mod parser;
 
 use crate::{
+    Exports,
     config::RenderOpts,
     invqueries::Query,
     types::{Mapping, Value},
@@ -164,7 +165,7 @@ impl Token {
     pub fn render(
         &self,
         params: &Mapping,
-        exports: &Mapping,
+        exports: &Exports,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Value> {
@@ -186,7 +187,7 @@ impl Token {
     fn resolve(
         &self,
         params: &Mapping,
-        exports: &Mapping,
+        exports: &Exports,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Value> {
@@ -372,7 +373,7 @@ impl std::fmt::Display for Token {
 fn interpolate_token_slice(
     tokens: &[Token],
     params: &Mapping,
-    exports: &Mapping,
+    exports: &Exports,
     state: &mut ResolveState,
     opts: &RenderOpts,
 ) -> Result<String> {
@@ -397,7 +398,7 @@ fn interpolate_token_slice(
 fn interpolate_string_or_valuelist(
     v: &Value,
     params: &Mapping,
-    exports: &Mapping,
+    exports: &Exports,
     state: &mut ResolveState,
     opts: &RenderOpts,
 ) -> Result<Value> {
