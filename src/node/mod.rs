@@ -36,7 +36,7 @@ pub struct Node {
     parameters: Mapping,
     /// Reclass exports for this node converted into our own mapping type
     #[serde(skip)]
-    exports: Mapping,
+    pub(crate) exports: Mapping,
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,

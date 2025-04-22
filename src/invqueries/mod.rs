@@ -16,7 +16,7 @@ enum Expression {
 }
 
 impl Expression {
-    fn evaluate(&self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
+    fn evaluate(&self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
         match self {
             Self::Expr(o, rem) => {
                 let res = o.evaluate(exports, ignore_errors)?;
@@ -63,7 +63,7 @@ impl Test {
         }
     }
 
-    fn evaluate(&self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
+    fn evaluate(&self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
         match self {
             Self::Eq(a, b) => a.eval_eq(b, exports, ignore_errors),
             Self::Neq(a, b) => a.eval_neq(b, exports, ignore_errors),
@@ -79,7 +79,7 @@ enum Item {
 }
 
 impl Item {
-    fn value(&self, exports: &Exports, ignore_errors: bool) -> Result<Option<Value>> {
+    fn value(&self, exports: &Mapping, ignore_errors: bool) -> Result<Option<Value>> {
         match self {
             Self::Obj(k) => {
                 if let Some((ktype, kpath)) = k.split_once(":") {
@@ -91,7 +91,7 @@ impl Item {
                     dbg!(&exports);
                     match ktype {
                         "exports" => {
-                            let v = exports.exports.get(&k0.into());
+                            let v = exports.get(&k0.into());
                             if ignore_errors && v.is_none() {
                                 return Ok(None);
                             }
@@ -125,16 +125,18 @@ impl Item {
         }
     }
 
-    fn eval_eq(&self, other: &Self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
+    fn eval_eq(&self, other: &Self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
         // TODO(sg): figure out how to properly propagate missing values on `ignore_errors`
         // what's the semantics of ignore_errors, do we silently skip the output for failing
         // lookups?
         let sv = self.value(exports, ignore_errors)?;
         let ov = other.value(exports, ignore_errors)?;
+        dbg!(&sv);
+        dbg!(&ov);
         Ok(sv == ov)
     }
 
-    fn eval_neq(&self, other: &Self, exports: &Exports, ignore_errors: bool) -> Result<bool> {
+    fn eval_neq(&self, other: &Self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
         let sv = self.value(exports, ignore_errors)?;
         let ov = other.value(exports, ignore_errors)?;
         Ok(sv != ov)
@@ -168,14 +170,16 @@ impl Query {
         if let Some(var) = &self.var {
             let o = Item::Obj(var.clone());
             let mut r = Mapping::new();
-            if let Some(v) = o.value(exports, self.ignore_errors)? {
+            if let Some(v) = o.value(&exports.exports, self.ignore_errors)? {
+                let vm = v
+                    .as_mapping()
+                    .ok_or(anyhow!("Expected resolved export to be a mapping"))?;
                 if let Some(e) = self.expr.as_ref() {
-                    for (n, nv) in v
-                        .as_mapping()
-                        .ok_or(anyhow!("expected inv query result to be a mapping"))?
-                    {
-                        if e.evaluate(exports, self.ignore_errors)? {
-                            r.insert(n.clone(), nv.clone()).unwrap();
+                    for (n, n_exports) in &exports.node_exports {
+                        let nk: Value = n.clone().into();
+                        let nv = vm.get(&nk).ok_or(anyhow!("value for node {n} missing"))?;
+                        if e.evaluate(n_exports, self.ignore_errors)? {
+                            r.insert(n.clone().into(), nv.clone()).unwrap();
                         }
                     }
                 } else {
@@ -187,8 +191,8 @@ impl Query {
         } else {
             let mut r = vec![];
             if let Some(e) = self.expr.as_ref() {
-                for n in &exports.nodes {
-                    if e.evaluate(exports, self.ignore_errors)? {
+                for (n, n_exports) in &exports.node_exports {
+                    if e.evaluate(n_exports, self.ignore_errors)? {
                         r.push(n.clone().into());
                     }
                 }
