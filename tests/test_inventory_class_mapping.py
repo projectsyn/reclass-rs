@@ -28,6 +28,9 @@ def test_inventory_class_mappings(compose_node_name, class_mappings_match_path):
             "test.*           composed.test",
             "production.*     composed.production",
             "/(test|production)\\/.*/ regex.params regex.\\\\1",
+            "/^test(?!.*-stg-test).*/  cluster.test",
+            "/^test.*-stg-test.*/      cluster.staging",
+            "/.*c$/                    class1 class2",
         ],
         "class_mappings_match_path": False,
     }
