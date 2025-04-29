@@ -626,7 +626,7 @@ mod inventory_tests {
 
     #[test]
     fn test_inventory_inv_queries() {
-        let mut c =
+        let c =
             crate::Config::new(Some("./tests/inventory-inv-queries"), None, None, None).unwrap();
         let r = Reclass::new_from_config(c).unwrap();
         let inv = Inventory::render(&r).unwrap();

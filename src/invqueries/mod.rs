@@ -139,6 +139,8 @@ impl Item {
     fn eval_neq(&self, other: &Self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
         let sv = self.value(exports, ignore_errors)?;
         let ov = other.value(exports, ignore_errors)?;
+        dbg!(&sv);
+        dbg!(&ov);
         Ok(sv != ov)
     }
 }
@@ -148,7 +150,6 @@ pub(crate) struct Query {
     qstr: String,
     var: Option<String>,
     expr: Option<Expression>,
-    // TODO(sg): figure out what these really do and implement them correctly
     all_envs: bool,
     ignore_errors: bool,
 }
@@ -159,39 +160,47 @@ impl Query {
         parse_query(q).map_err(|e| anyhow!("Error while parsing inventory query: {}", e))
     }
 
-    // exports has structure
-    // key1:
-    //  node1: value1
-    //  node2: value1
-    // key2:
-    //  node1: value2
-    //  node2: value2
+    // TODO(sg): properly implement +IgnoreErrors which should skip nodes that produce an error
+    // when rendering the exports value. To do this right, we'll have to pass the unrendered
+    // `exports` to this function and render the requested values from here.
     pub(crate) fn resolve(&self, exports: &Exports) -> Result<Value> {
+        if self.all_envs {
+            eprintln!(
+                "Warning: reclass-rs doesn't support environments yet, `+AllEnvs` has no effect"
+            );
+        }
         if let Some(var) = &self.var {
             let o = Item::Obj(var.clone());
             let mut r = Mapping::new();
-            if let Some(v) = o.value(&exports.exports, self.ignore_errors)? {
-                let vm = v
-                    .as_mapping()
-                    .ok_or(anyhow!("Expected resolved export to be a mapping"))?;
+            for (n, n_exports) in &exports.exports {
+                let nv = o
+                    .value(n_exports, self.ignore_errors)
+                    .map_err(|e| anyhow!("while evaluating export value for {n}: {e}"))?;
+                eprintln!("Got value {nv:?} for export {} for node {n}", self.qstr);
                 if let Some(e) = self.expr.as_ref() {
-                    for (n, n_exports) in &exports.node_exports {
-                        let nk: Value = n.clone().into();
-                        let nv = vm.get(&nk).ok_or(anyhow!("value for node {n} missing"))?;
-                        if e.evaluate(n_exports, self.ignore_errors)? {
-                            r.insert(n.clone().into(), nv.clone()).unwrap();
+                    let ee = e
+                        .evaluate(n_exports, self.ignore_errors)
+                        .map_err(|e| anyhow!("while evaluating export expression for {n}: {e}"))?;
+                    eprintln!("evaluating expr {e:?} with {n_exports:?}: {ee}");
+                    if ee {
+                        if let Some(nv) = nv {
+                            r.insert(n.clone().into(), nv.clone())?;
                         }
                     }
                 } else {
-                    return Ok(v);
+                    if let Some(nv) = nv {
+                        r.insert(n.clone().into(), nv)?;
+                    } else {
+                        eprintln!("export {} not resolvable for node {n}, TODO...", self.qstr);
+                    }
                 }
-            };
+            }
 
             Ok(Value::Mapping(r))
         } else {
             let mut r = vec![];
             if let Some(e) = self.expr.as_ref() {
-                for (n, n_exports) in &exports.node_exports {
+                for (n, n_exports) in &exports.exports {
                     if e.evaluate(n_exports, self.ignore_errors)? {
                         r.push(n.clone().into());
                     }
@@ -212,19 +221,75 @@ mod invqueries_test {
     fn test_resolve_simple_1() {
         let qstr = " exports:foo ";
         let q = Query::parse(qstr).unwrap();
-        let mut m = Mapping::new();
+        let mut exports = Exports::default();
         let mut expected = Mapping::new();
         for n in ["n1", "n2", "n3"] {
-            m.insert(n.into(), "bar".into()).unwrap();
+            let mut m = Mapping::new();
+            m.insert("foo".into(), "bar".into()).unwrap();
+            exports.exports.insert(n.into(), m);
             expected
                 .insert(n.into(), Value::String("bar".to_owned()))
                 .unwrap();
         }
+        let v = q.resolve(&exports).unwrap();
+
+        assert_eq!(v, Value::Mapping(expected));
+    }
+
+    #[test]
+    fn test_resolve_simple_ignore_errors_1() {
+        let qstr = " +IgnoreErrors exports:n1 ";
+        let q = Query::parse(qstr).unwrap();
         let mut exports = Exports::default();
-        exports
-            .exports
-            .insert("foo".into(), Value::Mapping(m))
-            .unwrap();
+        let mut expected = Mapping::new();
+        for n in ["n1", "n2", "n3"] {
+            let mut m = Mapping::new();
+            m.insert(n.into(), Value::Literal("bar".to_owned()))
+                .unwrap();
+            exports.exports.insert(n.into(), m);
+            if n == "n1" {
+                expected
+                    .insert(n.into(), Value::Literal("bar".to_owned()))
+                    .unwrap();
+            }
+        }
+        let v = q.resolve(&exports).unwrap();
+
+        assert_eq!(v, Value::Mapping(expected));
+    }
+
+    #[test]
+    fn test_resolve_simple_errors_1() {
+        let qstr = " exports:n1 ";
+        let q = Query::parse(qstr).unwrap();
+        let mut exports = Exports::default();
+        for n in ["n1", "n2", "n3"] {
+            let mut m = Mapping::new();
+            m.insert(n.into(), Value::Literal("bar".to_owned()))
+                .unwrap();
+            exports.exports.insert(n.into(), m);
+        }
+        let v = q.resolve(&exports);
+        assert!(v.is_err());
+    }
+
+    #[test]
+    fn test_resolve_cond_1() {
+        let qstr = " exports:foo if exports:foo != n3 ";
+        let q = Query::parse(qstr).unwrap();
+        let mut exports = Exports::default();
+        let mut expected = Mapping::new();
+        for n in ["n1", "n2", "n3"] {
+            let mut m = Mapping::new();
+            m.insert("foo".into(), Value::Literal(n.to_owned()))
+                .unwrap();
+            exports.exports.insert(n.into(), m);
+            if n != "n3" {
+                expected
+                    .insert(n.into(), Value::Literal(n.to_owned()))
+                    .unwrap();
+            }
+        }
         let v = q.resolve(&exports).unwrap();
 
         assert_eq!(v, Value::Mapping(expected));

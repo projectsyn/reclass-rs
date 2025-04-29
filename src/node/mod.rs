@@ -36,13 +36,13 @@ pub struct Node {
     parameters: Mapping,
     /// Reclass exports for this node converted into our own mapping type
     #[serde(skip)]
-    pub(crate) exports: Mapping,
+    exports: Mapping,
     /// Location of this node relative to `classes_path`. `None` for nodes.
     #[serde(skip)]
     own_loc: Option<PathBuf>,
     /// Information about the node, empty (default value) for Node objects parsed from classes.
     #[serde(skip)]
-    meta: NodeInfoMeta,
+    pub(crate) meta: NodeInfoMeta,
 }
 
 impl Node {
@@ -357,14 +357,8 @@ impl Node {
         Ok(res)
     }
 
-    pub(crate) fn get_exports(&self) -> Result<Mapping> {
-        let mut res = Mapping::new();
-        for (k, v) in self.exports.as_map() {
-            let mut kmap = Mapping::new();
-            kmap.insert(Value::String(self.meta.name.clone()), v.clone())?;
-            res.insert(k.clone(), Value::Mapping(kmap))?;
-        }
-        Ok(res)
+    pub(crate) fn get_exports(&self) -> &Mapping {
+        &self.exports
     }
 }
 
