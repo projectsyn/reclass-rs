@@ -172,7 +172,7 @@ impl From<super::Node> for NodeInfo {
             applications: n.applications.into(),
             classes: n.classes.into(),
             parameters: n.parameters,
-            exports: n.exports.into(),
+            exports: n.exports,
         }
     }
 }

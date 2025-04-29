@@ -10,9 +10,11 @@ use crate::{
 
 mod parser;
 
+type AdditionalTest = (String, Test);
+
 #[derive(Debug)]
 enum Expression {
-    Expr(Test, Vec<(Operator, Test)>),
+    Expr(Test, Vec<AdditionalTest>),
 }
 
 impl Expression {
@@ -22,9 +24,9 @@ impl Expression {
                 let res = o.evaluate(exports, ignore_errors)?;
                 dbg!(&res);
                 for (op, operation) in rem {
-                    match op {
-                        Operator::And => res && operation.evaluate(exports, ignore_errors)?,
-                        Operator::Or => res || operation.evaluate(exports, ignore_errors)?,
+                    match &op[..] {
+                        "and" => res && operation.evaluate(exports, ignore_errors)?,
+                        "or" => res || operation.evaluate(exports, ignore_errors)?,
                         _ => unreachable!("unexpected test op"),
                     };
                 }
@@ -41,25 +43,17 @@ enum QueryOption {
 }
 
 #[derive(Debug)]
-enum Operator {
-    Eq,
-    Neq,
-    And,
-    Or,
-}
-
-#[derive(Debug)]
 enum Test {
     Eq(Item, Item),
     Neq(Item, Item),
 }
 
 impl Test {
-    fn make(op: Operator, lhs: Item, rhs: Item) -> Result<Self> {
+    fn make(op: &str, lhs: Item, rhs: Item) -> Result<Self> {
         match op {
-            Operator::Eq => Ok(Self::Eq(lhs, rhs)),
-            Operator::Neq => Ok(Self::Neq(lhs, rhs)),
-            _ => Err(anyhow!("Unexpected operator {op:?} in Test::make")),
+            "==" => Ok(Self::Eq(lhs, rhs)),
+            "!=" => Ok(Self::Neq(lhs, rhs)),
+            _ => Err(anyhow!("Unexpected operator {op} in Test::make")),
         }
     }
 
@@ -82,10 +76,10 @@ impl Item {
     fn value(&self, exports: &Mapping, ignore_errors: bool) -> Result<Option<Value>> {
         match self {
             Self::Obj(k) => {
-                if let Some((ktype, kpath)) = k.split_once(":") {
+                if let Some((ktype, kpath)) = k.split_once(':') {
                     dbg!(&ktype);
                     dbg!(&kpath);
-                    let mut kparts = kpath.split(":");
+                    let mut kparts = kpath.split(':');
                     let k0 = kparts.next().ok_or(anyhow!("expected at least one key"))?;
                     dbg!(&k0);
                     dbg!(&exports);
@@ -96,7 +90,7 @@ impl Item {
                                 return Ok(None);
                             }
                             let mut v = v.ok_or(anyhow!("{k} doesn't exist"))?;
-                            while let Some(k) = kparts.next() {
+                            for k in kparts {
                                 let n = v.get(&k.into());
                                 if ignore_errors && n.is_none() {
                                     return Ok(None);
@@ -112,10 +106,11 @@ impl Item {
                     }
                 } else {
                     let v = k.to_lowercase();
-                    // true or false literals
+                    // convert true or false literals into booleans; number literals are already
+                    // handled in the parser.
                     match &v[..] {
                         "true" => Ok(Some(Value::Bool(true))),
-                        "false" => Ok(Some(Value::Bool(true))),
+                        "false" => Ok(Some(Value::Bool(false))),
                         _ => Ok(Some(Value::Literal(v))),
                     }
                 }
@@ -187,12 +182,8 @@ impl Query {
                             r.insert(n.clone().into(), nv.clone())?;
                         }
                     }
-                } else {
-                    if let Some(nv) = nv {
-                        r.insert(n.clone().into(), nv)?;
-                    } else {
-                        eprintln!("export {} not resolvable for node {n}, TODO...", self.qstr);
-                    }
+                } else if let Some(nv) = nv {
+                    r.insert(n.clone().into(), nv)?;
                 }
             }
 

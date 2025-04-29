@@ -10,7 +10,7 @@ use nom::{
     IResult,
 };
 
-use super::{Expression, Item, Operator, Query, QueryOption, Test};
+use super::{AdditionalTest, Expression, Item, Query, QueryOption, Test};
 
 fn sign(input: &str) -> IResult<&str, &str> {
     tag("-")(input)
@@ -19,17 +19,15 @@ fn sign(input: &str) -> IResult<&str, &str> {
 fn integer(input: &str) -> IResult<&str, Item> {
     map(
         alt((
-            map_res(preceded(sign, digit1), |n| {
-                i64::from_str_radix(n, 10).map(|v| -v)
-            }),
-            map_res(digit1, |n| i64::from_str_radix(n, 10)),
+            map_res(preceded(sign, digit1), |n| n.parse::<i64>().map(|v| -v)),
+            map_res(digit1, |n: &str| n.parse::<i64>()),
         )),
-        |i| Item::Integer(i),
+        Item::Integer,
     )(input)
 }
 
 fn real(input: &str) -> IResult<&str, Item> {
-    map(double, |d| Item::Real(d))(input)
+    map(double, Item::Real)(input)
 }
 
 fn ignore_errors(input: &str) -> IResult<&str, QueryOption> {
@@ -40,20 +38,20 @@ fn all_envs(input: &str) -> IResult<&str, QueryOption> {
     map(tag_no_case("+AllEnvs"), |_| QueryOption::AllEnvs)(input)
 }
 
-fn eq(input: &str) -> IResult<&str, Operator> {
-    map(tag("=="), |_| Operator::Eq)(input)
+fn eq(input: &str) -> IResult<&str, &str> {
+    tag("==")(input)
 }
 
-fn neq(input: &str) -> IResult<&str, Operator> {
-    map(tag("!="), |_| Operator::Neq)(input)
+fn neq(input: &str) -> IResult<&str, &str> {
+    tag("!=")(input)
 }
 
-fn and(input: &str) -> IResult<&str, Operator> {
-    map(tag_no_case("AND"), |_| Operator::And)(input)
+fn and(input: &str) -> IResult<&str, &str> {
+    tag_no_case("AND")(input)
 }
 
-fn or(input: &str) -> IResult<&str, Operator> {
-    map(tag_no_case("OR"), |_| Operator::Or)(input)
+fn or(input: &str) -> IResult<&str, &str> {
+    tag_no_case("OR")(input)
 }
 
 fn whitespace(input: &str) -> IResult<&str, &str> {
@@ -67,12 +65,12 @@ fn options(input: &str) -> IResult<&str, Vec<QueryOption>> {
     )))(input)
 }
 
-fn operator_test(input: &str) -> IResult<&str, Operator> {
+fn operator_test(input: &str) -> IResult<&str, &str> {
     alt((eq, neq))(input)
 }
 
-fn operator_logical(input: &str) -> IResult<&str, Operator> {
-    alt((and, or))(input)
+fn operator_logical(input: &str) -> IResult<&str, String> {
+    map(alt((and, or)), str::to_lowercase)(input)
 }
 
 fn begin_if(input: &str) -> IResult<&str, &str> {
@@ -105,7 +103,7 @@ fn single_test(input: &str) -> IResult<&str, Test> {
     )(input)
 }
 
-fn additional_test(input: &str) -> IResult<&str, (Operator, Test)> {
+fn additional_test(input: &str) -> IResult<&str, AdditionalTest> {
     tuple((operator_logical, preceded(whitespace, single_test)))(input)
 }
 
@@ -148,14 +146,15 @@ fn expr_list_test(input: &str) -> IResult<&str, (Option<String>, Option<Expressi
     )(input)
 }
 
-fn line(input: &str) -> IResult<&str, (Vec<QueryOption>, (Option<String>, Option<Expression>))> {
+type ParsedLine = (Vec<QueryOption>, (Option<String>, Option<Expression>));
+fn line(input: &str) -> IResult<&str, ParsedLine> {
     tuple((options, alt((expr_test, expr_var, expr_list_test))))(input)
 }
 
 pub(super) fn parse_query(s: &str) -> Result<Query> {
     let (uncons, (opts, (var, expr))) =
         line(s).map_err(|e| anyhow!("While parsing inventory query: {e}"))?;
-    if uncons != "" {
+    if !uncons.is_empty() {
         return Err(anyhow!("Parsing inventory query didn't consume '{uncons}'"));
     }
 

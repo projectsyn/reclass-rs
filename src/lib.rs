@@ -333,7 +333,7 @@ impl Reclass {
         //TODO(sg): figure out if we can do partial exports when rendering a single node if there's
         //errors when rendering some nodes' exports.
         //NOTE(sg): this API isn't available in the same way in the Python reclass implementation
-        let exports = self.render_exports().unwrap_or(Exports::default());
+        let exports = self.render_exports().unwrap_or_default();
         self.render_node(nodename, &exports)
             .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))
     }
