@@ -167,7 +167,11 @@ impl Query {
         if let Some(var) = &self.var {
             let o = Item::Obj(var.clone());
             let mut r = Mapping::new();
-            for (n, n_exports) in &exports.exports {
+            for (n, node) in &exports.exports {
+                let m = node
+                    .merged(exports.reclass.unwrap())
+                    .map_err(|e| anyhow!("while rendering exports for {n}: {e}"))?;
+                let n_exports = m.get_exports();
                 let nv = o
                     .value(n_exports, self.ignore_errors)
                     .map_err(|e| anyhow!("while evaluating export value for {n}: {e}"))?;
@@ -191,8 +195,11 @@ impl Query {
         } else {
             let mut r = vec![];
             if let Some(e) = self.expr.as_ref() {
-                for (n, n_exports) in &exports.exports {
-                    if e.evaluate(n_exports, self.ignore_errors)? {
+                for (n, node) in &exports.exports {
+                    let m = node
+                        .merged(exports.reclass.unwrap())
+                        .map_err(|e| anyhow!("while rendering exports for {n}: {e}"))?;
+                    if e.evaluate(m.get_exports(), self.ignore_errors)? {
                         r.push(n.clone().into());
                     }
                 }
@@ -204,22 +211,52 @@ impl Query {
 
 #[cfg(test)]
 mod invqueries_test {
+    use std::path::PathBuf;
+
     use super::Query;
     use crate::exports::Exports;
+    use crate::node::Node;
     use crate::types::{Mapping, Value};
+    use crate::{NodeInfoMeta, Reclass};
+
+    fn make_node(name: &str, contents: &str) -> Node {
+        let mut npath = PathBuf::new();
+        npath.set_file_name(format!("{name}.yml"));
+        Node::from_str(
+            NodeInfoMeta::new(
+                name,
+                name,
+                &format!("tmp://{name}"),
+                npath.clone(),
+                npath,
+                "base",
+            ),
+            None,
+            contents,
+        )
+        .unwrap()
+    }
 
     #[test]
     fn test_resolve_simple_1() {
         let qstr = " exports:foo ";
         let q = Query::parse(qstr).unwrap();
         let mut exports = Exports::default();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        println!("{:?}", r.nodes);
+        exports.reclass = Some(&r);
         let mut expected = Mapping::new();
         for n in ["n1", "n2", "n3"] {
-            let mut m = Mapping::new();
-            m.insert("foo".into(), "bar".into()).unwrap();
-            exports.exports.insert(n.into(), m);
+            let node = make_node(
+                n,
+                r#"
+                exports:
+                  foo: bar
+            "#,
+            );
+            exports.exports.insert(n.into(), node);
             expected
-                .insert(n.into(), Value::String("bar".to_owned()))
+                .insert(n.into(), Value::Literal("bar".to_owned()))
                 .unwrap();
         }
         let v = q.resolve(&exports).unwrap();
@@ -232,12 +269,20 @@ mod invqueries_test {
         let qstr = " +IgnoreErrors exports:n1 ";
         let q = Query::parse(qstr).unwrap();
         let mut exports = Exports::default();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        exports.reclass = Some(&r);
         let mut expected = Mapping::new();
         for n in ["n1", "n2", "n3"] {
-            let mut m = Mapping::new();
-            m.insert(n.into(), Value::Literal("bar".to_owned()))
-                .unwrap();
-            exports.exports.insert(n.into(), m);
+            let node = make_node(
+                n,
+                &format!(
+                    r#"
+                exports:
+                  {n}: bar
+            "#
+                ),
+            );
+            exports.exports.insert(n.into(), node);
             if n == "n1" {
                 expected
                     .insert(n.into(), Value::Literal("bar".to_owned()))
@@ -254,11 +299,19 @@ mod invqueries_test {
         let qstr = " exports:n1 ";
         let q = Query::parse(qstr).unwrap();
         let mut exports = Exports::default();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        exports.reclass = Some(&r);
         for n in ["n1", "n2", "n3"] {
-            let mut m = Mapping::new();
-            m.insert(n.into(), Value::Literal("bar".to_owned()))
-                .unwrap();
-            exports.exports.insert(n.into(), m);
+            let node = make_node(
+                n,
+                &format!(
+                    r#"
+                exports:
+                  {n}: bar
+            "#
+                ),
+            );
+            exports.exports.insert(n.into(), node);
         }
         let v = q.resolve(&exports);
         assert!(v.is_err());
@@ -269,12 +322,20 @@ mod invqueries_test {
         let qstr = " exports:foo if exports:foo != n3 ";
         let q = Query::parse(qstr).unwrap();
         let mut exports = Exports::default();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        exports.reclass = Some(&r);
         let mut expected = Mapping::new();
         for n in ["n1", "n2", "n3"] {
-            let mut m = Mapping::new();
-            m.insert("foo".into(), Value::Literal(n.to_owned()))
-                .unwrap();
-            exports.exports.insert(n.into(), m);
+            let node = make_node(
+                n,
+                &format!(
+                    r#"
+                exports:
+                  foo: {n}
+            "#
+                ),
+            );
+            exports.exports.insert(n.into(), node);
             if n != "n3" {
                 expected
                     .insert(n.into(), Value::Literal(n.to_owned()))
