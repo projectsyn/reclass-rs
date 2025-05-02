@@ -5,7 +5,7 @@ parameters:
   nodes: $[ exports:node ]
 
   n2_nodes: $[ if exports:node == n2 ]
-  n2_data: $[ +IgnoreErrors exports:n2_data ]
+  n2_data: $[ exports:n2_data ]
 
 
 exports:
