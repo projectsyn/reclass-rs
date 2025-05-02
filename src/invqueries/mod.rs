@@ -168,17 +168,21 @@ impl Query {
             let o = Item::Obj(var.clone());
             let mut r = Mapping::new();
             for (n, node) in &exports.exports {
-                let m = node
-                    .merged(exports.reclass.unwrap())
-                    .map_err(|e| anyhow!("while rendering exports for {n}: {e}"))?;
-                let n_exports = m.get_exports();
+                let m = node.merged(exports.reclass.unwrap());
+                let n_exports = if let Ok(merged) = m.as_ref() {
+                    merged.get_exports()
+                } else if self.ignore_errors {
+                    &Mapping::new()
+                } else {
+                    return Err(m.err().unwrap());
+                };
                 let nv = o
-                    .value(n_exports, self.ignore_errors)
+                    .value(n_exports, true)
                     .map_err(|e| anyhow!("while evaluating export value for {n}: {e}"))?;
                 eprintln!("Got value {nv:?} for export {} for node {n}", self.qstr);
                 if let Some(e) = self.expr.as_ref() {
                     let ee = e
-                        .evaluate(n_exports, self.ignore_errors)
+                        .evaluate(n_exports, true)
                         .map_err(|e| anyhow!("while evaluating export expression for {n}: {e}"))?;
                     eprintln!("evaluating expr {e:?} with {n_exports:?}: {ee}");
                     if ee {
@@ -295,12 +299,13 @@ mod invqueries_test {
     }
 
     #[test]
-    fn test_resolve_simple_errors_1() {
+    fn test_resolve_missing_export_1() {
         let qstr = " exports:n1 ";
         let q = Query::parse(qstr).unwrap();
         let mut exports = Exports::default();
         let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
         exports.reclass = Some(&r);
+        let mut expected = Mapping::new();
         for n in ["n1", "n2", "n3"] {
             let node = make_node(
                 n,
@@ -312,9 +317,92 @@ mod invqueries_test {
                 ),
             );
             exports.exports.insert(n.into(), node);
+            if n == "n1" {
+                expected
+                    .insert(n.into(), Value::Literal("bar".to_owned()))
+                    .unwrap();
+            }
+        }
+        let v = q.resolve(&exports).unwrap();
+        assert_eq!(v, Value::Mapping(expected));
+    }
+
+    #[test]
+    fn test_resolve_errors_1() {
+        let qstr = " exports:n1 ";
+        let q = Query::parse(qstr).unwrap();
+        let mut exports = Exports::default();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        exports.reclass = Some(&r);
+        for n in ["n1", "n2", "n3"] {
+            let node = if n == "n3" {
+                make_node(
+                    n,
+                    &format!(
+                        r#"
+                classes:
+                - notexisting
+                exports:
+                  {n}: bar
+            "#
+                    ),
+                )
+            } else {
+                make_node(
+                    n,
+                    &format!(
+                        r#"
+                exports:
+                  {n}: bar
+            "#
+                    ),
+                )
+            };
+            exports.exports.insert(n.into(), node);
         }
         let v = q.resolve(&exports);
         assert!(v.is_err());
+    }
+
+    #[test]
+    fn test_resolve_ignore_errors_1() {
+        let qstr = " +IgnoreErrors exports:foo ";
+        let q = Query::parse(qstr).unwrap();
+        let mut exports = Exports::default();
+        let r = Reclass::new("./tests/inventory", "nodes", "classes", false).unwrap();
+        exports.reclass = Some(&r);
+        let mut expected = Mapping::new();
+        for n in ["n1", "n2", "n3"] {
+            let node = if n == "n3" {
+                make_node(
+                    n,
+                    &format!(
+                        r#"
+                classes:
+                - notexisting
+                exports:
+                  {n}: bar
+            "#
+                    ),
+                )
+            } else {
+                make_node(
+                    n,
+                    r#"
+                exports:
+                  foo: bar
+            "#,
+                )
+            };
+            exports.exports.insert(n.into(), node);
+            if n != "n3" {
+                expected
+                    .insert(n.into(), Value::Literal("bar".to_owned()))
+                    .unwrap();
+            }
+        }
+        let v = q.resolve(&exports).unwrap();
+        assert_eq!(v, Value::Mapping(expected));
     }
 
     #[test]
