@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use chrono::offset::FixedOffset;
 use chrono::offset::Local;
 use chrono::DateTime;
 use pyo3::prelude::*;
@@ -29,8 +30,11 @@ pub struct NodeInfoMeta {
     #[pyo3(get)]
     pub environment: String,
     #[pyo3(get)]
-    /// `chrono::DateTime<Local>` at which we started rendering the data for the node
-    render_time: DateTime<Local>,
+    /// `chrono::DateTime<FixedOffset>` at which we started rendering the data for the node
+    ///
+    /// When creating the value we convert a `DateTime<Local>` to a `DateTime<FixedOffset> since
+    /// PyO3 can't convert `DateTime<Local>` to a `PyDateTime` anymore.
+    render_time: DateTime<FixedOffset>,
 }
 
 impl Default for NodeInfoMeta {
@@ -55,7 +59,7 @@ impl NodeInfoMeta {
             name: name.into(),
             uri: uri.into(),
             environment: environment.into(),
-            render_time: Local::now(),
+            render_time: Local::now().into(),
         }
     }
 
