@@ -150,6 +150,10 @@ impl Token {
         matches!(self, Self::Literal(_))
     }
 
+    pub fn is_inv_query(&self) -> bool {
+        matches!(self, Self::InvQuery(_))
+    }
+
     /// Renders the token into an arbitrary Value or a string. Reference values are looked up in
     /// the Mapping provided through parameter `params`.
     ///
@@ -160,7 +164,7 @@ impl Token {
         exports: &Exports,
         state: &mut ResolveState,
     ) -> Result<Value> {
-        if self.is_ref() {
+        if self.is_ref() || self.is_inv_query() {
             // handle value refs (i.e. refs where the full value of the key is replaced)
             // We call `interpolate()` after `resolve()` to ensure that we fully interpolate all
             // references if the result of `resolve()` is a complex Value (Mapping or Sequence).
