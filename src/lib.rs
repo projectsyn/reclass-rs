@@ -264,7 +264,11 @@ impl Reclass {
 
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
     pub fn render_node(&self, nodename: &str, exports: &Exports) -> Result<NodeInfo> {
-        let mut n = Node::parse(self, nodename)?;
+        let mut n = if let Some(n) = exports.exports.get(nodename) {
+            n.clone()
+        } else {
+            Node::parse(self, nodename)?
+        };
         n.render(self, exports)?;
         Ok(NodeInfo::from(n))
     }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use rayon::prelude::*;
 
 use crate::node::Node;
 use crate::Reclass;
@@ -14,11 +15,19 @@ pub struct Exports<'a> {
 impl<'a> Exports<'a> {
     // TODO(sg): ensure that we do proper ref lookups when rendering exports
     pub(crate) fn new(r: &'a Reclass) -> Result<Self> {
+        let nodes: Vec<_> = r
+            .nodes
+            .par_iter()
+            .map(|(n, _)| -> Result<(String, Node)> {
+                let node = Node::parse(r, n)?;
+                assert_eq!(n, &node.meta.name);
+                Ok((n.clone(), node))
+            })
+            .collect();
         let mut exports = HashMap::new();
-        for n in r.nodes.keys() {
-            let node = Node::parse(r, n)?;
-            assert_eq!(n, &node.meta.name);
-            exports.insert(n.clone(), node);
+        for v in nodes {
+            let (name, node) = v?;
+            exports.insert(name, node);
         }
         Ok(Self {
             exports,
