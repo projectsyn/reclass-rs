@@ -47,12 +47,12 @@ Documentation on Reclass extensions introduced in the Kapicorp Reclass fork can 
 
 ## Setup local development environment for Python bindings
 
-1. Create a local virtualenv for running Python tests and install [maturin] and pytest
+1. Create a local virtualenv for running Python tests and install [maturin], pytest and the Kapitan reclass fork
 
     ```
     python -m venv .venv
     source .venv/bin/activate
-    pip install maturin pytest
+    pip install maturin pytest kapicorp-reclass
     ```
 
 2. Build the reclass-rs Python library and install it in the virtualenv
