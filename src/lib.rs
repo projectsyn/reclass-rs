@@ -7,6 +7,8 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
 
+include!(concat!(env!("OUT_DIR"), "/rustc_version.rs"));
+
 mod config;
 mod fsutil;
 mod inventory;
