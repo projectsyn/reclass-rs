@@ -35,7 +35,7 @@ yaml-merge-keys = { version = "0.8.1", features = ["serde_yaml"] }
 rustc_version = "0.4.1"
 
 [dev-dependencies]
-criterion = "0.6.0"
+criterion = "0.7.0"
 paste = "1.0.14"
 
 [features]
