@@ -18,7 +18,7 @@ bench = false
 [dependencies]
 anyhow = "1.0.82"
 chrono = "0.4.38"
-fancy-regex = "0.15.0"
+fancy-regex = "0.16.0"
 glob = "0.3.2"
 indexmap = "2.2.6"
 nom = "7.1.3"
