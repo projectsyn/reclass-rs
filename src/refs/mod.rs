@@ -47,8 +47,8 @@ impl ResolveState {
         let kstr = match key.raw_string() {
             Ok(s) => s,
             Err(_) => match key {
-                Value::String(s) => Ok(s.clone()),
-                Value::ValueList(_) => Err(anyhow!("Unable to render ValueList as key segment")),
+                Value::String(s, _) => Ok(s.clone()),
+                Value::ValueList(_, _) => Err(anyhow!("Unable to render ValueList as key segment")),
                 _ => unreachable!("raw_string() implemented for other Value variants"),
             }?,
         };
@@ -156,7 +156,10 @@ impl Token {
             // references if the result of `resolve()` is a complex Value (Mapping or Sequence).
             self.resolve(params, state)?.interpolate(params, state)
         } else {
-            Ok(Value::Literal(self.resolve(params, state)?.raw_string()?))
+            Ok(Value::Literal(
+                self.resolve(params, state)?.raw_string()?,
+                None,
+            ))
         }
     }
 
@@ -165,13 +168,13 @@ impl Token {
     fn resolve(&self, params: &Mapping, state: &mut ResolveState) -> Result<Value> {
         match self {
             // Literal tokens can be directly turned into `Value::Literal`
-            Self::Literal(s) => Ok(Value::Literal(s.to_string())),
+            Self::Literal(s) => Ok(Value::Literal(s.to_string(), None)),
             Self::Combined(tokens) => {
                 let res = interpolate_token_slice(tokens, params, state)?;
                 // The result of `interpolate_token_slice()` for a `Token::Combined()` can't result
                 // in more unresolved refs since we iterate over each segment until there's no
                 // Value::String() left, so we return a Value::Literal().
-                Ok(Value::Literal(res))
+                Ok(Value::Literal(res, None))
             }
             // For Ref tokens, we first resolve nested references in the Ref path by calling
             // `interpolate_token_slice()`. Then we split the resolved reference path into segments
@@ -232,21 +235,21 @@ impl Token {
                     match newv {
                         // trivial case: v is a Mapping, we can just lookup the next value based
                         // on `key`.
-                        Value::Mapping(_) => {
+                        Value::Mapping(_, _) => {
                             v = newv
                                 .get(&key.into())
                                 .ok_or_else(|| state.render_missing_key_error(&path, key))?;
                         }
                         // Sequence lookups aren't supported by Python Reclass. We may implement
                         // them in the future.
-                        Value::Sequence(_) => {
+                        Value::Sequence(_, _) => {
                             return Err(state.render_lookup_error(
                                 &path,
                                 key,
                                 "Sequence lookups aren't supported for Reclass references!",
                             ));
                         }
-                        Value::String(_) | Value::ValueList(_) => unreachable!(
+                        Value::String(_, _) | Value::ValueList(_, _) => unreachable!(
                             "We should have rendered Value::String and Value::ValueList into some other variant"
                         ),
                         // A lookup into any other Value variant is an error
@@ -336,11 +339,11 @@ fn interpolate_string_or_valuelist(
 ) -> Result<Value> {
     match v {
         // For Value::String, we can simply call `interpolate()` on the value.
-        Value::String(_) => v.interpolate(params, state),
+        Value::String(_, _) => v.interpolate(params, state),
         // For Value::ValueList, we interpolate each layer, and flatten the resulting layers into a
         // single Value.  We don't use `interpolate()` here, since we only want to flatten the
         // resulting ValueList here.
-        Value::ValueList(l) => {
+        Value::ValueList(l, _) => {
             let mut i = vec![];
             for v in l {
                 // When resolving references in ValueLists, we want to track state
@@ -355,7 +358,7 @@ fn interpolate_string_or_valuelist(
                 i.push(v);
             }
             // Finally we flatten the resulting ValueList into a single Value.
-            Value::ValueList(i).flattened(state)
+            Value::ValueList(i, None).flattened(state)
         }
         // Do nothing for other types
         _ => Ok(v.clone()),

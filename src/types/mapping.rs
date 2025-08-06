@@ -192,7 +192,7 @@ impl Mapping {
                 } else {
                     // If k isn't a ValueList yet, replace current value in map with an empty
                     // ValueList, and store the old value in `oldv`.
-                    self.map.insert(k.clone(), Value::ValueList(vec![]))
+                    self.map.insert(k.clone(), Value::ValueList(vec![], None))
                 };
 
                 // Get a mutable reference to the underlying Vec<Value> of the ValueList for `k`.
@@ -209,7 +209,7 @@ impl Mapping {
                 }
 
                 // Append value(s) to insert to our ValueList
-                if let Value::ValueList(l) = v {
+                if let Value::ValueList(l, _) = v {
                     elems.extend(l);
                 } else {
                     elems.push(v);
@@ -476,10 +476,10 @@ impl From<Mapping> for serde_json::Map<String, serde_json::Value> {
         for (k, v) in m.map {
             // JSON keys must be strings, we convert some Value variants to string here
             let k = match k {
-                Value::String(s) | Value::Literal(s) => s,
-                Value::Bool(b) => format!("{b}"),
-                Value::Number(n) => format!("{n}"),
-                Value::Null => "null".to_owned(),
+                Value::String(s, _) | Value::Literal(s, _) => s,
+                Value::Bool(b, _) => format!("{b}"),
+                Value::Number(n, _) => format!("{n}"),
+                Value::Null(_) => "null".to_owned(),
                 _ => panic!("Can't serialize {} as JSON key", v.variant()),
             };
             new.insert(k, serde_json::Value::from(v));
@@ -597,7 +597,7 @@ mod mapping_tests {
         m.insert_raw("a".into(), 1.into());
         m.insert_raw("b".into(), "foo".into());
         m.insert_raw("c".into(), 3.14.into());
-        m.insert_raw("d".into(), Value::Bool(true));
+        m.insert_raw("d".into(), Value::Bool(true, None));
         m
     }
 
@@ -631,7 +631,7 @@ mod mapping_tests {
         assert_eq!(items[0], (&"a".into(), &1.into()));
         assert_eq!(items[1], (&"b".into(), &"foo".into()));
         assert_eq!(items[2], (&"c".into(), &3.14.into()));
-        assert_eq!(items[3], (&"d".into(), &Value::Bool(true)));
+        assert_eq!(items[3], (&"d".into(), &Value::Bool(true, None)));
     }
 
     #[test]
@@ -778,7 +778,7 @@ mod mapping_tests {
                 (&"a".into(), &1.into()),
                 (&"b".into(), &"foo".into()),
                 (&"c".into(), &3.14.into()),
-                (&"d".into(), &Value::Bool(true)),
+                (&"d".into(), &Value::Bool(true, None)),
             ]
         );
     }
@@ -838,7 +838,7 @@ mod mapping_tests {
         assert!(m.const_keys.contains(&"foo".into()));
         assert_eq!(
             m.get(&"foo".into()),
-            Some(&Value::ValueList(vec!["foo".into(), "bar".into()]))
+            Some(&Value::ValueList(vec!["foo".into(), "bar".into()], None))
         );
 
         let v = m.insert("foo".into(), "baz".into());
@@ -851,7 +851,7 @@ mod mapping_tests {
         assert!(m.const_keys.contains(&"foo".into()));
         assert_eq!(
             m.get(&"foo".into()),
-            Some(&Value::ValueList(vec!["foo".into(), "bar".into()]))
+            Some(&Value::ValueList(vec!["foo".into(), "bar".into()], None))
         );
     }
 
@@ -882,7 +882,7 @@ mod mapping_tests {
         // duplicate values for single key are stored in valuelist
         assert_eq!(
             m.get(&"foo".into()),
-            Some(&Value::ValueList(vec!["foo".into(), "bar".into()]))
+            Some(&Value::ValueList(vec!["foo".into(), "bar".into()], None))
         );
     }
 
@@ -978,7 +978,7 @@ mod mapping_tests {
         let mut expected = Mapping::new();
         expected.insert_raw(
             "foo".into(),
-            Value::ValueList(vec!["foo".into(), "bar".into()]),
+            Value::ValueList(vec!["foo".into(), "bar".into()], None),
         );
         assert_eq!(base, expected);
     }
@@ -1005,17 +1005,23 @@ mod mapping_tests {
         let mut expected = Mapping::new();
         expected.insert_raw(
             "foo".into(),
-            Value::ValueList(vec![
-                Mapping::from_str("foo: foo").unwrap().into(),
-                Mapping::from_str("baz: baz").unwrap().into(),
-            ]),
+            Value::ValueList(
+                vec![
+                    Mapping::from_str("foo: foo").unwrap().into(),
+                    Mapping::from_str("baz: baz").unwrap().into(),
+                ],
+                None,
+            ),
         );
         expected.insert_raw(
             "bar".into(),
-            Value::ValueList(vec![
-                Mapping::from_str("bar: bar").unwrap().into(),
-                Mapping::from_str("qux: qux").unwrap().into(),
-            ]),
+            Value::ValueList(
+                vec![
+                    Mapping::from_str("bar: bar").unwrap().into(),
+                    Mapping::from_str("qux: qux").unwrap().into(),
+                ],
+                None,
+            ),
         );
 
         assert_eq!(base, expected);
@@ -1031,7 +1037,7 @@ mod mapping_tests {
         let mut expected = Mapping::new();
         expected.insert_raw(
             "foo".into(),
-            Value::ValueList(vec!["foo".into(), "bar".into()]),
+            Value::ValueList(vec!["foo".into(), "bar".into()], None),
         );
         expected.const_keys.insert("foo".into());
         assert_eq!(base, expected);

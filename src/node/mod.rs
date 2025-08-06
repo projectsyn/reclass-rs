@@ -277,10 +277,10 @@ impl Node {
     /// ValueLists.
     fn render_parameters(&mut self) -> Result<()> {
         let p = std::mem::take(&mut self.parameters);
-        let mut f = Value::Mapping(p);
+        let mut f = Value::Mapping(p, None);
         f.render_with_self()?;
         match f {
-            Value::Mapping(m) => {
+            Value::Mapping(m, _) => {
                 self.parameters = m;
                 Ok(())
             }

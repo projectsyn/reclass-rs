@@ -4,21 +4,21 @@ use std::str::FromStr;
 
 #[test]
 fn test_is_null() {
-    assert!(Value::Null.is_null());
-    assert!(!Value::Bool(true).is_null());
+    assert!(Value::Null(None).is_null());
+    assert!(!Value::Bool(true, None).is_null());
 }
 
 #[test]
 fn test_is_bool() {
-    assert!(!Value::Null.is_bool());
-    assert!(Value::Bool(true).is_bool());
+    assert!(!Value::Null(None).is_bool());
+    assert!(Value::Bool(true, None).is_bool());
 }
 
 #[test]
 fn test_as_bool() {
-    let b = Value::Bool(true);
+    let b = Value::Bool(true, None);
     assert_eq!(b.as_bool(), Some(true));
-    assert_eq!(Value::Null.as_bool(), None);
+    assert_eq!(Value::Null(None).as_bool(), None);
 }
 
 macro_rules! test_number {
@@ -27,17 +27,17 @@ macro_rules! test_number {
             paste! {
             #[test]
             fn [<test_is_ $ty>]() {
-                assert!(!Value::Null.[<is_ $ty>]());
+                assert!(!Value::Null(None).[<is_ $ty>]());
                 let n: $ty = $val;
-                let n = Value::Number(n.into());
+                let n = Value::Number(n.into(), None);
                 assert!(n.[<is_ $ty>]());
             }
 
             #[test]
             fn [<test_as_ $ty>]() {
-                assert_eq!(Value::Null.[<as_ $ty>](), None);
+                assert_eq!(Value::Null(None).[<as_ $ty>](), None);
                 let n: $ty = $val;
-                let n = Value::Number(n.into());
+                let n = Value::Number(n.into(), None);
                 assert_eq!(n.[<as_ $ty>](), Some($val));
             }
             }
@@ -48,7 +48,7 @@ test_number! { u64 5 i64 -3 f64 3.14 }
 
 #[test]
 fn test_is_string() {
-    assert!(!Value::Null.is_string());
+    assert!(!Value::Null(None).is_string());
     let s = Value::from("foo");
     assert!(s.is_string());
     assert!(!s.is_literal());
@@ -56,17 +56,17 @@ fn test_is_string() {
 
 #[test]
 fn test_is_literal() {
-    assert!(!Value::Null.is_literal());
-    let s = Value::Literal("foo".into());
+    assert!(!Value::Null(None).is_literal());
+    let s = Value::Literal("foo".into(), None);
     assert!(s.is_literal());
     assert!(!s.is_string());
 }
 
 #[test]
 fn test_as_str() {
-    assert_eq!(Value::Null.as_str(), None);
+    assert_eq!(Value::Null(None).as_str(), None);
 
-    let s = Value::Literal("foo".into());
+    let s = Value::Literal("foo".into(), None);
     assert_eq!(s.as_str(), Some("foo"));
 
     let s = Value::from("foo");
@@ -75,21 +75,21 @@ fn test_as_str() {
 
 #[test]
 fn test_is_mapping() {
-    assert!(!Value::Null.is_mapping());
+    assert!(!Value::Null(None).is_mapping());
     let m = Value::from(Mapping::new());
     assert!(m.is_mapping());
 }
 
 #[test]
 fn test_as_mapping() {
-    assert_eq!(Value::Null.as_mapping(), None);
+    assert_eq!(Value::Null(None).as_mapping(), None);
     let m = Value::from(Mapping::new());
     assert_eq!(m.as_mapping(), Some(&Mapping::new()));
 }
 
 #[test]
 fn test_as_mapping_mut() {
-    assert_eq!(Value::Null.as_mapping_mut(), None);
+    assert_eq!(Value::Null(None).as_mapping_mut(), None);
     let mut m = Value::from(Mapping::new());
     let map = m.as_mapping_mut().unwrap();
     map.insert("foo".into(), "bar".into()).unwrap();
@@ -101,21 +101,21 @@ fn test_as_mapping_mut() {
 
 #[test]
 fn test_is_sequence() {
-    assert!(!Value::Null.is_sequence());
+    assert!(!Value::Null(None).is_sequence());
     let s = Value::from(Sequence::new());
     assert!(s.is_sequence());
 }
 
 #[test]
 fn test_as_sequence() {
-    assert_eq!(Value::Null.as_sequence(), None);
+    assert_eq!(Value::Null(None).as_sequence(), None);
     let s = Value::from(Sequence::new());
     assert_eq!(s.as_sequence(), Some(&Sequence::new()));
 }
 
 #[test]
 fn test_as_sequence_mut() {
-    assert_eq!(Value::Null.as_sequence_mut(), None);
+    assert_eq!(Value::Null(None).as_sequence_mut(), None);
     let mut s = Value::from(Sequence::new());
     let seq = s.as_sequence_mut().unwrap();
     seq.push("foo".into());
@@ -127,22 +127,22 @@ fn test_as_sequence_mut() {
 
 #[test]
 fn test_is_value_list() {
-    assert!(!Value::Null.is_value_list());
-    let l = Value::ValueList(Sequence::new());
+    assert!(!Value::Null(None).is_value_list());
+    let l = Value::ValueList(Sequence::new(), None);
     assert!(l.is_value_list());
 }
 
 #[test]
 fn test_as_value_list() {
-    assert_eq!(Value::Null.as_value_list(), None);
-    let l = Value::ValueList(Sequence::new());
+    assert_eq!(Value::Null(None).as_value_list(), None);
+    let l = Value::ValueList(Sequence::new(), None);
     assert_eq!(l.as_value_list(), Some(&Sequence::new()));
 }
 
 #[test]
 fn test_as_value_list_mut() {
-    assert_eq!(Value::Null.as_value_list_mut(), None);
-    let mut l = Value::ValueList(Sequence::new());
+    assert_eq!(Value::Null(None).as_value_list_mut(), None);
+    let mut l = Value::ValueList(Sequence::new(), None);
     let seq = l.as_value_list_mut().unwrap();
     seq.push("foo".into());
     assert_eq!(
@@ -215,7 +215,7 @@ fn test_get_mut_sequence() {
 #[test]
 fn test_get_valuelist() {
     let s = Sequence::from_iter(vec!["a".into(), 2.into(), 3.14.into()]);
-    let l = Value::ValueList(s);
+    let l = Value::ValueList(s, None);
 
     // non-u64 and out of bounds accesses return None
     assert_eq!(l.get(&(-1).into()), None);
@@ -233,7 +233,7 @@ fn test_get_valuelist() {
 #[test]
 fn test_get_mut_valuelist() {
     let s = Sequence::from_iter(vec!["a".into(), 2.into(), 3.14.into()]);
-    let mut l = Value::ValueList(s);
+    let mut l = Value::ValueList(s, None);
 
     assert_eq!(l.get(&0.into()), Some(&"a".into()));
     let e0 = l.get_mut(&0.into()).unwrap().unwrap();
@@ -244,33 +244,42 @@ fn test_get_mut_valuelist() {
 
 #[test]
 fn test_get_other_types() {
-    assert_eq!(Value::Null.get(&"a".into()), None);
-    assert_eq!(Value::Bool(true).get(&"a".into()), None);
-    assert_eq!(Value::String("foo".into()).get(&"a".into()), None);
+    assert_eq!(Value::Null(None).get(&"a".into()), None);
+    assert_eq!(Value::Bool(true, None).get(&"a".into()), None);
+    assert_eq!(Value::String("foo".into(), None).get(&"a".into()), None);
     // Strings can't be treated as sequences
-    assert_eq!(Value::String("foo".into()).get(&0.into()), None);
-    assert_eq!(Value::Literal("foo".into()).get(&"a".into()), None);
-    assert_eq!(Value::Number(1.into()).get(&"a".into()), None);
+    assert_eq!(Value::String("foo".into(), None).get(&0.into()), None);
+    assert_eq!(Value::Literal("foo".into(), None).get(&"a".into()), None);
+    assert_eq!(Value::Number(1.into(), None).get(&"a".into()), None);
 }
 
 #[test]
 fn test_get_mut_other_types() {
-    assert_eq!(Value::Null.get_mut(&"a".into()).unwrap(), None);
-    assert_eq!(Value::Bool(true).get_mut(&"a".into()).unwrap(), None);
+    assert_eq!(Value::Null(None).get_mut(&"a".into()).unwrap(), None);
+    assert_eq!(Value::Bool(true, None).get_mut(&"a".into()).unwrap(), None);
     assert_eq!(
-        Value::String("foo".into()).get_mut(&"a".into()).unwrap(),
+        Value::String("foo".into(), None)
+            .get_mut(&"a".into())
+            .unwrap(),
         None
     );
     // Strings can't be treated as sequences
     assert_eq!(
-        Value::String("foo".into()).get_mut(&0.into()).unwrap(),
+        Value::String("foo".into(), None)
+            .get_mut(&0.into())
+            .unwrap(),
         None
     );
     assert_eq!(
-        Value::Literal("foo".into()).get_mut(&"a".into()).unwrap(),
+        Value::Literal("foo".into(), None)
+            .get_mut(&"a".into())
+            .unwrap(),
         None
     );
-    assert_eq!(Value::Number(1.into()).get_mut(&"a".into()).unwrap(), None);
+    assert_eq!(
+        Value::Number(1.into(), None).get_mut(&"a".into()).unwrap(),
+        None
+    );
 }
 
 #[test]
@@ -294,44 +303,44 @@ fn test_strip_prefix() {
 #[test]
 fn test_raw_string_literal() {
     assert_eq!(
-        Value::Literal("foo".into()).raw_string().unwrap(),
+        Value::Literal("foo".into(), None).raw_string().unwrap(),
         "foo".to_string()
     );
 }
 
 #[test]
 fn test_raw_string_null() {
-    assert_eq!(Value::Null.raw_string().unwrap(), "None".to_string());
+    assert_eq!(Value::Null(None).raw_string().unwrap(), "None".to_string());
 }
 
 #[test]
 fn test_raw_string_number() {
     assert_eq!(
-        Value::Number(5.into()).raw_string().unwrap(),
+        Value::Number(5.into(), None).raw_string().unwrap(),
         "5".to_string()
     );
     assert_eq!(
-        Value::Number((-1).into()).raw_string().unwrap(),
+        Value::Number((-1).into(), None).raw_string().unwrap(),
         "-1".to_string()
     );
     assert_eq!(
-        Value::Number(3.14.into()).raw_string().unwrap(),
+        Value::Number(3.14.into(), None).raw_string().unwrap(),
         "3.14".to_string()
     );
     assert_eq!(
-        Value::Number(serde_yaml::Number::from(f64::INFINITY))
+        Value::Number(serde_yaml::Number::from(f64::INFINITY), None)
             .raw_string()
             .unwrap(),
         ".inf".to_string()
     );
     assert_eq!(
-        Value::Number(serde_yaml::Number::from(f64::NEG_INFINITY))
+        Value::Number(serde_yaml::Number::from(f64::NEG_INFINITY), None)
             .raw_string()
             .unwrap(),
         "-.inf".to_string()
     );
     assert_eq!(
-        Value::Number(serde_yaml::Number::from(f64::NAN))
+        Value::Number(serde_yaml::Number::from(f64::NAN), None)
             .raw_string()
             .unwrap(),
         ".nan".to_string()
@@ -340,7 +349,10 @@ fn test_raw_string_number() {
 
 #[test]
 fn test_raw_string_mapping() {
-    let mut m = Value::Mapping(Mapping::from_str("{foo: foo, bar: true, baz: 1.23}").unwrap());
+    let mut m = Value::Mapping(
+        Mapping::from_str("{foo: foo, bar: true, baz: 1.23}").unwrap(),
+        None,
+    );
     // turn string values into literals by calling flatten
     m.render(&Mapping::new()).unwrap();
     let mstr = m.raw_string().unwrap();
@@ -350,7 +362,10 @@ fn test_raw_string_mapping() {
 
 #[test]
 fn test_raw_string_sequence() {
-    let v = Value::Sequence(vec!["foo".into(), 3.14.into(), Value::Bool(true)]);
+    let v = Value::Sequence(
+        vec!["foo".into(), 3.14.into(), Value::Bool(true, None)],
+        None,
+    );
     let vstr = v.raw_string().unwrap();
     assert_eq!(vstr, r#"["foo",3.14,true]"#);
 }
@@ -361,7 +376,7 @@ fn test_raw_string_mapping_nonstring_keys() {
     // serializing the Mapping as JSON.
     let m = Mapping::from_str("{true: foo, 3.14: true, ~: 1.23}").unwrap();
     // turn string values into literals by calling interpolate
-    let m = Value::Mapping(m).rendered(&Mapping::new()).unwrap();
+    let m = Value::Mapping(m, None).rendered(&Mapping::new()).unwrap();
     let mstr = m.raw_string().unwrap();
     // NOTE(sg): serde_json output is sorted by keys
     assert_eq!(mstr, r#"{"3.14":true,"null":1.23,"true":"foo"}"#);

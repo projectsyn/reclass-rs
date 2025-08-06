@@ -5,8 +5,10 @@ use std::str::FromStr;
 #[test]
 fn test_flattened_null() {
     assert_eq!(
-        Value::Null.flattened(&mut ResolveState::default()).unwrap(),
-        Value::Null
+        Value::Null(None)
+            .flattened(&mut ResolveState::default())
+            .unwrap(),
+        Value::Null(None)
     );
 }
 
@@ -16,7 +18,7 @@ macro_rules! test_flattened_simple {
             paste! {
             #[test]
             fn [<test_flattened_simple_ $variant:snake>]() {
-                let v = Value::$variant($val);
+                let v = Value::$variant($val, None);
                 let f = v.flattened(&mut ResolveState::default()).unwrap();
                 assert_eq!(f, $expected);
             }
@@ -26,11 +28,11 @@ macro_rules! test_flattened_simple {
 }
 
 test_flattened_simple! {
-    Bool,true,Value::Bool(true),
-    Number,5.into(),Value::Number(5.into()),
-    Literal,"foo".into(),Value::Literal("foo".into()),
-    Sequence,vec![Value::Bool(true), 3.14.into()],Value::Sequence(vec![Value::Bool(true), 3.14.into()]),
-    Mapping,Mapping::from_str("{foo: true, bar: 3.14}").unwrap(),Value::Mapping(Mapping::from_str("{foo: true, bar: 3.14}").unwrap())
+    Bool,true,Value::Bool(true, None),
+    Number,5.into(),Value::Number(5.into(), None),
+    Literal,"foo".into(),Value::Literal("foo".into(), None),
+    Sequence,vec![Value::Bool(true, None), 3.14.into()],Value::Sequence(vec![Value::Bool(true, None), 3.14.into()], None),
+    Mapping,Mapping::from_str("{foo: true, bar: 3.14}").unwrap(),Value::Mapping(Mapping::from_str("{foo: true, bar: 3.14}").unwrap(), None)
 }
 
 #[test]
@@ -38,7 +40,7 @@ test_flattened_simple! {
     expected = "In test: Can't flatten unparsed String, did you mean to call `rendered()`?"
 )]
 fn test_flattened_string() {
-    let v = Value::String("foo".into());
+    let v = Value::String("foo".into(), None);
     let mut st = ResolveState::default();
     st.push_mapping_key(&"test".into()).unwrap();
     v.flattened(&mut st).unwrap();
@@ -46,73 +48,91 @@ fn test_flattened_string() {
 
 #[test]
 fn test_flattened_nested_mapping() {
-    let m = Value::Mapping(Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}").unwrap());
+    let m = Value::Mapping(
+        Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}").unwrap(),
+        None,
+    );
     let f = m.rendered(&Mapping::new()).unwrap();
     let mut foo = Mapping::new();
-    foo.insert("foo".into(), Value::Literal("foo".to_string()))
+    foo.insert("foo".into(), Value::Literal("foo".to_string(), None))
         .unwrap();
-    foo.insert("bar".into(), Value::Literal("bar".to_string()))
+    foo.insert("bar".into(), Value::Literal("bar".to_string(), None))
         .unwrap();
     let mut expected = Mapping::new();
     expected.insert("foo".into(), foo.into()).unwrap();
     expected
-        .insert("bar".into(), Value::Literal("bar".to_string()))
+        .insert("bar".into(), Value::Literal("bar".to_string(), None))
         .unwrap();
-    let expected = Value::Mapping(expected);
+    let expected = Value::Mapping(expected, None);
     assert_eq!(f, expected);
 }
 
 #[test]
 fn test_flattened_simple_value_list() {
-    let v = Value::ValueList(vec![
-        Value::Literal("foo".into()),
-        Value::Literal("bar".into()),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Literal("foo".into(), None),
+            Value::Literal("bar".into(), None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_literal());
-    assert_eq!(f, Value::Literal("bar".into()));
+    assert_eq!(f, Value::Literal("bar".into(), None));
 }
 
 #[test]
 fn test_flattened_mixed_value_list() {
-    let v = Value::ValueList(vec![
-        Value::Number(3.14.into()),
-        Value::Null,
-        Value::Literal("bar".into()),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Number(3.14.into(), None),
+            Value::Null(None),
+            Value::Literal("bar".into(), None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_literal());
-    assert_eq!(f, Value::Literal("bar".into()));
+    assert_eq!(f, Value::Literal("bar".into(), None));
 }
 
 #[test]
 fn test_flattened_sequence_value_list() {
-    let v = Value::ValueList(vec![
-        Value::Sequence(vec!["foo".into(), "bar".into()]),
-        Value::Sequence(vec!["baz".into(), "qux".into()]),
-        Value::Sequence(vec!["foo".into()]),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Sequence(vec!["foo".into(), "bar".into()], None),
+            Value::Sequence(vec!["baz".into(), "qux".into()], None),
+            Value::Sequence(vec!["foo".into()], None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert_eq!(
         f,
-        Value::Sequence(vec![
-            "foo".into(),
-            "bar".into(),
-            "baz".into(),
-            "qux".into(),
-            "foo".into()
-        ])
+        Value::Sequence(
+            vec![
+                "foo".into(),
+                "bar".into(),
+                "baz".into(),
+                "qux".into(),
+                "foo".into()
+            ],
+            None
+        )
     );
 }
 
 #[test]
 fn test_flattened_mapping_value_list() {
-    let v = Value::ValueList(vec![
-        Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}")
-            .unwrap()
-            .into(),
-        Mapping::from_str("{baz: baz, qux: qux}").unwrap().into(),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}")
+                .unwrap()
+                .into(),
+            Mapping::from_str("{baz: baz, qux: qux}").unwrap().into(),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_mapping());
 
@@ -124,64 +144,82 @@ fn test_flattened_mapping_value_list() {
 
 #[test]
 fn test_flattened_null_over_mapping() {
-    let v = Value::ValueList(vec![
-        Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}")
-            .unwrap()
-            .into(),
-        Value::Null,
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}")
+                .unwrap()
+                .into(),
+            Value::Null(None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_null());
-    assert_eq!(f, Value::Null);
+    assert_eq!(f, Value::Null(None));
 }
 
 #[test]
 fn test_flattened_null_over_sequence() {
-    let v = Value::ValueList(vec![
-        Value::Sequence(vec!["foo".into(), "bar".into()]),
-        Value::Null,
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Sequence(vec!["foo".into(), "bar".into()], None),
+            Value::Null(None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default()).unwrap();
     assert!(f.is_null());
-    assert_eq!(f, Value::Null);
+    assert_eq!(f, Value::Null(None));
 }
 
 #[test]
 fn test_flattened_map_over_sequence_error() {
-    let v = Value::ValueList(vec![
-        Value::Sequence(vec!["foo".into(), "bar".into()]),
-        Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Sequence(vec!["foo".into(), "bar".into()], None),
+            Value::Mapping(Mapping::from_str("foo: foo").unwrap(), None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 
 #[test]
 fn test_flattened_map_over_simple_value_error() {
-    let v = Value::ValueList(vec![
-        Value::Bool(true),
-        Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Bool(true, None),
+            Value::Mapping(Mapping::from_str("foo: foo").unwrap(), None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 
 #[test]
 fn test_flattened_sequence_over_map_error() {
-    let v = Value::ValueList(vec![
-        Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
-        Value::Sequence(vec!["foo".into(), "bar".into()]),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Mapping(Mapping::from_str("foo: foo").unwrap(), None),
+            Value::Sequence(vec!["foo".into(), "bar".into()], None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
 
 #[test]
 fn test_flattened_sequence_over_simple_value_error() {
-    let v = Value::ValueList(vec![
-        Value::Bool(true),
-        Value::Sequence(vec!["foo".into(), "bar".into()]),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Value::Bool(true, None),
+            Value::Sequence(vec!["foo".into(), "bar".into()], None),
+        ],
+        None,
+    );
     let f = v.flattened(&mut ResolveState::default());
     assert!(f.is_err());
 }
@@ -190,28 +228,31 @@ fn test_flattened_sequence_over_simple_value_error() {
 fn test_flattened_nested_mapping_value_list() {
     // preprocess the valuelist entries by calling render() on each entry to ensure we've
     // transformed all `Value::String()` to `Value::Literal()`.
-    let v = Value::ValueList(vec![
-        Mapping::from_str("foo: {foo: {foo: foo}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("foo: {foo: {foo: bar}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("foo: {foo: {bar: bar}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("foo: {bar: {bar: bar}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Mapping::from_str("foo: {foo: {foo: foo}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("foo: {foo: {foo: bar}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("foo: {foo: {bar: bar}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("foo: {bar: {bar: bar}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+        ],
+        None,
+    );
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
     let f = v.rendered(&Mapping::new()).unwrap();
@@ -226,33 +267,36 @@ fn test_flattened_nested_mapping_value_list() {
 fn test_flattened_nested_mapping_value_list_2() {
     // preprocess the valuelist entries by calling render() on each entry to ensure we've
     // transformed all `Value::String()` to `Value::Literal()`.
-    let v = Value::ValueList(vec![
-        Mapping::from_str("qux: {foo: {foo: {foo: foo}}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("qux: {foo: {foo: {foo: bar}}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("qux: {foo: {foo: {bar: bar}}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("qux: {foo: {bar: {bar: bar}}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-        Mapping::from_str("qux: {bar: {bar: {bar: bar}}}")
-            .unwrap()
-            .render(&Mapping::new())
-            .unwrap()
-            .into(),
-    ]);
+    let v = Value::ValueList(
+        vec![
+            Mapping::from_str("qux: {foo: {foo: {foo: foo}}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("qux: {foo: {foo: {foo: bar}}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("qux: {foo: {foo: {bar: bar}}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("qux: {foo: {bar: {bar: bar}}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+            Mapping::from_str("qux: {bar: {bar: {bar: bar}}}")
+                .unwrap()
+                .render(&Mapping::new())
+                .unwrap()
+                .into(),
+        ],
+        None,
+    );
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
     let f = v.rendered(&Mapping::new()).unwrap();
@@ -279,7 +323,7 @@ fn test_flattened_nested_mapping_value_list_3() {
 
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
-    let f = Value::Mapping(dbg!(base))
+    let f = Value::Mapping(dbg!(base), None)
         .rendered(&Mapping::new())
         .unwrap();
     assert!(f.is_mapping());
@@ -306,7 +350,7 @@ fn test_flatten_value_list() {
     base.merge(&m3).unwrap();
     base.merge(&m4).unwrap();
 
-    let mut v = Value::Mapping(base);
+    let mut v = Value::Mapping(base, None);
     v.render(&Mapping::new()).unwrap();
     assert!(v.is_mapping());
 

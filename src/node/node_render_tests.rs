@@ -18,7 +18,7 @@ fn expected_params(nodename: &str, yaml: &str) -> Mapping {
 
     let mut expected = Mapping::from_str(yaml).unwrap();
     expected.merge(&reclass).unwrap();
-    let mut expected = Value::Mapping(expected);
+    let mut expected = Value::Mapping(expected, None);
     expected.render(&Mapping::new()).unwrap();
     expected.as_mapping().unwrap().clone()
 }

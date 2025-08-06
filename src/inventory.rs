@@ -197,11 +197,11 @@ mod inventory_tests {
 
     use crate::types::Value;
     fn literal(v: &str) -> Value {
-        Value::Literal(v.to_string())
+        Value::Literal(v.to_string(), None)
     }
 
     fn sequence(i: &[&str]) -> Value {
-        Value::Sequence(i.iter().map(|s| literal(s)).collect::<Vec<Value>>())
+        Value::Sequence(i.iter().map(|s| literal(s)).collect::<Vec<Value>>(), None)
     }
 
     fn check_compose_node_name_shared(inv: &Inventory, invabsdir: &str) {

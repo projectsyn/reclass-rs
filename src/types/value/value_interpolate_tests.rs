@@ -11,26 +11,29 @@ impl Mapping {
 
 fn sequence_literal(v: Vec<Value>) -> Value {
     let mut state = ResolveState::default();
-    Value::Sequence(v)
+    Value::Sequence(v, None)
         .interpolate(&Mapping::new(), &mut state)
         .unwrap()
 }
 
 fn mapping_literal(m: Mapping) -> Value {
-    Value::Mapping(m.render(&Mapping::new()).unwrap())
+    Value::Mapping(m.render(&Mapping::new()).unwrap(), None)
 }
 
 #[test]
 fn test_extend_sequence() {
     let mut p = Mapping::new();
     p.insert(
-        Value::String("l".into()),
-        Value::Sequence(vec!["a".into(), "b".into(), "c".into()]),
+        Value::String("l".into(), None),
+        Value::Sequence(vec!["a".into(), "b".into(), "c".into()], None),
     )
     .unwrap();
     let mut o = Mapping::new();
-    o.insert(Value::String("l".into()), Value::Sequence(vec!["d".into()]))
-        .unwrap();
+    o.insert(
+        Value::String("l".into(), None),
+        Value::Sequence(vec!["d".into()], None),
+    )
+    .unwrap();
 
     p.merge(&o).unwrap();
     p = p.render(&p).unwrap();
@@ -45,14 +48,14 @@ fn test_extend_sequence() {
 fn test_override_sequence() {
     let mut p = Mapping::new();
     p.insert(
-        Value::String("l".into()),
-        Value::Sequence(vec!["a".into(), "b".into(), "c".into()]),
+        Value::String("l".into(), None),
+        Value::Sequence(vec!["a".into(), "b".into(), "c".into()], None),
     )
     .unwrap();
     let mut o = Mapping::new();
     o.insert(
-        Value::String("~l".into()),
-        Value::Sequence(vec!["d".into()]),
+        Value::String("~l".into(), None),
+        Value::Sequence(vec!["d".into()], None),
     )
     .unwrap();
 
@@ -69,50 +72,48 @@ fn test_override_sequence() {
 fn test_extend_mapping() {
     let mut p = Mapping::new();
     let mut m = Mapping::new();
-    m.insert(Value::String("a".into()), Value::Bool(true))
+    m.insert(Value::String("a".into(), None), Value::Bool(true, None))
         .unwrap();
-    p.insert(Value::String("m".into()), Value::Mapping(m))
+    p.insert(Value::String("m".into(), None), Value::Mapping(m, None))
         .unwrap();
 
     let mut o = Mapping::new();
     let mut n = Mapping::new();
-    n.insert(Value::String("b".into()), Value::Bool(true))
+    n.insert(Value::String("b".into(), None), Value::Bool(true, None))
         .unwrap();
-    o.insert(Value::String("m".into()), Value::Mapping(n))
+    o.insert(Value::String("m".into(), None), Value::Mapping(n, None))
         .unwrap();
 
     let mut r = Mapping::new();
-    r.insert(Value::String("a".into()), Value::Bool(true))
+    r.insert(Value::String("a".into(), None), Value::Bool(true, None))
         .unwrap();
-    r.insert(Value::String("b".into()), Value::Bool(true))
+    r.insert(Value::String("b".into(), None), Value::Bool(true, None))
         .unwrap();
 
     p.merge(&o).unwrap();
     p = p.render(&p).unwrap();
 
-    assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(r));
+    assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(r, None));
 }
 
 #[test]
 fn test_override_mapping() {
     let mut p = Mapping::new();
     let mut m = Mapping::new();
-    m.insert(Value::String("a".into()), Value::Bool(true))
+    m.insert(Value::String("a".into(), None), Value::Bool(true, None))
         .unwrap();
-    p.insert(Value::String("m".into()), Value::Mapping(m))
+    p.insert(Value::String("m".into(), None), Value::Mapping(m, None))
         .unwrap();
 
     let mut o = Mapping::new();
     let mut n = Mapping::new();
-    n.insert(Value::String("b".into()), Value::Bool(true))
-        .unwrap();
-    o.insert(Value::String("~m".into()), Value::Mapping(n.clone()))
+    n.insert(Value::String("b".into(), None), Value::Bool(true, None))
         .unwrap();
 
     p.merge(&o).unwrap();
     p = p.render(&p).unwrap();
 
-    assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(n));
+    assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(n, None));
 }
 
 #[test]
@@ -121,14 +122,20 @@ fn test_constant_param_overwrite_panics() {
     let mut p = Mapping::new();
 
     let mut n = Mapping::new();
-    n.insert(Value::String("=c".into()), Value::String("p".into()))
-        .unwrap();
+    n.insert(
+        Value::String("=c".into(), None),
+        Value::String("p".into(), None),
+    )
+    .unwrap();
 
     p.merge(&n).unwrap();
 
     let mut o = Mapping::new();
-    o.insert(Value::String("c".into()), Value::String("o".into()))
-        .unwrap();
+    o.insert(
+        Value::String("c".into(), None),
+        Value::String("o".into(), None),
+    )
+    .unwrap();
 
     p.merge(&o).unwrap();
 }
@@ -137,50 +144,59 @@ fn test_constant_param_overwrite_panics() {
 fn test_embedded_ref() {
     let mut p = Mapping::new();
     let mut m = Mapping::new();
-    m.insert(Value::String("foo".into()), Value::String("foo".into()))
-        .unwrap();
-    m.insert(Value::String("bar".into()), Value::String("bar".into()))
-        .unwrap();
     m.insert(
-        Value::String("foobar1".into()),
-        Value::String("${foo}bar".into()),
+        Value::String("foo".into(), None),
+        Value::String("foo".into(), None),
     )
     .unwrap();
     m.insert(
-        Value::String("foobar2".into()),
-        Value::String("foo${bar}".into()),
+        Value::String("bar".into(), None),
+        Value::String("bar".into(), None),
     )
     .unwrap();
     m.insert(
-        Value::String("foobar3".into()),
-        Value::String("${foo}${bar}".into()),
+        Value::String("foobar1".into(), None),
+        Value::String("${foo}bar".into(), None),
     )
     .unwrap();
     m.insert(
-        Value::String("baz".into()),
-        Value::String("${foo}-${bar}-baz".into()),
+        Value::String("foobar2".into(), None),
+        Value::String("foo${bar}".into(), None),
+    )
+    .unwrap();
+    m.insert(
+        Value::String("foobar3".into(), None),
+        Value::String("${foo}${bar}".into(), None),
+    )
+    .unwrap();
+    m.insert(
+        Value::String("baz".into(), None),
+        Value::String("${foo}-${bar}-baz".into(), None),
     )
     .unwrap();
 
     p.merge(&m).unwrap();
     p = p.render(&p).unwrap();
 
-    assert_eq!(p.get(&"foo".into()).unwrap(), &Value::Literal("foo".into()));
+    assert_eq!(
+        p.get(&"foo".into()).unwrap(),
+        &Value::Literal("foo".into(), None)
+    );
     assert_eq!(
         p.get(&"foobar1".into()).unwrap(),
-        &Value::Literal("foobar".into())
+        &Value::Literal("foobar".into(), None)
     );
     assert_eq!(
         p.get(&"foobar2".into()).unwrap(),
-        &Value::Literal("foobar".into())
+        &Value::Literal("foobar".into(), None)
     );
     assert_eq!(
         p.get(&"foobar3".into()).unwrap(),
-        &Value::Literal("foobar".into())
+        &Value::Literal("foobar".into(), None)
     );
     assert_eq!(
         p.get(&"baz".into()).unwrap(),
-        &Value::Literal("foo-bar-baz".into())
+        &Value::Literal("foo-bar-baz".into(), None)
     );
 }
 
@@ -188,21 +204,33 @@ fn test_embedded_ref() {
 fn test_ref_in_sequence() {
     let mut p = Mapping::new();
     let mut m = Mapping::new();
-    m.insert(Value::String("foo".into()), Value::String("foo".into()))
-        .unwrap();
-    m.insert(Value::String("bar".into()), Value::String("bar".into()))
-        .unwrap();
     m.insert(
-        Value::String("list".into()),
-        Value::Sequence(vec!["${foo}".into(), "${bar}".into()]),
+        Value::String("foo".into(), None),
+        Value::String("foo".into(), None),
+    )
+    .unwrap();
+    m.insert(
+        Value::String("bar".into(), None),
+        Value::String("bar".into(), None),
+    )
+    .unwrap();
+    m.insert(
+        Value::String("list".into(), None),
+        Value::Sequence(vec!["${foo}".into(), "${bar}".into()], None),
     )
     .unwrap();
 
     p.merge(&m).unwrap();
     p = p.render(&p).unwrap();
 
-    assert_eq!(p.get(&"foo".into()).unwrap(), &Value::Literal("foo".into()));
-    assert_eq!(p.get(&"bar".into()).unwrap(), &Value::Literal("bar".into()));
+    assert_eq!(
+        p.get(&"foo".into()).unwrap(),
+        &Value::Literal("foo".into(), None)
+    );
+    assert_eq!(
+        p.get(&"bar".into()).unwrap(),
+        &Value::Literal("bar".into(), None)
+    );
     assert_eq!(
         p.get(&"list".into()).unwrap(),
         &sequence_literal(vec!["foo".into(), "bar".into()])
@@ -215,17 +243,20 @@ fn test_nested_ref() {
     let mut m = Mapping::new();
     let mut mm = Mapping::new();
     mm.insert(
-        Value::String("bar".into()),
-        Value::String("nested-bar".into()),
+        Value::String("bar".into(), None),
+        Value::String("nested-bar".into(), None),
     )
     .unwrap();
-    m.insert(Value::String("foo".into()), Value::Mapping(mm))
-        .unwrap();
-    m.insert(Value::String("bar".into()), Value::String("bar".into()))
+    m.insert(Value::String("foo".into(), None), Value::Mapping(mm, None))
         .unwrap();
     m.insert(
-        Value::String("ref".into()),
-        Value::String("${foo:${bar}}".into()),
+        Value::String("bar".into(), None),
+        Value::String("bar".into(), None),
+    )
+    .unwrap();
+    m.insert(
+        Value::String("ref".into(), None),
+        Value::String("${foo:${bar}}".into(), None),
     )
     .unwrap();
 
@@ -234,7 +265,7 @@ fn test_nested_ref() {
 
     assert_eq!(
         p.get(&"ref".into()).unwrap(),
-        &Value::Literal("nested-bar".into())
+        &Value::Literal("nested-bar".into(), None)
     );
 }
 
@@ -410,7 +441,7 @@ fn test_merge_interpolate_embedded_nested_ref() {
         .unwrap()
         .get(&"baz".into())
         .unwrap();
-    assert_eq!(val, &Value::Literal("baz-foo-1.22".into()));
+    assert_eq!(val, &Value::Literal("baz-foo-1.22".into(), None));
 }
 
 #[test]
@@ -549,7 +580,7 @@ fn test_interpolate_depth_exceeded() {
     let refstr = (0..70).fold("${foo}".to_string(), |s, _| format!("${{foo:{s}}}"));
     let mut map = (0..70).fold(Mapping::from_str("foo: bar").unwrap(), |m, _| {
         let mut n = Mapping::new();
-        n.insert("foo".into(), Value::Mapping(m)).unwrap();
+        n.insert("foo".into(), Value::Mapping(m, None)).unwrap();
         n
     });
     map.insert("baz".into(), refstr.into()).unwrap();

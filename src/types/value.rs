@@ -14,22 +14,30 @@ use crate::refs::{ResolveState, Token};
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     /// Represents a YAML null value.
-    Null,
+    Null(Option<ValueOrigin>),
     /// Represents a YAML boolean value.
-    Bool(bool),
+    Bool(bool, Option<ValueOrigin>),
     /// Represents a raw string value which may contain reclass references.
-    String(String),
+    String(String, Option<ValueOrigin>),
     /// Represents a string literal value which can't contain reclass references.
-    Literal(String),
+    Literal(String, Option<ValueOrigin>),
     /// Represents a YAML numerical value.
-    Number(Number),
+    Number(Number, Option<ValueOrigin>),
     /// Represents a YAML mapping.
-    Mapping(Mapping),
+    Mapping(Mapping, Option<ValueOrigin>),
     /// Represents a YAML sequence.
-    Sequence(Sequence),
+    Sequence(Sequence, Option<ValueOrigin>),
     /// Represents a list of layered values which may have different types. ValueLists are
     /// flattened during reference interpolation.
-    ValueList(Sequence),
+    ValueList(Sequence, Option<ValueOrigin>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValueOrigin {
+    pub repository: String,
+    pub file: String,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
 }
 
 impl std::fmt::Display for Value {
@@ -65,11 +73,11 @@ impl std::fmt::Display for Value {
     /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Null => write!(f, "Null"),
-            Self::Bool(b) => write!(f, "{b}"),
-            Self::Number(n) => write!(f, "{n}"),
-            Self::String(s) | Self::Literal(s) => write!(f, "\"{s}\""),
-            Self::Sequence(seq) | Self::ValueList(seq) => {
+            Self::Null(_) => write!(f, "Null"),
+            Self::Bool(b, _) => write!(f, "{b}"),
+            Self::Number(n, _) => write!(f, "{n}"),
+            Self::String(s, _) | Self::Literal(s, _) => write!(f, "\"{s}\""),
+            Self::Sequence(seq, _) | Self::ValueList(seq, _) => {
                 write!(f, "[")?;
                 for (i, v) in seq.iter().enumerate() {
                     if i > 0 {
@@ -79,7 +87,7 @@ impl std::fmt::Display for Value {
                 }
                 write!(f, "]")
             }
-            Self::Mapping(m) => write!(f, "{m}"),
+            Self::Mapping(m, _) => write!(f, "{m}"),
         }
     }
 }
@@ -90,12 +98,12 @@ impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         mem::discriminant(self).hash(state);
         match self {
-            Self::Null => {}
-            Self::Bool(v) => v.hash(state),
-            Self::Number(v) => v.hash(state),
-            Self::Literal(v) | Self::String(v) => v.hash(state),
-            Self::Mapping(v) => v.hash(state),
-            Self::Sequence(v) | Self::ValueList(v) => v.hash(state),
+            Self::Null(_) => {}
+            Self::Bool(v, _) => v.hash(state),
+            Self::Number(v, _) => v.hash(state),
+            Self::Literal(v, _) | Self::String(v, _) => v.hash(state),
+            Self::Mapping(v, _) => v.hash(state),
+            Self::Sequence(v, _) | Self::ValueList(v, _) => v.hash(state),
         }
     }
 }
@@ -103,16 +111,16 @@ impl Hash for Value {
 /// The default value is `Value::Null`.
 impl Default for Value {
     fn default() -> Self {
-        Self::Null
+        Self::Null(None)
     }
 }
 
 impl From<Value> for serde_json::Value {
     fn from(v: Value) -> Self {
         match v {
-            Value::Null => Self::Null,
-            Value::Bool(b) => Self::Bool(b),
-            Value::Number(n) => {
+            Value::Null(_) => Self::Null,
+            Value::Bool(b, _) => Self::Bool(b),
+            Value::Number(n, _) => {
                 if n.is_nan() || n.is_infinite() {
                     // Render NaN and -+inf as strings, since JSON's number type doesn't support
                     // those values.
@@ -134,16 +142,16 @@ impl From<Value> for serde_json::Value {
                 };
                 serde_json::Value::Number(jn)
             }
-            Value::Literal(s) | Value::String(s) => Self::String(s),
-            Value::Sequence(s) => {
+            Value::Literal(s, _) | Value::String(s, _) => Self::String(s),
+            Value::Sequence(s, _) => {
                 let mut seq: Vec<Self> = Vec::with_capacity(s.len());
                 for v in s {
                     seq.push(Self::from(v));
                 }
                 Self::Array(seq)
             }
-            Value::Mapping(m) => Self::Object(serde_json::Map::<String, Self>::from(m)),
-            Value::ValueList(_) => todo!(),
+            Value::Mapping(m, _) => Self::Object(serde_json::Map::<String, Self>::from(m)),
+            Value::ValueList(_, _) => todo!(),
         }
     }
 }
@@ -153,14 +161,14 @@ impl Value {
     #[inline]
     #[must_use]
     pub fn is_null(&self) -> bool {
-        matches!(self, Self::Null)
+        matches!(self, Self::Null(_))
     }
 
     /// Checks if the `Value` is a boolean.
     #[inline]
     #[must_use]
     pub fn is_bool(&self) -> bool {
-        matches!(self, Self::Bool(_))
+        matches!(self, Self::Bool(_, _))
     }
 
     /// If the `Value` is a Boolean, return the associated bool. Returns None otherwise.
@@ -168,7 +176,7 @@ impl Value {
     #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         match self {
-            Self::Bool(b) => Some(*b),
+            Self::Bool(b, _) => Some(*b),
             _ => None,
         }
     }
@@ -181,7 +189,7 @@ impl Value {
     #[must_use]
     pub fn is_i64(&self) -> bool {
         match self {
-            Self::Number(n) => n.is_i64(),
+            Self::Number(n, _) => n.is_i64(),
             _ => false,
         }
     }
@@ -191,7 +199,7 @@ impl Value {
     #[must_use]
     pub fn as_i64(&self) -> Option<i64> {
         match self {
-            Self::Number(n) => n.as_i64(),
+            Self::Number(n, _) => n.as_i64(),
             _ => None,
         }
     }
@@ -204,7 +212,7 @@ impl Value {
     #[must_use]
     pub fn is_u64(&self) -> bool {
         match self {
-            Self::Number(n) => n.is_u64(),
+            Self::Number(n, _) => n.is_u64(),
             _ => false,
         }
     }
@@ -214,7 +222,7 @@ impl Value {
     #[must_use]
     pub fn as_u64(&self) -> Option<u64> {
         match self {
-            Self::Number(n) => n.as_u64(),
+            Self::Number(n, _) => n.as_u64(),
             _ => None,
         }
     }
@@ -231,7 +239,7 @@ impl Value {
     #[must_use]
     pub fn is_f64(&self) -> bool {
         match self {
-            Self::Number(n) => n.is_f64(),
+            Self::Number(n, _) => n.is_f64(),
             _ => false,
         }
     }
@@ -241,7 +249,7 @@ impl Value {
     #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match self {
-            Self::Number(n) => n.as_f64(),
+            Self::Number(n, _) => n.as_f64(),
             _ => None,
         }
     }
@@ -253,7 +261,7 @@ impl Value {
     #[inline]
     #[must_use]
     pub fn is_string(&self) -> bool {
-        matches!(self, Self::String(_))
+        matches!(self, Self::String(_, _))
     }
 
     /// Checks if the `Value` is a Literal.
@@ -263,7 +271,7 @@ impl Value {
     #[inline]
     #[must_use]
     pub fn is_literal(&self) -> bool {
-        matches!(self, Self::Literal(_))
+        matches!(self, Self::Literal(_, _))
     }
 
     /// If the `Value` is a String or Literal, return the associated `str`. Returns None otherwise.
@@ -271,7 +279,7 @@ impl Value {
     #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::Literal(s) | Self::String(s) => Some(s),
+            Self::Literal(s, _) | Self::String(s, _) => Some(s),
             _ => None,
         }
     }
@@ -280,7 +288,7 @@ impl Value {
     #[inline]
     #[must_use]
     pub fn is_mapping(&self) -> bool {
-        matches!(self, Self::Mapping(_))
+        matches!(self, Self::Mapping(_, _))
     }
 
     /// If the value is a Mapping, return a reference to it. Returns None otherwise.
@@ -288,7 +296,7 @@ impl Value {
     #[must_use]
     pub fn as_mapping(&self) -> Option<&Mapping> {
         match self {
-            Self::Mapping(m) => Some(m),
+            Self::Mapping(m, _) => Some(m),
             _ => None,
         }
     }
@@ -298,7 +306,7 @@ impl Value {
     #[must_use]
     pub fn as_mapping_mut(&mut self) -> Option<&mut Mapping> {
         match self {
-            Self::Mapping(m) => Some(m),
+            Self::Mapping(m, _) => Some(m),
             _ => None,
         }
     }
@@ -307,7 +315,7 @@ impl Value {
     #[inline]
     #[must_use]
     pub fn is_sequence(&self) -> bool {
-        matches!(self, Self::Sequence(_))
+        matches!(self, Self::Sequence(_, _))
     }
 
     /// If the value is a Sequence, return a reference to it. Returns None otherwise.
@@ -315,7 +323,7 @@ impl Value {
     #[must_use]
     pub fn as_sequence(&self) -> Option<&Sequence> {
         match self {
-            Self::Sequence(s) => Some(s),
+            Self::Sequence(s, _) => Some(s),
             _ => None,
         }
     }
@@ -325,7 +333,7 @@ impl Value {
     #[must_use]
     pub fn as_sequence_mut(&mut self) -> Option<&mut Sequence> {
         match self {
-            Self::Sequence(s) => Some(s),
+            Self::Sequence(s, _) => Some(s),
             _ => None,
         }
     }
@@ -334,7 +342,7 @@ impl Value {
     #[inline]
     #[must_use]
     pub fn is_value_list(&self) -> bool {
-        matches!(self, Self::ValueList(_))
+        matches!(self, Self::ValueList(_, _))
     }
 
     /// If the value is a ValueList, return a reference to it. Returns None otherwise.
@@ -342,7 +350,7 @@ impl Value {
     #[must_use]
     pub fn as_value_list(&self) -> Option<&Sequence> {
         match self {
-            Self::ValueList(l) => Some(l),
+            Self::ValueList(l, _) => Some(l),
             _ => None,
         }
     }
@@ -352,7 +360,7 @@ impl Value {
     #[must_use]
     pub fn as_value_list_mut(&mut self) -> Option<&mut Sequence> {
         match self {
-            Self::ValueList(l) => Some(l),
+            Self::ValueList(l, _) => Some(l),
             _ => None,
         }
     }
@@ -369,8 +377,8 @@ impl Value {
     #[must_use]
     pub fn get(&self, k: &Value) -> Option<&Value> {
         match self {
-            Self::Mapping(m) => m.get(k),
-            Self::Sequence(s) | Self::ValueList(s) => {
+            Self::Mapping(m, _) => m.get(k),
+            Self::Sequence(s, _) | Self::ValueList(s, _) => {
                 if let Some(idx) = k.as_u64() {
                     if let Ok(idx) = usize::try_from(idx) {
                         if idx < s.len() {
@@ -396,8 +404,8 @@ impl Value {
     #[inline]
     pub fn get_mut(&mut self, k: &Value) -> Result<Option<&mut Value>> {
         match self {
-            Self::Mapping(m) => m.get_mut(k),
-            Self::Sequence(s) | Self::ValueList(s) => {
+            Self::Mapping(m, _) => m.get_mut(k),
+            Self::Sequence(s, _) | Self::ValueList(s, _) => {
                 if let Some(idx) = k.as_u64() {
                     let idx = usize::try_from(idx)?;
                     if idx < s.len() {
@@ -413,14 +421,14 @@ impl Value {
     /// Provides a nice string for each enum variant for debugging and pretty-printing.
     pub(crate) fn variant(&self) -> &str {
         match self {
-            Self::Bool(_) => "Value::Bool",
-            Self::Mapping(_) => "Value::Mapping",
-            Self::Null => "Value::Null",
-            Self::Number(_) => "Value::Number",
-            Self::Sequence(_) => "Value::Sequence",
-            Self::String(_) => "Value::String",
-            Self::Literal(_) => "Value::Literal",
-            Self::ValueList(_) => "Value::ValueList",
+            Self::Bool(_, _) => "Value::Bool",
+            Self::Mapping(_, _) => "Value::Mapping",
+            Self::Null(_) => "Value::Null",
+            Self::Number(_, _) => "Value::Number",
+            Self::Sequence(_, _) => "Value::Sequence",
+            Self::String(_, _) => "Value::String",
+            Self::Literal(_, _) => "Value::Literal",
+            Self::ValueList(_, _) => "Value::ValueList",
         }
     }
 
@@ -428,9 +436,9 @@ impl Value {
     #[allow(clippy::missing_panics_doc)]
     pub fn as_py_obj<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let obj = match self {
-            Value::Literal(s) | Value::String(s) => s.into_pyobject(py)?.into_any(),
-            Value::Bool(b) => pyo3::types::PyBool::new(py, *b).to_owned().into_any(),
-            Value::Number(n) => {
+            Value::Literal(s, _) | Value::String(s, _) => s.into_pyobject(py)?.into_any(),
+            Value::Bool(b, _) => pyo3::types::PyBool::new(py, *b).to_owned().into_any(),
+            Value::Number(n, _) => {
                 if n.is_i64() {
                     // NOTE(sg): We allow the missing panics doc because we already checked that
                     // `as_i64()` can't panic here.
@@ -443,17 +451,17 @@ impl Value {
                     Option::<()>::None.into_pyobject(py)?.into_any()
                 }
             }
-            Value::Sequence(s) => {
+            Value::Sequence(s, _) => {
                 let mut pyseq = vec![];
                 for v in s {
                     pyseq.push(v.as_py_obj(py)?);
                 }
                 pyseq.into_pyobject(py)?.into_any()
             }
-            Value::Mapping(m) => m.as_py_dict(py)?.into_any(),
-            Value::Null => Option::<()>::None.into_pyobject(py)?.into_any(),
+            Value::Mapping(m, _) => m.as_py_dict(py)?.into_any(),
+            Value::Null(_) => Option::<()>::None.into_pyobject(py)?.into_any(),
             // ValueList should never get emitted to Python
-            Value::ValueList(_) => unreachable!(),
+            Value::ValueList(_, _) => unreachable!(),
         };
         Ok(obj)
     }
@@ -468,15 +476,15 @@ impl Value {
     #[inline]
     pub(super) fn strip_prefix(self) -> (Self, Option<KeyPrefix>) {
         match self {
-            Self::String(s) => {
+            Self::String(s, _) => {
                 if s.is_empty() {
-                    return (Self::String(s), None);
+                    return (Self::String(s, None), None);
                 }
                 let p = KeyPrefix::from(s.chars().next().unwrap());
                 if p.is_some() {
-                    (Self::String(s[1..].to_string()), p)
+                    (Self::String(s[1..].to_string(), None), p)
                 } else {
-                    (Self::String(s), None)
+                    (Self::String(s, None), None)
                 }
             }
             _ => (self, None),
@@ -492,12 +500,12 @@ impl Value {
     #[inline]
     pub(crate) fn raw_string(&self) -> Result<String> {
         match self {
-            Value::Literal(s) => Ok(s.clone()),
+            Value::Literal(s, _) => Ok(s.clone()),
             // We serialize Null as `None` to be compatible with Python's str()
-            Value::Null => Ok("None".to_string()),
+            Value::Null(_) => Ok("None".to_string()),
             // We need custom formatting for bool instead of `format!("{b}")`, so that this
             // function returns strings which match Python's `str()` implementation.
-            Value::Bool(b) => match b {
+            Value::Bool(b, _) => match b {
                 true => Ok("True".to_owned()),
                 false => Ok("False".to_owned()),
             },
@@ -507,15 +515,15 @@ impl Value {
             // quotes), but works similar enough in the resulting YAML. Serializing to YAML doesn't
             // work cleanly for embedded references in multiline strings which contain YAML, as the
             // indentation will break.
-            Value::Mapping(m) => {
+            Value::Mapping(m, _) => {
                 let m = serde_json::Map::<String, serde_json::Value>::from(m.clone());
                 serde_json::to_string(&m).map_err(|e| anyhow!(e))
             }
-            Value::Sequence(_) => {
+            Value::Sequence(_, _) => {
                 let v = serde_json::Value::from(self.clone());
                 serde_json::to_string(&v).map_err(|e| anyhow!(e))
             }
-            Value::Number(n) => Ok(n.to_string()),
+            Value::Number(n, _) => Ok(n.to_string()),
             _ => Err(anyhow!(
                 "Value::raw_string isn't implemented for {}",
                 self.variant()
@@ -530,7 +538,7 @@ impl Value {
     /// over this method.
     pub(crate) fn interpolate(&self, root: &Mapping, state: &mut ResolveState) -> Result<Self> {
         Ok(match self {
-            Self::String(s) => {
+            Self::String(s, _) => {
                 // String interpolation parses any Reclass references in the String and resolves
                 // them. The result of `Token::render()` can be an arbitrary Value, except for
                 // `Value::String()`, since `render()` will recursively call `interpolate()`.
@@ -539,12 +547,12 @@ impl Value {
                 } else {
                     // If Token::parse() returns None, we can be sure that there's no references
                     // int the String, and just return the string as a `Value::Literal`.
-                    Self::Literal(s.clone())
+                    Self::Literal(s.clone(), None)
                 }
             }
             // Mappings are interpolated by calling `Mapping::interpolate()`.
-            Self::Mapping(m) => Self::Mapping(m.interpolate(root, state)?),
-            Self::Sequence(s) => {
+            Self::Mapping(m, _) => Self::Mapping(m.interpolate(root, state)?, None),
+            Self::Sequence(s, _) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
                 for (idx, it) in s.iter().enumerate() {
@@ -558,15 +566,15 @@ impl Value {
                     let e = it.interpolate(root, &mut st)?;
                     seq.push(e);
                 }
-                Self::Sequence(seq)
+                Self::Sequence(seq, None)
             }
-            Self::ValueList(l) => {
+            Self::ValueList(l, _) => {
                 // iteratively interpolate each element of the ValueList, by starting with a base
                 // Value::Null, and merging each interpolated element over that base value. This
                 // correctly handles cases where an intermediate layer of a ValueList is a
                 // reference to a Mapping.
                 // NOTE(sg): Empty ValueLists are interpolated as Value::Null.
-                let mut r = Value::Null;
+                let mut r = Value::Null(None);
                 for v in l {
                     // For each ValueList layer, we pass a copy of the current resolution state to
                     // the recursive call to interpolate, since references in different ValueList
@@ -618,12 +626,12 @@ impl Value {
         // we assume that self is already interpolated
         match self {
             // anything can be merged over null
-            Self::Null => {
+            Self::Null(_) => {
                 let _prev = std::mem::replace(self, other);
             }
-            Self::Mapping(m) => match other {
+            Self::Mapping(m, _) => match other {
                 // merge mapping and mapping
-                Self::Mapping(other) => m.merge(&other)?,
+                Self::Mapping(other, _) => m.merge(&other)?,
                 _ => {
                     return Err(state.render_flattening_error(&format!(
                         "Can't merge {} over mapping",
@@ -631,9 +639,9 @@ impl Value {
                     )))
                 }
             },
-            Self::Sequence(s) => match other {
+            Self::Sequence(s, _) => match other {
                 // merge sequence and sequence
-                Self::Sequence(mut other) => s.append(&mut other),
+                Self::Sequence(mut other, _) => s.append(&mut other),
                 _ => {
                     return Err(state.render_flattening_error(&format!(
                         "Can't merge {} over sequence",
@@ -641,7 +649,7 @@ impl Value {
                     )))
                 }
             },
-            Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {
+            Self::Literal(_, _) | Self::Bool(_, _) | Self::Number(_, _) => {
                 if other.is_mapping() || other.is_sequence() {
                     // We can't merge simple non-null types over mappings or sequences
                     return Err(state.render_flattening_error(&format!(
@@ -653,10 +661,10 @@ impl Value {
                 // overwrite self with the value that's being merged
                 let _prev = std::mem::replace(self, other);
             }
-            Self::String(_) => {
+            Self::String(_, _) => {
                 unreachable!("Encountered unparsed String as merge target, this shouldn't happen!");
             }
-            Self::ValueList(_) => {
+            Self::ValueList(_, _) => {
                 // NOTE(sg): We should never end up with nested ValueLists with our implementation
                 // of `Mapping::insert()`. If a user constructs a ValueList by hand, it's their job
                 // to ensure that they don't construct nested ValueLists.
@@ -680,28 +688,30 @@ impl Value {
         match self {
             // Flatten ValueList by iterating over its elements and merging each element into a
             // base Value.
-            Self::ValueList(l) => {
+            Self::ValueList(l, _) => {
                 // NOTE(sg): Empty ValueLists get flattened to Value::Null
-                let mut base = Value::Null;
+                let mut base = Value::Null(None);
                 for v in l {
                     base.merge(v.clone(), state)?;
                 }
                 Ok(base)
             }
             // Flatten Mapping by flattening each value and inserting it into a new Mapping.
-            Self::Mapping(m) => Ok(Self::Mapping(m.flattened(state)?)),
+            Self::Mapping(m, _) => Ok(Self::Mapping(m.flattened(state)?, None)),
             // Flatten Sequence by flattening each element and inserting it into a new Sequence
-            Self::Sequence(s) => {
+            Self::Sequence(s, _) => {
                 let mut n = Vec::with_capacity(s.len());
                 for v in s {
                     n.push(v.flattened(state)?);
                 }
-                Ok(Self::Sequence(n))
+                Ok(Self::Sequence(n, None))
             }
             // Simple values are flattened as themselves
-            Self::Null | Self::Bool(_) | Self::Literal(_) | Self::Number(_) => Ok(self.clone()),
+            Self::Null(_) | Self::Bool(_, _) | Self::Literal(_, _) | Self::Number(_, _) => {
+                Ok(self.clone())
+            }
             // Flattening an unparsed string is an error
-            Self::String(_) => Err(state.render_flattening_error(
+            Self::String(_, _) => Err(state.render_flattening_error(
                 "Can't flatten unparsed String, did you mean to call `rendered()`?",
             )),
         }

@@ -107,7 +107,10 @@ impl NodeInfoMeta {
             ("full".into(), self.name.clone().into()),
             (
                 "parts".into(),
-                Value::Sequence(parts.iter().map(|&s| s.into()).collect::<Vec<Value>>()),
+                Value::Sequence(
+                    parts.iter().map(|&s| s.into()).collect::<Vec<Value>>(),
+                    None,
+                ),
             ),
             ("path".into(), parts.join("/").into()),
             (
@@ -119,7 +122,7 @@ impl NodeInfoMeta {
 
         let mut pmeta = Mapping::new();
         pmeta.insert("environment".into(), self.environment.clone().into())?;
-        pmeta.insert("name".into(), Value::Mapping(namedata))?;
+        pmeta.insert("name".into(), Value::Mapping(namedata, None))?;
 
         Ok(pmeta)
     }

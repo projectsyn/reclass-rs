@@ -8,7 +8,7 @@ fn test_resolve_ref_str() {
 
     let mut state = ResolveState::default();
     let v = token.resolve(&params, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("bar".into()));
+    assert_eq!(v, Value::Literal("bar".into(), None));
 }
 
 #[test]
@@ -18,7 +18,7 @@ fn test_resolve_ref_val() {
 
     let mut state = ResolveState::default();
     let v = token.resolve(&params, &mut state).unwrap();
-    assert_eq!(v, Value::Bool(true));
+    assert_eq!(v, Value::Bool(true, None));
 }
 
 #[test]
@@ -28,7 +28,7 @@ fn test_resolve_literal() {
 
     let mut state = ResolveState::default();
     let v = token.resolve(&params, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foo".into()));
+    assert_eq!(v, Value::Literal("foo".into(), None));
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn test_resolve_combined() {
 
     let mut state = ResolveState::default();
     let v = token.resolve(&params, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foobar".into()));
+    assert_eq!(v, Value::Literal("foobar".into(), None));
 }
 #[test]
 
@@ -54,7 +54,7 @@ fn test_resolve_combined_2() {
 
     let mut state = ResolveState::default();
     let v = token.resolve(&params, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foobaz".into()));
+    assert_eq!(v, Value::Literal("foobaz".into(), None));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn test_resolve_combined_3() {
 
     let mut state = ResolveState::default();
     let v = token.resolve(&params, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foo${bar}".into()));
+    assert_eq!(v, Value::Literal("foo${bar}".into(), None));
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn test_resolve() {
     let mut state = ResolveState::default();
     assert_eq!(
         reftoken.resolve(&p, &mut state).unwrap(),
-        Value::Literal("foo".into())
+        Value::Literal("foo".into(), None)
     );
 }
 
@@ -125,7 +125,7 @@ fn test_resolve_subkey() {
 
     let mut state = ResolveState::default();
     let v = reftoken.resolve(&p, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foo".into()));
+    assert_eq!(v, Value::Literal("foo".into(), None));
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn test_resolve_nested() {
 
     let mut state = ResolveState::default();
     let v = reftoken.resolve(&p, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foo".into()));
+    assert_eq!(v, Value::Literal("foo".into(), None));
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn test_resolve_nested_subkey() {
     let reftoken = parse_ref(&"${bar:${foo:bar}}").unwrap();
     let mut state = ResolveState::default();
     let v = reftoken.resolve(&p, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("foo".to_string()));
+    assert_eq!(v, Value::Literal("foo".to_string(), None));
 }
 
 #[test]
@@ -167,7 +167,10 @@ fn test_resolve_kapitan_secret_ref() {
     dbg!(&reftoken);
     let mut state = ResolveState::default();
     let v = reftoken.resolve(&p, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("?{vaultkv:foo/bar/baz/qux}".to_string()));
+    assert_eq!(
+        v,
+        Value::Literal("?{vaultkv:foo/bar/baz/qux}".to_string(), None)
+    );
 }
 
 #[test]
@@ -182,7 +185,7 @@ fn test_resolve_escaped_ref() {
     let reftoken = parse_ref("\\${PROJECT_LABEL}").unwrap();
     let mut state = ResolveState::default();
     let v = reftoken.resolve(&p, &mut state).unwrap();
-    assert_eq!(v, Value::Literal("${PROJECT_LABEL}".to_string()));
+    assert_eq!(v, Value::Literal("${PROJECT_LABEL}".to_string(), None));
 }
 
 #[test]
@@ -198,7 +201,7 @@ fn test_resolve_mapping_value() {
     let v = reftoken.resolve(&p, &mut state).unwrap();
     assert_eq!(
         v,
-        Value::Mapping(Mapping::from_str("{bar: bar, baz: baz}").unwrap())
+        Value::Mapping(Mapping::from_str("{bar: bar, baz: baz}").unwrap(), None)
     );
 }
 
@@ -217,7 +220,7 @@ fn test_resolve_mapping_embedded() {
         v,
         // Mapping is serialized as JSON when embedded in a string. serde_json emits JSON maps
         // with lexically sorted keys and minimal whitespace.
-        Value::Literal(r#"foo: {"bar":"bar","baz":"baz"}"#.to_string())
+        Value::Literal(r#"foo: {"bar":"bar","baz":"baz"}"#.to_string(), None)
     );
 }
 

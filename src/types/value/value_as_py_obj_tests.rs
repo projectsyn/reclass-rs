@@ -3,7 +3,7 @@ use super::*;
 fn test_as_py_obj_null() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
-        let v = Value::Null.as_py_obj(py).unwrap();
+        let v = Value::Null(None).as_py_obj(py).unwrap();
         assert!(v.is_none());
     });
 }
@@ -12,7 +12,7 @@ fn test_as_py_obj_null() {
 fn test_as_py_obj_bool() {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
-        let b = Value::Bool(true).as_py_obj(py).unwrap();
+        let b = Value::Bool(true, None).as_py_obj(py).unwrap();
         assert!(b.is_instance_of::<pyo3::types::PyBool>());
         assert!(b.downcast_exact::<pyo3::types::PyBool>().unwrap().is_true());
     });

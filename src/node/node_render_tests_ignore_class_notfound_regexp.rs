@@ -20,7 +20,7 @@ fn test_render_n1() {
     );
     assert_eq!(
         n1.parameters.get(&"a".into()),
-        Some(&Value::Literal("a".into()))
+        Some(&Value::Literal("a".into(), None))
     );
 }
 
