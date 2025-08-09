@@ -1,0 +1,24 @@
+name: Benchmarks
+
+on:
+  # Only run benchmarks for PRs that modify code, dependencies or test inventory
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'benches/**'
+      - 'Cargo.toml'
+      - 'tests/inventory/**'
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+      - uses: boa-dev/criterion-compare-action@v3
+        with:
+          features: bench
+          branchName: ${{ github.base_ref }}
