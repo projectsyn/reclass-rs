@@ -159,7 +159,6 @@ pub struct NodeInfo {
     #[pyo3(get)]
     pub classes: Vec<String>,
     /// Exports defined for the node.
-    /// Note that the exports functionality is not yet implemented.
     pub exports: Mapping,
     /// Parameters defined for the node.
     pub parameters: Mapping,
@@ -173,8 +172,7 @@ impl From<super::Node> for NodeInfo {
             applications: n.applications.into(),
             classes: n.classes.into(),
             parameters: n.parameters,
-            // NOTE(sg): Python reclass's exports functionality is not implemented yet.
-            exports: Mapping::new(),
+            exports: n.exports,
         }
     }
 }
