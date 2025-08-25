@@ -13,14 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
+      - run: rustup install --profile=minimal stable
+      - run: cargo +stable fmt --check
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -35,10 +29,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
+      - run: rustup install --profile=minimal stable
       - uses: actions-rs/cargo@v1
         with:
           command: check
@@ -51,10 +42,7 @@ jobs:
     if: github.base_ref != ''
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
+      - run: rustup install --profile=minimal stable
       - uses: boa-dev/criterion-compare-action@v3
         with:
           features: bench
