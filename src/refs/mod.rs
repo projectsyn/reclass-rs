@@ -392,7 +392,7 @@ impl std::fmt::Display for ParseError<'_> {
 ///
 /// Users should use `Token::parse()` which converts the internal `ParseError` into a format
 /// suitable to be handled with `anyhow::Result`.
-fn parse_ref(input: &str) -> Result<Token, ParseError> {
+fn parse_ref(input: &str) -> Result<Token, ParseError<'_>> {
     use self::parser::parse_ref;
     let (uncons, token) = parse_ref(input).map_err(|e| match e {
         nom::Err::Error(e) | nom::Err::Failure(e) => ParseError {

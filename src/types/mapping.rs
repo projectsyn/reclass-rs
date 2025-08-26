@@ -230,7 +230,7 @@ impl Mapping {
     /// insertion. Iterator element type is `(&'a Value, &'a Value)`.
     #[inline]
     #[must_use]
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             iter: self.map.iter(),
         }
@@ -270,7 +270,7 @@ impl Mapping {
     /// Returns the given key's entry in the map for insertion and/or in-place updates.
     /// Returns an error if called for a key which is marked constant.
     #[inline]
-    pub fn entry(&mut self, k: Value) -> Result<indexmap::map::Entry<Value, Value>> {
+    pub fn entry(&mut self, k: Value) -> Result<indexmap::map::Entry<'_, Value, Value>> {
         if self.const_keys.contains(&k) {
             return Err(anyhow!("Key {k} is marked constant"));
         }
