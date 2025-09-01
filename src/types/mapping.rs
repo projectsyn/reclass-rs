@@ -738,8 +738,8 @@ mod mapping_tests {
             "f".into(),
             Mapping::from_iter(vec![("foo".into(), "bar".into())]).into(),
         );
-        pyo3::prepare_freethreaded_python();
-        Python::with_gil(|py| {
+        Python::initialize();
+        Python::attach(|py| {
             let m = m.as_py_dict(py).unwrap();
             assert_eq!(m.len(), 6);
             assert_eq!(format!("{:?}", m.keys()), "['a', 'b', 'c', 'd', 'e', 'f']");
