@@ -7,8 +7,8 @@ use reclass_rs::Reclass;
 
 #[test]
 fn test_reclass() {
-    pyo3::prepare_freethreaded_python();
-    Python::with_gil(|py| {
+    Python::initialize();
+    Python::attach(|py| {
         let r = Reclass::new("./tests/inventory", "nodes", "classes", false)
             .unwrap()
             .into_pyobject(py)
