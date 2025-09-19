@@ -80,8 +80,6 @@ fn begin_if(input: &str) -> IResult<&str, &str> {
 }
 
 fn obj(input: &str) -> IResult<&str, Item> {
-    dbg!("obj");
-    dbg!(&input);
     map(recognize(many1(none_of(" \t"))), |s: &str| {
         Item::Obj(s.to_owned())
     })
@@ -89,8 +87,6 @@ fn obj(input: &str) -> IResult<&str, Item> {
 }
 
 fn expritem(input: &str) -> IResult<&str, Item> {
-    dbg!("expritem");
-    dbg!(&input);
     alt((integer, real, obj)).parse(input)
 }
 

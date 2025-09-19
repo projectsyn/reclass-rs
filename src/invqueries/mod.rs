@@ -22,7 +22,6 @@ impl Expression {
         match self {
             Self::Expr(o, rem) => {
                 let res = o.evaluate(exports, ignore_errors)?;
-                dbg!(&res);
                 for (op, operation) in rem {
                     match &op[..] {
                         "and" => res && operation.evaluate(exports, ignore_errors)?,
@@ -77,12 +76,8 @@ impl Item {
         match self {
             Self::Obj(k) => {
                 if let Some((ktype, kpath)) = k.split_once(':') {
-                    dbg!(&ktype);
-                    dbg!(&kpath);
                     let mut kparts = kpath.split(':');
                     let k0 = kparts.next().ok_or(anyhow!("expected at least one key"))?;
-                    dbg!(&k0);
-                    dbg!(&exports);
                     match ktype {
                         "exports" => {
                             let v = exports.get(&k0.into());
@@ -126,16 +121,12 @@ impl Item {
         // lookups?
         let sv = self.value(exports, ignore_errors)?;
         let ov = other.value(exports, ignore_errors)?;
-        dbg!(&sv);
-        dbg!(&ov);
         Ok(sv == ov)
     }
 
     fn eval_neq(&self, other: &Self, exports: &Mapping, ignore_errors: bool) -> Result<bool> {
         let sv = self.value(exports, ignore_errors)?;
         let ov = other.value(exports, ignore_errors)?;
-        dbg!(&sv);
-        dbg!(&ov);
         Ok(sv != ov)
     }
 }
@@ -179,11 +170,13 @@ impl Query {
                 let nv = o
                     .value(n_exports, true)
                     .map_err(|e| anyhow!("while evaluating export value for {n}: {e}"))?;
+                #[cfg(debug_assertions)]
                 eprintln!("Got value {nv:?} for export {} for node {n}", self.qstr);
                 if let Some(e) = self.expr.as_ref() {
                     let ee = e
                         .evaluate(n_exports, true)
                         .map_err(|e| anyhow!("while evaluating export expression for {n}: {e}"))?;
+                    #[cfg(debug_assertions)]
                     eprintln!("evaluating expr {e:?} with {n_exports:?}: {ee}");
                     if ee {
                         if let Some(nv) = nv {
