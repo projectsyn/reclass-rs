@@ -258,7 +258,7 @@ impl Reclass {
         )
     }
 
-    fn render_exports(&self) -> Result<Exports> {
+    fn render_exports(&self) -> Result<Exports<'_>> {
         Exports::new(self)
     }
 
