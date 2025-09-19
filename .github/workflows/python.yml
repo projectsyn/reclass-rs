@@ -80,6 +80,7 @@ jobs:
         shell: bash
         run: |
           set -e
+          rustup install --profile=minimal stable
           python3 -m venv .venv
           source .venv/bin/activate
           pip install reclass-rs --find-links dist --force-reinstall

@@ -342,7 +342,7 @@ fn test_raw_string_number() {
 fn test_raw_string_mapping() {
     let mut m = Value::Mapping(Mapping::from_str("{foo: foo, bar: true, baz: 1.23}").unwrap());
     // turn string values into literals by calling flatten
-    m.render(&Mapping::new()).unwrap();
+    m.render(&Mapping::new(), &Exports::default()).unwrap();
     let mstr = m.raw_string().unwrap();
     // NOTE(sg): serde_json output is sorted by keys
     assert_eq!(mstr, r#"{"bar":true,"baz":1.23,"foo":"foo"}"#);
@@ -361,7 +361,9 @@ fn test_raw_string_mapping_nonstring_keys() {
     // serializing the Mapping as JSON.
     let m = Mapping::from_str("{true: foo, 3.14: true, ~: 1.23}").unwrap();
     // turn string values into literals by calling interpolate
-    let m = Value::Mapping(m).rendered(&Mapping::new()).unwrap();
+    let m = Value::Mapping(m)
+        .rendered(&Mapping::new(), &Exports::default())
+        .unwrap();
     let mstr = m.raw_string().unwrap();
     // NOTE(sg): serde_json output is sorted by keys
     assert_eq!(mstr, r#"{"3.14":true,"null":1.23,"true":"foo"}"#);

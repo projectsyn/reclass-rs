@@ -11,8 +11,10 @@
 include!(concat!(env!("OUT_DIR"), "/rustc_version.rs"));
 
 mod config;
+mod exports;
 mod fsutil;
 mod inventory;
+mod invqueries;
 mod list;
 mod node;
 mod refs;
@@ -28,6 +30,7 @@ use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use walkdir::WalkDir;
 
 use config::{CompatFlag, Config};
+use exports::Exports;
 use fsutil::to_lexical_absolute;
 use inventory::Inventory;
 use node::{Node, NodeInfo, NodeInfoMeta};
@@ -255,10 +258,18 @@ impl Reclass {
         )
     }
 
+    fn render_exports(&self) -> Result<Exports<'_>> {
+        Exports::new(self)
+    }
+
     /// Renders a single Node and returns the corresponding `NodeInfo` struct.
-    pub fn render_node(&self, nodename: &str) -> Result<NodeInfo> {
-        let mut n = Node::parse(self, nodename)?;
-        n.render(self)?;
+    pub fn render_node(&self, nodename: &str, exports: &Exports) -> Result<NodeInfo> {
+        let mut n = if let Some(n) = exports.exports.get(nodename) {
+            n.clone()
+        } else {
+            Node::parse(self, nodename)?
+        };
+        n.render(self, exports)?;
         Ok(NodeInfo::from(n))
     }
 
@@ -323,7 +334,11 @@ impl Reclass {
 
     /// Returns the rendered data for the node with the provided name if it exists.
     pub fn nodeinfo(&self, nodename: &str) -> PyResult<NodeInfo> {
-        self.render_node(nodename)
+        //TODO(sg): figure out if we can do partial exports when rendering a single node if there's
+        //errors when rendering some nodes' exports.
+        //NOTE(sg): this API isn't available in the same way in the Python reclass implementation
+        let exports = self.render_exports().unwrap_or_default();
+        self.render_node(nodename, &exports)
             .map_err(|e| PyValueError::new_err(format!("Error while rendering {nodename}: {e}")))
     }
 
