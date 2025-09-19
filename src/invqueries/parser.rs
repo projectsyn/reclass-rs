@@ -74,21 +74,16 @@ fn operator_logical(input: &str) -> IResult<&str, String> {
 }
 
 fn begin_if(input: &str) -> IResult<&str, &str> {
-    dbg!(&input);
     tag_no_case("IF")(input)
 }
 
 fn obj(input: &str) -> IResult<&str, Item> {
-    dbg!("obj");
-    dbg!(&input);
     map(recognize(many1(none_of(" \t"))), |s: &str| {
         Item::Obj(s.to_owned())
     })(input)
 }
 
 fn expritem(input: &str) -> IResult<&str, Item> {
-    dbg!("expritem");
-    dbg!(&input);
     alt((integer, real, obj))(input)
 }
 
