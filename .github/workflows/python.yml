@@ -66,6 +66,9 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          before-script-linux: |
+            rustup show active-toolchain
+            rustc --version
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -80,7 +83,14 @@ jobs:
         shell: bash
         run: |
           set -e
+          rustup show active-toolchain
+          rustc --version
           rustup install --profile=minimal stable
+          rustup show active-toolchain
+          rustc --version
+          rustup default stable
+          rustup show active-toolchain
+          rustc --version
           python3 -m venv .venv
           source .venv/bin/activate
           pip install reclass-rs --find-links dist --force-reinstall
