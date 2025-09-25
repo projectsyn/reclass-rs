@@ -31,6 +31,10 @@ pub enum Value {
     /// Represents a list of layered values which may have different types. ValueLists are
     /// flattened during reference interpolation.
     ValueList(Sequence),
+    /// Represents an error which occurred when interpolating a value. ResolveErrors are ignored or
+    /// raised during interpolation/merging depending on the involved Value variants and whether
+    /// `ignore_overwritten_missing_references` is set to `true`.
+    ResolveError(String),
 }
 
 impl std::fmt::Display for Value {
@@ -81,6 +85,7 @@ impl std::fmt::Display for Value {
                 write!(f, "]")
             }
             Self::Mapping(m) => write!(f, "{m}"),
+            Self::ResolveError(errmsg) => write!(f, "ResolveError({errmsg})"),
         }
     }
 }
@@ -94,7 +99,7 @@ impl Hash for Value {
             Self::Null => {}
             Self::Bool(v) => v.hash(state),
             Self::Number(v) => v.hash(state),
-            Self::Literal(v) | Self::String(v) => v.hash(state),
+            Self::Literal(v) | Self::String(v) | Self::ResolveError(v) => v.hash(state),
             Self::Mapping(v) => v.hash(state),
             Self::Sequence(v) | Self::ValueList(v) => v.hash(state),
         }
@@ -145,6 +150,11 @@ impl From<Value> for serde_json::Value {
             }
             Value::Mapping(m) => Self::Object(serde_json::Map::<String, Self>::from(m)),
             Value::ValueList(_) => todo!(),
+            Value::ResolveError(errmsg) => {
+                unreachable!(
+                    "`ResolveError({errmsg})` should never be converted to serde_json::Value"
+                )
+            }
         }
     }
 }
@@ -367,6 +377,22 @@ impl Value {
         }
     }
 
+    /// Checks if the `Value` is a ResolveError
+    #[inline]
+    #[must_use]
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::ResolveError(_))
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn as_resolve_error(&self) -> Option<&String> {
+        match self {
+            Self::ResolveError(errmsg) => Some(errmsg),
+            _ => None,
+        }
+    }
+
     /// Access elements in a Sequence or Mapping, returning a reference to the value if the given
     /// key exists. Returns None otherwise.
     ///
@@ -431,6 +457,7 @@ impl Value {
             Self::String(_) => "Value::String",
             Self::Literal(_) => "Value::Literal",
             Self::ValueList(_) => "Value::ValueList",
+            Self::ResolveError(_) => "Value::ResolveError",
         }
     }
 
@@ -464,6 +491,9 @@ impl Value {
             Value::Null => Option::<()>::None.into_pyobject(py)?.into_any(),
             // ValueList should never get emitted to Python
             Value::ValueList(_) => unreachable!(),
+            Value::ResolveError(errmsg) => {
+                unreachable!("`ResolveError({errmsg})` should never be emitted as Python value")
+            }
         };
         Ok(obj)
     }
@@ -582,7 +612,7 @@ impl Value {
                 // reference to a Mapping.
                 // NOTE(sg): Empty ValueLists are interpolated as Value::Null.
                 let mut r = Value::Null;
-                for v in l {
+                for (i, v) in l.iter().enumerate() {
                     // For each ValueList layer, we pass a copy of the current resolution state to
                     // the recursive call to interpolate, since references in different ValueList
                     // layers can't form loops with each other (Intuitively: either we manage to
@@ -590,7 +620,21 @@ impl Value {
                     // done with a layer, any references that we saw there have been successfully
                     // resolved, and don't matter for the next layer we're interpolating).
                     let mut st = state.clone();
-                    r.merge(v.interpolate(root, &mut st, opts)?, &mut st, opts)?;
+                    let iv = v.interpolate(root, &mut st, opts);
+
+                    let v = if iv.is_err()
+                        && opts.ignore_overwritten_missing_references
+                        && i < l.len() - 1
+                    {
+                        // if it's not the last layer of a ValueList and we're ignoring overwritten
+                        // missing references, convert interpolation errors into
+                        // Value::ResolveError and continue merging.
+                        let e = iv.err().unwrap();
+                        Self::ResolveError(format!("{e}"))
+                    } else {
+                        iv?
+                    };
+                    r.merge(v, &mut st, opts)?;
                 }
                 // Depending on the structure of the ValueList, we may end up with a final
                 // interpolated Value which contains more ValueLists due to mapping merges. Such
@@ -601,6 +645,7 @@ impl Value {
                 // pass in the `state` which we were called with.
                 r.interpolate(root, state, opts)?
             }
+            // No special handling necessary for interpolating Value::ResolveError
             _ => self.clone(),
         })
     }
@@ -617,6 +662,13 @@ impl Value {
     /// Note that this method will call [`Value::flatten()`] after merging two Mappings to ensure
     /// that the resulting Value doesn't contain any `ValueList` elements.
     fn merge(&mut self, other: Self, state: &mut ResolveState, opts: &RenderOpts) -> Result<()> {
+        if !opts.ignore_overwritten_missing_references && self.is_error() {
+            // Merging into a Value::ResolveError is always an error if
+            // `ignore_overwritten_missing_references=false`.
+            let errmsg = self.as_resolve_error().unwrap().clone();
+            return Err(anyhow!(errmsg));
+        }
+
         if other.is_null() {
             // Any value can be replaced by null,
             let _prev = std::mem::replace(self, other);
@@ -677,6 +729,21 @@ impl Value {
                 // to ensure that they don't construct nested ValueLists.
                 unreachable!("Encountered ValueList as merge target, this shouldn't happen!");
             }
+            Self::ResolveError(errmsg) => {
+                if opts.ignore_overwritten_missing_references
+                    && (other.is_scalar() || other.is_error())
+                {
+                    // When `ignore_overwritten_missing_references=true` and we're merging a scalar
+                    // or error value over an error value, print the current error and replace it
+                    // with the new value.
+                    #[cfg(not(feature = "bench"))]
+                    eprintln!("[WARN] Ignoring resolve error: {errmsg}");
+                    let _prev = std::mem::replace(self, other);
+                } else {
+                    // Merging a complex value over an error is always an error
+                    return Err(anyhow!(errmsg.clone()));
+                }
+            }
         }
         Ok(())
     }
@@ -719,6 +786,22 @@ impl Value {
             Self::String(_) => Err(state.render_flattening_error(
                 "Can't flatten unparsed String, did you mean to call `rendered()`?",
             )),
+            Self::ResolveError(errmsg) => {
+                if opts.preserve_resolve_error_in_flattened {
+                    // We sometimes call `flattened()` from the implementation (e.g. in
+                    // `Mapping::interpolate()`). In those cases we may want to preserve
+                    // Value::ResolveError values as-is. The `preserve_resolve_error_in_flattened`
+                    // resolve option is only available within the crate and is set on a clone of
+                    // the "real" resolve options if necessary.
+                    Ok(self.clone())
+                } else {
+                    // Generally, if we encounter a Value::ResolveError when flattening an
+                    // interpolated value, it's an error, e.g. because we never merged a non-error
+                    // value over a missing reference with `ignore_overwritten_missing_references`
+                    // or because we just have a missing reference.
+                    Err(anyhow!(errmsg.clone()))
+                }
+            }
         }
     }
 

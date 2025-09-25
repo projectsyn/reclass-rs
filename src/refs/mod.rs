@@ -372,8 +372,12 @@ fn interpolate_string_or_valuelist(
                 };
                 i.push(v);
             }
-            // Finally we flatten the resulting ValueList into a single Value.
-            Value::ValueList(i).flattened(state, opts)
+            // Finally we flatten the resulting ValueList into a single Value. For this flattening
+            // we want to preserve Value::ResolveError values.
+            // NOTE(sg): not sure if we have test coverage for this yet.
+            let mut fopts = opts.clone();
+            fopts.preserve_resolve_error_in_flattened = true;
+            Value::ValueList(i).flattened(state, &fopts)
         }
         // Do nothing for other types
         _ => Ok(v.clone()),

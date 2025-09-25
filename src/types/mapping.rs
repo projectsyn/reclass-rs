@@ -433,6 +433,8 @@ impl Mapping {
         opts: &RenderOpts,
     ) -> Result<Self> {
         let mut res = Self::new();
+        let mut fopts = opts.clone();
+        fopts.preserve_resolve_error_in_flattened = true;
         for (k, v) in self {
             // Reference loops in mappings can't be stretched across key-value pairs, so we pass a
             // copy of the resolution state we're called with to the `interpolate` call for each
@@ -441,8 +443,17 @@ impl Mapping {
             // don't and the whole interpolation is aborted.
             let mut st = state.clone();
             st.push_mapping_key(k)?;
-            let mut v = v.interpolate(root, &mut st, opts)?;
-            v.flatten(&mut st, opts)?;
+            let iv = v.interpolate(root, &mut st, opts);
+            let v = if let Err(e) = iv {
+                // convert interpolation errors into `Value::ResolveError` when interpolating
+                // Mapping
+                Value::ResolveError(format!("{e}"))
+            } else {
+                let mut v = iv?;
+                // call flatten with resolve options which preserve resolve errors
+                v.flatten(&mut st, &fopts)?;
+                v
+            };
             // Propagate key properties to the resulting mapping by using `insert_impl()`.
             res.insert_impl(k.clone(), v, self.is_const(k), self.is_override(k))?;
         }

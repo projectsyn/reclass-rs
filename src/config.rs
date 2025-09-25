@@ -167,10 +167,14 @@ impl ClassMapping {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct RenderOpts {}
+pub struct RenderOpts {
+    pub ignore_overwritten_missing_references: bool,
+    pub(crate) preserve_resolve_error_in_flattened: bool,
+}
 
 #[pyclass]
 #[derive(Clone, Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Config {
     /// Base path of the inventory
     #[pyo3(get)]
@@ -213,6 +217,10 @@ pub struct Config {
     // determines the order in which classes are included and class include order can be
     // semantically relevant depending on the contents of each included class.
     class_mappings_patterns: Vec<ClassMapping>,
+    /// Whether to ignore missing overwritten references in scalar values.
+    /// Defaults to `true` to retain kapicorp-reclass compatibility.
+    #[pyo3(get)]
+    pub ignore_overwritten_missing_references: bool,
 }
 
 impl Config {
@@ -269,6 +277,7 @@ impl Config {
             class_mappings: Vec::new(),
             class_mappings_patterns: Vec::new(),
             class_mappings_match_path: false,
+            ignore_overwritten_missing_references: true,
         })
     }
 
@@ -354,6 +363,11 @@ impl Config {
                         ))
                     })
                     .collect::<Result<Vec<String>>>()?;
+            }
+            "ignore_overwritten_missing_references" => {
+                self.ignore_overwritten_missing_references = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'ignore_overwritten_missing_references' to be a boolean"
+                ))?;
             }
             _ => {
                 if verbose {
@@ -459,8 +473,11 @@ impl Config {
 }
 
 impl From<&Config> for RenderOpts {
-    fn from(_value: &Config) -> Self {
-        Self {}
+    fn from(value: &Config) -> Self {
+        Self {
+            ignore_overwritten_missing_references: value.ignore_overwritten_missing_references,
+            ..Default::default()
+        }
     }
 }
 

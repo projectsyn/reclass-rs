@@ -281,7 +281,6 @@ fn test_resolve_recursive_error_2() {
 }
 
 #[test]
-#[should_panic(expected = "Detected reference loop with reference paths [\"baz\", \"foo\"].")]
 fn test_resolve_nested_recursive_error() {
     let p = r#"
     foo: ${baz}
@@ -292,7 +291,18 @@ fn test_resolve_nested_recursive_error() {
     let reftoken = parse_ref("${foo}").unwrap();
 
     let mut state = ResolveState::default();
-    let _v = reftoken
+    let v = reftoken
         .resolve(&p, &mut state, &RenderOpts::default())
         .unwrap();
+    // nested recursive error doesn't raise an error in `resolve()` anymore
+    let mut expected = Mapping::new();
+    expected
+        .insert(
+            "qux".into(),
+            Value::ResolveError(
+                "Detected reference loop with reference paths [\"baz\", \"foo\"].".into(),
+            ),
+        )
+        .unwrap();
+    assert_eq!(v, Value::Mapping(expected));
 }
