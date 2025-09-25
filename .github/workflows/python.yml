@@ -84,6 +84,7 @@ jobs:
         run: |
           set -e
           rustup install --profile=minimal stable
+          rustup default stable
           rustup show active-toolchain
           rustc --version
           python3 -m venv .venv
