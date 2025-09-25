@@ -83,7 +83,11 @@ jobs:
         shell: bash
         run: |
           set -e
+          rustup show active-toolchain
+          rustc --version
           rustup install --profile=minimal stable
+          rustup show active-toolchain
+          rustc --version
           rustup default stable
           rustup show active-toolchain
           rustc --version
