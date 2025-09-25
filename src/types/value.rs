@@ -276,6 +276,15 @@ impl Value {
         }
     }
 
+    /// Checks if the `Value` is a scalar type
+    ///
+    /// Returns true for any variants other than Mapping, Sequence and ValueList
+    #[inline]
+    #[must_use]
+    pub fn is_scalar(&self) -> bool {
+        !self.is_mapping() && !self.is_sequence() && !self.is_value_list()
+    }
+
     /// Checks if the `Value` is a Mapping.
     #[inline]
     #[must_use]
