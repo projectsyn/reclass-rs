@@ -576,7 +576,7 @@ impl Value {
                 // reference to a Mapping.
                 // NOTE(sg): Empty ValueLists are interpolated as Value::Null.
                 let mut r = Value::Null;
-                for v in l {
+                for (i, v) in l.iter().enumerate() {
                     // For each ValueList layer, we pass a copy of the current resolution state to
                     // the recursive call to interpolate, since references in different ValueList
                     // layers can't form loops with each other (Intuitively: either we manage to
@@ -584,7 +584,13 @@ impl Value {
                     // done with a layer, any references that we saw there have been successfully
                     // resolved, and don't matter for the next layer we're interpolating).
                     let mut st = state.clone();
-                    r.merge(v.interpolate(root, &mut st)?, &mut st)?;
+                    let iv = v.interpolate(root, &mut st);
+                    if iv.is_err() && i < l.len() - 1 && r.is_scalar() {
+                        // inner layer -> allow missing refs for scalar values
+                        eprintln!("[WARN] Ignoring interpolation error: {}", iv.err().unwrap());
+                        continue;
+                    }
+                    r.merge(iv?, &mut st)?;
                 }
                 // Depending on the structure of the ValueList, we may end up with a final
                 // interpolated Value which contains more ValueLists due to mapping merges. Such
