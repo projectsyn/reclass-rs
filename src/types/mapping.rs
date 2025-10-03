@@ -10,6 +10,7 @@ use std::hash::{Hash, Hasher};
 
 use super::value::Value;
 use super::KeyPrefix;
+use crate::config::RenderOpts;
 use crate::refs::ResolveState;
 
 /// Represents a YAML mapping in a form suitable to manage Reclass parameters.
@@ -405,13 +406,13 @@ impl Mapping {
     ///
     /// Used in `Value::flattened()` to preserve const and override key information when flattening
     /// Mapping values.
-    pub(super) fn flattened(&self, state: &mut ResolveState) -> Result<Self> {
+    pub(super) fn flattened(&self, state: &mut ResolveState, opts: &RenderOpts) -> Result<Self> {
         let mut res = Self::new();
         for (k, v) in self {
             // Propagate key properties to the resulting mapping by using `insert_impl()`.
             res.insert_impl(
                 k.clone(),
-                v.flattened(state)?,
+                v.flattened(state, opts)?,
                 self.is_const(k),
                 self.is_override(k),
             )?;
@@ -425,7 +426,12 @@ impl Mapping {
     /// The method looks up reference values in parameter `root`. After interpolation of each
     /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
-    pub(super) fn interpolate(&self, root: &Self, state: &mut ResolveState) -> Result<Self> {
+    pub(super) fn interpolate(
+        &self,
+        root: &Self,
+        state: &mut ResolveState,
+        opts: &RenderOpts,
+    ) -> Result<Self> {
         let mut res = Self::new();
         for (k, v) in self {
             // Reference loops in mappings can't be stretched across key-value pairs, so we pass a
@@ -435,8 +441,8 @@ impl Mapping {
             // don't and the whole interpolation is aborted.
             let mut st = state.clone();
             st.push_mapping_key(k)?;
-            let mut v = v.interpolate(root, &mut st)?;
-            v.flatten(&mut st)?;
+            let mut v = v.interpolate(root, &mut st, opts)?;
+            v.flatten(&mut st, opts)?;
             // Propagate key properties to the resulting mapping by using `insert_impl()`.
             res.insert_impl(k.clone(), v, self.is_const(k), self.is_override(k))?;
         }

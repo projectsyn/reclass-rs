@@ -5,14 +5,14 @@ use std::str::FromStr;
 impl Mapping {
     pub(super) fn render(&self, root: &Self) -> Result<Self> {
         let mut state = ResolveState::default();
-        self.interpolate(root, &mut state)
+        self.interpolate(root, &mut state, &RenderOpts::default())
     }
 }
 
 fn sequence_literal(v: Vec<Value>) -> Value {
     let mut state = ResolveState::default();
     Value::Sequence(v)
-        .interpolate(&Mapping::new(), &mut state)
+        .interpolate(&Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap()
 }
 
@@ -492,7 +492,7 @@ fn test_merge_interpolate_loop() {
     p.merge(&config1).unwrap();
 
     let mut v = Value::from(p);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
 
 #[test]
@@ -512,7 +512,7 @@ fn test_interpolate_sequence_loop() {
     let base = Mapping::from_str(base).unwrap();
 
     let mut v = Value::from(base);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
 
 #[test]
@@ -533,7 +533,7 @@ fn test_interpolate_nested_mapping_loop() {
     let m = Mapping::from_str(m).unwrap();
 
     let mut v = Value::from(m);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
 
 #[test]
@@ -554,5 +554,5 @@ fn test_interpolate_depth_exceeded() {
     });
     map.insert("baz".into(), refstr.into()).unwrap();
     let mut v = Value::from(map);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
