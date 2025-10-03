@@ -26,11 +26,12 @@ pub struct Inventory {
 impl Inventory {
     /// Renders the full inventory for the given Reclass config.
     pub fn render(r: &Reclass) -> Result<Self> {
+        let exports = r.render_exports()?;
         // Render all nodes
         let infos: Vec<_> = r
             .nodes
             .par_iter()
-            .map(|(name, _)| (name, { r.render_node(name) }))
+            .map(|(name, _)| (name, { r.render_node(name, &exports) }))
             .collect();
 
         // Generate `Inventory` from the rendered nodes
@@ -97,6 +98,7 @@ impl Inventory {
 #[cfg(test)]
 mod inventory_tests {
     use super::*;
+    use crate::types::Mapping;
     use std::collections::HashSet;
 
     #[test]
@@ -620,5 +622,36 @@ mod inventory_tests {
         class_mappings_validate_a(&inv.nodes[&"test.a".to_owned()], &c);
         class_mappings_validate_b(&inv.nodes[&"production.b".to_owned()], &c);
         class_mappings_validate_c(&inv.nodes[&"test.c".to_owned()], &c);
+    }
+
+    #[test]
+    fn test_inventory_inv_queries() {
+        let c =
+            crate::Config::new(Some("./tests/inventory-inv-queries"), None, None, None).unwrap();
+        let r = Reclass::new_from_config(c).unwrap();
+        let inv = Inventory::render(&r).unwrap();
+
+        dbg!(&inv);
+
+        let mut expected_n1 = Mapping::new();
+        expected_n1
+            .insert("n1".into(), Value::Literal("n1".to_owned()))
+            .unwrap();
+        let mut expected_n2 = expected_n1.clone();
+        expected_n2
+            .insert("n2".into(), Value::Literal("n2".to_owned()))
+            .unwrap();
+
+        let n1_nodes = inv.nodes[&"n1".to_owned()]
+            .parameters
+            .get(&"nodes".into())
+            .unwrap();
+        let n2_nodes = inv.nodes[&"n2".to_owned()]
+            .parameters
+            .get(&"nodes".into())
+            .unwrap();
+
+        assert_eq!(n1_nodes, &Value::Mapping(expected_n1));
+        assert_eq!(n2_nodes, &Value::Mapping(expected_n2));
     }
 }

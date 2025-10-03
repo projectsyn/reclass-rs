@@ -1,0 +1,13 @@
+parameters:
+  foo: foo
+  bar: bar
+
+  nodes: $[ exports:node ]
+
+  n2_nodes: $[ if exports:node == n2 ]
+  n2_data: $[ exports:n2_data ]
+
+
+exports:
+  node: n2
+  n2_data: foo

@@ -47,7 +47,7 @@ fn test_flattened_string() {
 #[test]
 fn test_flattened_nested_mapping() {
     let m = Value::Mapping(Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}").unwrap());
-    let f = m.rendered(&Mapping::new()).unwrap();
+    let f = m.rendered(&Mapping::new(), &Exports::default()).unwrap();
     let mut foo = Mapping::new();
     foo.insert("foo".into(), Value::Literal("foo".to_string()))
         .unwrap();
@@ -214,7 +214,7 @@ fn test_flattened_nested_mapping_value_list() {
     ]);
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
-    let f = v.rendered(&Mapping::new()).unwrap();
+    let f = v.rendered(&Mapping::new(), &Exports::default()).unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected =
@@ -255,7 +255,7 @@ fn test_flattened_nested_mapping_value_list_2() {
     ]);
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
-    let f = v.rendered(&Mapping::new()).unwrap();
+    let f = v.rendered(&Mapping::new(), &Exports::default()).unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected = serde_yaml::from_str(
@@ -280,7 +280,7 @@ fn test_flattened_nested_mapping_value_list_3() {
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
     let f = Value::Mapping(dbg!(base))
-        .rendered(&Mapping::new())
+        .rendered(&Mapping::new(), &Exports::default())
         .unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
@@ -307,7 +307,7 @@ fn test_flatten_value_list() {
     base.merge(&m4).unwrap();
 
     let mut v = Value::Mapping(base);
-    v.render(&Mapping::new()).unwrap();
+    v.render(&Mapping::new(), &Exports::default()).unwrap();
     assert!(v.is_mapping());
 
     let m: serde_yaml::Mapping = v.as_mapping().unwrap().clone().into();

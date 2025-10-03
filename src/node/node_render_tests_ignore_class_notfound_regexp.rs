@@ -1,5 +1,5 @@
 use crate::types::Value;
-use crate::{Config, Reclass};
+use crate::{Config, Exports, Reclass};
 
 #[test]
 fn test_render_n1() {
@@ -13,7 +13,7 @@ fn test_render_n1() {
     c.load_from_file("reclass-config.yml", false).unwrap();
     let r = Reclass::new_from_config(c).unwrap();
 
-    let n1 = r.render_node("n1").unwrap();
+    let n1 = r.render_node("n1", &Exports::default()).unwrap();
     assert_eq!(
         n1.classes,
         vec!["service.foo", "service.bar", "missing", "a", "amissing"]
@@ -36,6 +36,6 @@ fn test_render_n2() {
     c.load_from_file("reclass-config.yml", false).unwrap();
     let r = Reclass::new_from_config(c).unwrap();
 
-    let n2 = r.render_node("n2");
+    let n2 = r.render_node("n2", &Exports::default());
     assert!(n2.is_err());
 }

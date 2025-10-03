@@ -7,7 +7,9 @@ fn test_resolve_ref_str() {
     let params = Mapping::from_str("foo: bar").unwrap();
 
     let mut state = ResolveState::default();
-    let v = token.resolve(&params, &mut state).unwrap();
+    let v = token
+        .resolve(&params, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("bar".into()));
 }
 
@@ -17,7 +19,9 @@ fn test_resolve_ref_val() {
     let params = Mapping::from_str("foo: True").unwrap();
 
     let mut state = ResolveState::default();
-    let v = token.resolve(&params, &mut state).unwrap();
+    let v = token
+        .resolve(&params, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Bool(true));
 }
 
@@ -27,7 +31,9 @@ fn test_resolve_literal() {
     let params = Mapping::new();
 
     let mut state = ResolveState::default();
-    let v = token.resolve(&params, &mut state).unwrap();
+    let v = token
+        .resolve(&params, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
 
@@ -40,7 +46,9 @@ fn test_resolve_combined() {
     let params = Mapping::from_str("{foo: bar, bar: baz}").unwrap();
 
     let mut state = ResolveState::default();
-    let v = token.resolve(&params, &mut state).unwrap();
+    let v = token
+        .resolve(&params, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foobar".into()));
 }
 #[test]
@@ -53,7 +61,9 @@ fn test_resolve_combined_2() {
     let params = Mapping::from_str(r#"{foo: "${bar}", bar: baz}"#).unwrap();
 
     let mut state = ResolveState::default();
-    let v = token.resolve(&params, &mut state).unwrap();
+    let v = token
+        .resolve(&params, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foobaz".into()));
 }
 
@@ -70,7 +80,9 @@ fn test_resolve_combined_3() {
     let params = Mapping::from_str(params).unwrap();
 
     let mut state = ResolveState::default();
-    let v = token.resolve(&params, &mut state).unwrap();
+    let v = token
+        .resolve(&params, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foo${bar}".into()));
 }
 
@@ -113,7 +125,9 @@ fn test_resolve() {
 
     let mut state = ResolveState::default();
     assert_eq!(
-        reftoken.resolve(&p, &mut state).unwrap(),
+        reftoken
+            .resolve(&p, &Exports::default(), &mut state)
+            .unwrap(),
         Value::Literal("foo".into())
     );
 }
@@ -124,7 +138,9 @@ fn test_resolve_subkey() {
     let reftoken = parse_ref(&"${foo:foo}").unwrap();
 
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
 
@@ -134,7 +150,9 @@ fn test_resolve_nested() {
     let reftoken = parse_ref(&"${bar:${foo}}").unwrap();
 
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foo".into()));
 }
 
@@ -150,7 +168,9 @@ fn test_resolve_nested_subkey() {
     // ${bar:${foo:bar}} == ${bar:foo} == foo
     let reftoken = parse_ref(&"${bar:${foo:bar}}").unwrap();
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("foo".to_string()));
 }
 
@@ -166,7 +186,9 @@ fn test_resolve_kapitan_secret_ref() {
     let reftoken = parse_ref(&"?{vaultkv:foo/bar/${baz:baz}/qux}").unwrap();
     dbg!(&reftoken);
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("?{vaultkv:foo/bar/baz/qux}".to_string()));
 }
 
@@ -181,7 +203,9 @@ fn test_resolve_escaped_ref() {
 
     let reftoken = parse_ref("\\${PROJECT_LABEL}").unwrap();
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(v, Value::Literal("${PROJECT_LABEL}".to_string()));
 }
 
@@ -195,7 +219,9 @@ fn test_resolve_mapping_value() {
     let p = Mapping::from_str(p).unwrap();
     let reftoken = parse_ref("${foo}").unwrap();
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(
         v,
         Value::Mapping(Mapping::from_str("{bar: bar, baz: baz}").unwrap())
@@ -212,7 +238,9 @@ fn test_resolve_mapping_embedded() {
     let p = Mapping::from_str(p).unwrap();
     let reftoken = parse_ref("foo: ${foo}").unwrap();
     let mut state = ResolveState::default();
-    let v = reftoken.resolve(&p, &mut state).unwrap();
+    let v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
     assert_eq!(
         v,
         // Mapping is serialized as JSON when embedded in a string. serde_json emits JSON maps
@@ -231,7 +259,9 @@ fn test_resolve_recursive_error() {
     let reftoken = parse_ref("${foo}").unwrap();
 
     let mut state = ResolveState::default();
-    let _v = reftoken.resolve(&p, &mut state).unwrap();
+    let _v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
 }
 
 #[test]
@@ -245,7 +275,9 @@ fn test_resolve_recursive_error_2() {
     let reftoken = parse_ref("${foo}").unwrap();
 
     let mut state = ResolveState::default();
-    let _v = reftoken.resolve(&p, &mut state).unwrap();
+    let _v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
 }
 
 #[test]
@@ -260,5 +292,7 @@ fn test_resolve_nested_recursive_error() {
     let reftoken = parse_ref("${foo}").unwrap();
 
     let mut state = ResolveState::default();
-    let _v = reftoken.resolve(&p, &mut state).unwrap();
+    let _v = reftoken
+        .resolve(&p, &Exports::default(), &mut state)
+        .unwrap();
 }
