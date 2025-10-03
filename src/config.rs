@@ -166,6 +166,11 @@ impl ClassMapping {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct RenderOpts {
+    pub ignore_overwritten_missing_references: bool,
+}
+
 #[pyclass]
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -210,6 +215,10 @@ pub struct Config {
     // determines the order in which classes are included and class include order can be
     // semantically relevant depending on the contents of each included class.
     class_mappings_patterns: Vec<ClassMapping>,
+    /// Whether to ignore missing overwritten references in scalar values.
+    /// Defaults to `TBD`
+    #[pyo3(get)]
+    pub ignore_overwritten_missing_references: bool,
 }
 
 impl Config {
@@ -266,6 +275,7 @@ impl Config {
             class_mappings: Vec::new(),
             class_mappings_patterns: Vec::new(),
             class_mappings_match_path: false,
+            ignore_overwritten_missing_references: true, //XXX(sg): default value
         })
     }
 
@@ -351,6 +361,11 @@ impl Config {
                         ))
                     })
                     .collect::<Result<Vec<String>>>()?;
+            }
+            "ignore_overwritten_missing_references" => {
+                self.ignore_overwritten_missing_references = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'ignore_overwritten_missing_references' to be a boolean"
+                ))?;
             }
             _ => {
                 if verbose {
@@ -448,6 +463,12 @@ impl Config {
         let mut invpath = PathBuf::from(&self.classes_path);
         invpath.push(cpath);
         invpath
+    }
+
+    pub fn get_render_opts(&self) -> RenderOpts {
+        let mut opts = RenderOpts::default();
+        opts.ignore_overwritten_missing_references = self.ignore_overwritten_missing_references;
+        opts
     }
 }
 
