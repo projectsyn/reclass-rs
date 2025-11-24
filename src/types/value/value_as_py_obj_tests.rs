@@ -14,7 +14,7 @@ fn test_as_py_obj_bool() {
     Python::attach(|py| {
         let b = Value::Bool(true).as_py_obj(py).unwrap();
         assert!(b.is_instance_of::<pyo3::types::PyBool>());
-        assert!(b.downcast_exact::<pyo3::types::PyBool>().unwrap().is_true());
+        assert!(b.cast_exact::<pyo3::types::PyBool>().unwrap().is_true());
     });
 }
 
@@ -27,7 +27,7 @@ fn test_as_py_obj_int() {
             let pyn = n.as_py_obj(py).unwrap();
             let n = n.as_i64().unwrap();
             assert!(pyn.is_instance_of::<pyo3::types::PyInt>());
-            assert!(pyn.downcast_exact::<pyo3::types::PyInt>().unwrap().eq(&n));
+            assert!(pyn.cast_exact::<pyo3::types::PyInt>().unwrap().eq(&n));
         }
     });
 }
@@ -39,10 +39,7 @@ fn test_as_py_obj_float() {
         let n: Value = 3.14.into();
         let n = n.as_py_obj(py).unwrap();
         assert!(n.is_instance_of::<pyo3::types::PyFloat>());
-        assert!(n
-            .downcast_exact::<pyo3::types::PyFloat>()
-            .unwrap()
-            .eq(&3.14));
+        assert!(n.cast_exact::<pyo3::types::PyFloat>().unwrap().eq(&3.14));
     });
 }
 
@@ -54,7 +51,7 @@ fn test_as_py_obj_sequence() {
         let s = s.as_py_obj(py).unwrap();
         assert!(s.is_instance_of::<pyo3::types::PyList>());
         assert!(s
-            .downcast_exact::<pyo3::types::PyList>()
+            .cast_exact::<pyo3::types::PyList>()
             .unwrap()
             .eq(&vec![1, 2, 3])
             .unwrap());
@@ -70,7 +67,7 @@ fn test_as_py_obj_string() {
             .unwrap();
         assert!(s.is_instance_of::<pyo3::types::PyString>());
         assert_eq!(
-            s.downcast_exact::<pyo3::types::PyString>()
+            s.cast_exact::<pyo3::types::PyString>()
                 .unwrap()
                 .to_str()
                 .unwrap(),

@@ -135,7 +135,7 @@ impl TryFrom<Bound<'_, PyAny>> for Value {
                 Ok(Self::String(v.to_string()))
             }
             "list" => {
-                let v = value.downcast::<PySequence>()?;
+                let v = value.cast::<PySequence>()?;
                 let mut items: Vec<Value> = vec![];
                 for it in v.try_iter()? {
                     items.push(TryInto::try_into(it?)?);
@@ -143,7 +143,7 @@ impl TryFrom<Bound<'_, PyAny>> for Value {
                 Ok(Self::Sequence(items))
             }
             "dict" => {
-                let dict = value.downcast::<PyDict>()?;
+                let dict = value.cast::<PyDict>()?;
                 let mut mapping = crate::types::Mapping::new();
                 for (k, v) in dict {
                     let kv = TryInto::try_into(k)?;
