@@ -111,7 +111,7 @@ mod inventory_tests {
         let mut nodes = inv.nodes.keys().cloned().collect::<Vec<String>>();
         nodes.sort();
 
-        let mut expected_nodes = (1..=25).map(|n| format!("n{n}")).collect::<Vec<String>>();
+        let mut expected_nodes = (1..=26).map(|n| format!("n{n}")).collect::<Vec<String>>();
         expected_nodes.sort();
 
         assert_eq!(nodes, expected_nodes);
@@ -189,7 +189,9 @@ mod inventory_tests {
         expected_classes.insert("nested.cls1".into(), vec!["n2".into()]);
         expected_classes.insert("nested.cls2".into(), vec!["n2".into()]);
         expected_classes.insert("nonexisting".into(), vec!["n18".into()]);
+        expected_classes.insert("overridden".into(), vec!["n26".into()]);
         expected_classes.insert("override".into(), vec!["n24".into()]);
+        expected_classes.insert("overriding".into(), vec!["n26".into()]);
         expected_classes.insert("yaml-anchor".into(), vec!["n21".into()]);
 
         assert_eq!(inv.classes, expected_classes);

@@ -49,7 +49,9 @@ expected_classes = {
     "nested.cls1": ["n2"],
     "nested.cls2": ["n2"],
     "nonexisting": ["n18"],
+    "overridden": ["n26"],
     "override": ["n24"],
+    "overriding": ["n26"],
     "yaml-anchor": ["n21"],
 }
 
@@ -62,7 +64,7 @@ expected_applications = {
     "d": ["n13"],
 }
 
-expected_nodes = {f"n{i}" for i in range(1, 26)}
+expected_nodes = {f"n{i}" for i in range(1, 27)}
 
 
 def test_inventory():

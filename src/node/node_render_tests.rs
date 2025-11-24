@@ -630,3 +630,38 @@ fn test_render_n25() {
     assert_eq!(n.parameters, expected);
     assert_eq!(n.classes, vec!["bar", "foo"]);
 }
+
+#[test]
+fn test_render_n26() {
+    let r = make_reclass();
+    let n = r.render_node("n26").unwrap();
+
+    let expected = expected_params(
+        "n26",
+        r#"
+        foo: bar
+        baz: qux
+        base: n26
+        complex:
+          data:
+            structure:
+              with: with
+              some: some
+              missing: missing
+              overwritten: overwritten
+              references: references
+        extra: with
+        nested:
+          extra:
+            with: with
+            some: some
+            missing: missing
+            overwritten: overwritten
+            references: references
+        embedded: with some missing overwritten references
+        "#,
+    );
+    println!("{:#?}", n.parameters);
+    assert_eq!(n.parameters, expected);
+    assert_eq!(n.classes, vec!["overridden", "overriding"]);
+}

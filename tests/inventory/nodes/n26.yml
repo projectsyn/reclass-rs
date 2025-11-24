@@ -1,0 +1,11 @@
+classes:
+  - overridden
+  - overriding
+parameters:
+  baz: qux
+  base: n26
+  complex:
+    data:
+      structure:
+        missing: missing
+        references: references
