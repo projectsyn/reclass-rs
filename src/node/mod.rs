@@ -236,12 +236,12 @@ impl Node {
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
                     // just convert cls into an owned String.
-                    cls.to_string()
+                    cls.clone()
                 }
             } else {
                 // If the class name doesn't contain any opening reference symbols, it can't
                 // contain any references, just convert cls into an owned String.
-                cls.to_string()
+                cls.clone()
             };
 
             // Check if we've seen the class already after resolving any references in the class
@@ -266,7 +266,7 @@ impl Node {
             // NOTE(sg): we don't need to merge here, since we've already merged into root as part
             // of the recursive call to `render_impl()`
 
-            seen.push(cls.to_string());
+            seen.push(cls.clone());
         }
 
         // merge self into root, then update self with merged values

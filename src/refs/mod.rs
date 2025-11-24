@@ -165,7 +165,7 @@ impl Token {
     fn resolve(&self, params: &Mapping, state: &mut ResolveState) -> Result<Value> {
         match self {
             // Literal tokens can be directly turned into `Value::Literal`
-            Self::Literal(s) => Ok(Value::Literal(s.to_string())),
+            Self::Literal(s) => Ok(Value::Literal(s.clone())),
             Self::Combined(tokens) => {
                 let res = interpolate_token_slice(tokens, params, state)?;
                 // The result of `interpolate_token_slice()` for a `Token::Combined()` can't result
