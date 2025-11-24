@@ -5,6 +5,7 @@ use std::path::PathBuf;
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::config::RenderOpts;
 use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
@@ -231,7 +232,7 @@ impl Node {
                     // `raw_string()` to ensure no spurious quotes are injected.
                     let mut state = ResolveState::default();
                     clstoken
-                        .render(&root.parameters, &mut state)?
+                        .render(&root.parameters, &mut state, &r.config.get_render_opts())?
                         .raw_string()?
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
@@ -275,10 +276,10 @@ impl Node {
 
     /// Renders the Node's parameters by interpolating Reclass references and flattening
     /// ValueLists.
-    fn render_parameters(&mut self) -> Result<()> {
+    fn render_parameters(&mut self, opts: &RenderOpts) -> Result<()> {
         let p = std::mem::take(&mut self.parameters);
         let mut f = Value::Mapping(p);
-        f.render_with_self()?;
+        f.render_with_self(opts)?;
         match f {
             Value::Mapping(m) => {
                 self.parameters = m;
@@ -314,7 +315,7 @@ impl Node {
         base.render_impl(r, &mut seen, &mut root)?;
         // Then render ourselves into the rendered base and update ourselves with the result
         self.render_impl(r, &mut seen, &mut base)?;
-        self.render_parameters()
+        self.render_parameters(&r.config.get_render_opts())
     }
 }
 

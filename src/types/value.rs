@@ -8,6 +8,7 @@ use std::mem;
 
 use super::KeyPrefix;
 use super::{Mapping, Sequence};
+use crate::config::RenderOpts;
 use crate::refs::{ResolveState, Token};
 
 /// Represents a YAML value in a form suitable for processing Reclass parameters.
@@ -537,14 +538,19 @@ impl Value {
     ///
     /// Note that users should prefer calling `Value::rendered()` or one of its in-place variants
     /// over this method.
-    pub(crate) fn interpolate(&self, root: &Mapping, state: &mut ResolveState) -> Result<Self> {
+    pub(crate) fn interpolate(
+        &self,
+        root: &Mapping,
+        state: &mut ResolveState,
+        opts: &RenderOpts,
+    ) -> Result<Self> {
         Ok(match self {
             Self::String(s) => {
                 // String interpolation parses any Reclass references in the String and resolves
                 // them. The result of `Token::render()` can be an arbitrary Value, except for
                 // `Value::String()`, since `render()` will recursively call `interpolate()`.
                 if let Some(token) = Token::parse(s)? {
-                    token.render(root, state)?
+                    token.render(root, state, opts)?
                 } else {
                     // If Token::parse() returns None, we can be sure that there's no references
                     // int the String, and just return the string as a `Value::Literal`.
@@ -552,7 +558,7 @@ impl Value {
                 }
             }
             // Mappings are interpolated by calling `Mapping::interpolate()`.
-            Self::Mapping(m) => Self::Mapping(m.interpolate(root, state)?),
+            Self::Mapping(m) => Self::Mapping(m.interpolate(root, state, opts)?),
             Self::Sequence(s) => {
                 // Sequences are interpolated by calling interpolate() for each element.
                 let mut seq = vec![];
@@ -564,7 +570,7 @@ impl Value {
                     // we've fully interpolated a Sequence.
                     let mut st = state.clone();
                     st.push_list_index(idx)?;
-                    let e = it.interpolate(root, &mut st)?;
+                    let e = it.interpolate(root, &mut st, opts)?;
                     seq.push(e);
                 }
                 Self::Sequence(seq)
@@ -584,7 +590,7 @@ impl Value {
                     // done with a layer, any references that we saw there have been successfully
                     // resolved, and don't matter for the next layer we're interpolating).
                     let mut st = state.clone();
-                    r.merge(v.interpolate(root, &mut st)?, &mut st)?;
+                    r.merge(v.interpolate(root, &mut st, opts)?, &mut st, opts)?;
                 }
                 // Depending on the structure of the ValueList, we may end up with a final
                 // interpolated Value which contains more ValueLists due to mapping merges. Such
@@ -593,7 +599,7 @@ impl Value {
                 // once `Token::render()` doesn't produce new `Value::String()`.
                 // For this interpolation, we need to actually update the resolution state, so we
                 // pass in the `state` which we were called with.
-                r.interpolate(root, state)?
+                r.interpolate(root, state, opts)?
             }
             _ => self.clone(),
         })
@@ -610,7 +616,7 @@ impl Value {
     ///
     /// Note that this method will call [`Value::flatten()`] after merging two Mappings to ensure
     /// that the resulting Value doesn't contain any `ValueList` elements.
-    fn merge(&mut self, other: Self, state: &mut ResolveState) -> Result<()> {
+    fn merge(&mut self, other: Self, state: &mut ResolveState, opts: &RenderOpts) -> Result<()> {
         if other.is_null() {
             // Any value can be replaced by null,
             let _prev = std::mem::replace(self, other);
@@ -619,7 +625,7 @@ impl Value {
 
         // If `other` is a ValueList, flatten it before trying to merge
         let other = if other.is_value_list() {
-            other.flattened(state)?
+            other.flattened(state, opts)?
         } else {
             other
         };
@@ -685,7 +691,7 @@ impl Value {
     ///
     /// Note that we don't recommend calling `flattened()` on arbitrary Values. Users should always
     /// prefer calling [`Value::rendered()`] or one of the in-place variations of that method.
-    pub(crate) fn flattened(&self, state: &mut ResolveState) -> Result<Self> {
+    pub(crate) fn flattened(&self, state: &mut ResolveState, opts: &RenderOpts) -> Result<Self> {
         match self {
             // Flatten ValueList by iterating over its elements and merging each element into a
             // base Value.
@@ -693,17 +699,17 @@ impl Value {
                 // NOTE(sg): Empty ValueLists get flattened to Value::Null
                 let mut base = Value::Null;
                 for v in l {
-                    base.merge(v.clone(), state)?;
+                    base.merge(v.clone(), state, opts)?;
                 }
                 Ok(base)
             }
             // Flatten Mapping by flattening each value and inserting it into a new Mapping.
-            Self::Mapping(m) => Ok(Self::Mapping(m.flattened(state)?)),
+            Self::Mapping(m) => Ok(Self::Mapping(m.flattened(state, opts)?)),
             // Flatten Sequence by flattening each element and inserting it into a new Sequence
             Self::Sequence(s) => {
                 let mut n = Vec::with_capacity(s.len());
                 for v in s {
-                    n.push(v.flattened(state)?);
+                    n.push(v.flattened(state, opts)?);
                 }
                 Ok(Self::Sequence(n))
             }
@@ -719,8 +725,8 @@ impl Value {
     /// Flattens the Value in-place.
     ///
     /// See [`Value::flattened()`] for details.
-    pub(super) fn flatten(&mut self, state: &mut ResolveState) -> Result<()> {
-        let _prev = std::mem::replace(self, self.flattened(state)?);
+    pub(super) fn flatten(&mut self, state: &mut ResolveState, opts: &RenderOpts) -> Result<()> {
+        let _prev = std::mem::replace(self, self.flattened(state, opts)?);
         Ok(())
     }
 
@@ -732,20 +738,20 @@ impl Value {
     /// The method first interpolates any Reclass references found in the Value by looking up the
     /// reference keys in `root`. After all references have been interpolated, the method flattens
     /// any remaining ValueLists and returns the final "flattened" value.
-    pub fn rendered(&self, root: &Mapping) -> Result<Self> {
+    pub fn rendered(&self, root: &Mapping, opts: &RenderOpts) -> Result<Self> {
         let mut state = ResolveState::default();
         let mut v = self
-            .interpolate(root, &mut state)
+            .interpolate(root, &mut state, opts)
             .map_err(|e| anyhow!("While resolving references: {e}"))?;
-        v.flatten(&mut state)?;
+        v.flatten(&mut state, opts)?;
         Ok(v)
     }
 
     /// Renders the Value in-place.
     ///
     /// See [`Value::rendered()`] for details.
-    pub fn render(&mut self, root: &Mapping) -> Result<()> {
-        let _prev = std::mem::replace(self, self.rendered(root)?);
+    pub fn render(&mut self, root: &Mapping, opts: &RenderOpts) -> Result<()> {
+        let _prev = std::mem::replace(self, self.rendered(root, opts)?);
         Ok(())
     }
 
@@ -753,14 +759,14 @@ impl Value {
     /// Returns an error when called for a Value variant other than `Value::Mapping`.
     ///
     /// See [`Value::rendered()`] for details on how Reclass references are rendered.
-    pub fn render_with_self(&mut self) -> Result<()> {
+    pub fn render_with_self(&mut self, opts: &RenderOpts) -> Result<()> {
         let m = self.as_mapping().ok_or_else(|| {
             anyhow!(
                 "Can't render {} with itself as the parameter source",
                 self.variant()
             )
         })?;
-        let n = self.rendered(m)?;
+        let n = self.rendered(m, opts)?;
         let _prev = std::mem::replace(self, n);
         Ok(())
     }

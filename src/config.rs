@@ -166,6 +166,9 @@ impl ClassMapping {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct RenderOpts {}
+
 #[pyclass]
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -448,6 +451,16 @@ impl Config {
         let mut invpath = PathBuf::from(&self.classes_path);
         invpath.push(cpath);
         invpath
+    }
+
+    pub fn get_render_opts(&self) -> RenderOpts {
+        self.into()
+    }
+}
+
+impl From<&Config> for RenderOpts {
+    fn from(_value: &Config) -> Self {
+        Self {}
     }
 }
 
