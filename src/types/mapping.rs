@@ -388,15 +388,50 @@ impl Mapping {
     ///
     /// This function will update the current map's constant key set with any keys that are marked
     /// as constant in the `other` map.
-    pub fn merge(&mut self, other: &Self) -> Result<()> {
+    pub fn merge(&mut self, other: &Self, state: &ResolveState, opts: &RenderOpts) -> Result<()> {
         for (k, v) in other {
             // ValueList merging is implemented in insert_impl
-            self.insert_impl(
+            let p = self.insert_impl(
                 k.clone(),
                 v.clone(),
                 other.is_const(k),
                 other.is_override(k),
             )?;
+            if other.is_override(k) {
+                if let Some(p) = p {
+                    let mut st = state.clone();
+                    st.push_mapping_key(k)?;
+                    let key = st.current_key();
+                    match p {
+                        Value::ResolveError(errmsg) => {
+                            if opts.ignore_overwritten_missing_references {
+                                #[cfg(not(feature = "bench"))]
+                                eprintln!("[WARN] Ignoring resolve error: {errmsg}");
+                            } else {
+                                return Err(anyhow!(errmsg));
+                            }
+                        }
+                        Value::String(s) => {
+                            if s.contains("${") {
+                                #[cfg(not(feature = "bench"))]
+                                eprintln!(
+                                    "[WARN] Dropping potentially missing reference in \
+                                    overrridden unrendered value '{s}' for parameter '{key}'"
+                                );
+                            }
+                        }
+                        _ => {
+                            // TODO(sg): can we make this more accurate?
+                            #[cfg(not(feature = "bench"))]
+                            eprintln!(
+                                "[WARN] Dropping unrendered {} which may contain \
+                                missing references for parameter '{key}'",
+                                p.variant()
+                            );
+                        }
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -975,7 +1010,8 @@ mod mapping_tests {
         "#;
         let m = Mapping::from_str(m).unwrap();
 
-        base.merge(&m).unwrap();
+        base.merge(&m, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
 
         let expected = r#"
         foo: foo
@@ -990,7 +1026,8 @@ mod mapping_tests {
         let mut base = Mapping::from_str("foo: foo").unwrap();
         let m = Mapping::from_str("foo: bar").unwrap();
 
-        base.merge(&m).unwrap();
+        base.merge(&m, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
 
         let mut expected = Mapping::new();
         expected.insert_raw(
@@ -1017,7 +1054,8 @@ mod mapping_tests {
         "#;
         let m = Mapping::from_str(m).unwrap();
 
-        base.merge(&m).unwrap();
+        base.merge(&m, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
 
         let mut expected = Mapping::new();
         expected.insert_raw(
@@ -1043,7 +1081,8 @@ mod mapping_tests {
         let mut base = Mapping::from_str("foo: foo").unwrap();
         let m = Mapping::from_str("=foo: bar").unwrap();
 
-        base.merge(&m).unwrap();
+        base.merge(&m, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
 
         let mut expected = Mapping::new();
         expected.insert_raw(
@@ -1059,7 +1098,8 @@ mod mapping_tests {
         let mut base = Mapping::from_str("foo: foo").unwrap();
         let m = Mapping::from_str("~foo: bar").unwrap();
 
-        base.merge(&m).unwrap();
+        base.merge(&m, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
 
         assert_eq!(base, Mapping::from_str("foo: bar").unwrap());
     }
@@ -1074,12 +1114,14 @@ mod mapping_tests {
 
         // here we consume the first override marker of `~~foo` in m2 which results in `~foo: baz`
         // in the merged m1
-        m1.merge(&m2).unwrap();
+        m1.merge(&m2, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
         assert_eq!(m1, Mapping::from_str("~foo: baz").unwrap());
 
         // here we consume the remaining override marker of `~foo` in the merged m1 which results
         // in `foo: baz` in the merged base
-        base.merge(&m1).unwrap();
+        base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
         assert_eq!(base, Mapping::from_str("foo: baz").unwrap());
     }
 
@@ -1091,7 +1133,8 @@ mod mapping_tests {
 
         // The merge sees overriding key `foo`, and propagates the previously stored constantness
         // of `~foo`. In the end we have mapping `{foo: bar}` where `foo` is marked constant.
-        base.merge(&m1).unwrap();
+        base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
         assert_eq!(base, Mapping::from_str("=foo: bar").unwrap());
     }
 
@@ -1103,7 +1146,8 @@ mod mapping_tests {
 
         // The merge sees a constant key `foo` which has the overriding flag set. In the end we
         // have mapping `{foo: bar}` where `foo` is marked constant.
-        base.merge(&m1).unwrap();
+        base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+            .unwrap();
         assert_eq!(base, Mapping::from_str("=foo: bar").unwrap());
     }
 }

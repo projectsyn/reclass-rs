@@ -200,7 +200,7 @@ impl Node {
     }
 
     /// Merges self into other, then updates self with merged values from other
-    fn merge_into(&mut self, other: &mut Self) -> Result<()> {
+    fn merge_into(&mut self, other: &mut Self, opts: &RenderOpts) -> Result<()> {
         // We use std::mem::take() here so we can merge self.applications into other.applications
         // without having to call `clone()` twice. This doesn't destroy `self.applications` because
         // we update `self.applications` with the result of the merge immediately afterwards.
@@ -215,7 +215,9 @@ impl Node {
         other.classes.merge(self_classes);
         self.classes = other.classes.clone();
 
-        other.parameters.merge(&self.parameters)?;
+        other
+            .parameters
+            .merge(&self.parameters, &ResolveState::default(), opts)?;
         self.parameters = other.parameters.clone();
         Ok(())
     }
@@ -271,7 +273,7 @@ impl Node {
         }
 
         // merge self into root, then update self with merged values
-        self.merge_into(root)
+        self.merge_into(root, &r.config.get_render_opts())
     }
 
     /// Renders the Node's parameters by interpolating Reclass references and flattening

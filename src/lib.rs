@@ -302,9 +302,9 @@ impl Reclass {
         verbose: bool,
     ) -> PyResult<Self> {
         let mut c = Config::new(Some(inventory_path), None, None, None)
-            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+            .map_err(|e| PyValueError::new_err(format!("creating config: {e}")))?;
         c.load_from_file(config_file, verbose)
-            .map_err(|e| PyValueError::new_err(format!("{e}")))?;
+            .map_err(|e| PyValueError::new_err(format!("loading config: {e}")))?;
         Self::from_config(cls, c)
     }
 

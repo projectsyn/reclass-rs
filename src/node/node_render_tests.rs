@@ -17,7 +17,9 @@ fn expected_params(nodename: &str, yaml: &str) -> Mapping {
     .unwrap();
 
     let mut expected = Mapping::from_str(yaml).unwrap();
-    expected.merge(&reclass).unwrap();
+    expected
+        .merge(&reclass, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     let mut expected = Value::Mapping(expected);
     expected
         .render(&Mapping::new(), &RenderOpts::default())
@@ -659,6 +661,9 @@ fn test_render_n26() {
             overwritten: overwritten
             references: references
         embedded: with some missing overwritten references
+        missing_top: hard override
+        missing:
+          nested: hard override
         "#,
     );
     println!("{:#?}", n.parameters);

@@ -10,3 +10,7 @@ parameters:
         missing: ${complex:data:structure:invalid}
         overwritten: overwritten
         references: ${complex:data:structure:overwritten:references}
+
+  missing_top: ${missingref}
+  missing:
+    nested: ${missingref}

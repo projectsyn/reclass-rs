@@ -286,10 +286,14 @@ fn test_flattened_nested_mapping_value_list_3() {
     let m2 = Mapping::from_str("{foo: [qux], qux: {foo: {bar: bar}}}").unwrap();
     let m3 = Mapping::from_str("qux: {foo: {foo: qux}}").unwrap();
     let m4 = Mapping::from_str("qux: {foo: {bar: baz}}").unwrap();
-    base.merge(&m1).unwrap();
-    base.merge(&m2).unwrap();
-    base.merge(&m3).unwrap();
-    base.merge(&m4).unwrap();
+    base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m2, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m3, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m4, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
@@ -315,10 +319,14 @@ fn test_flatten_value_list() {
     let m2 = Mapping::from_str("{foo: [qux], qux: {foo: {bar: bar}}}").unwrap();
     let m3 = Mapping::from_str("qux: {foo: {foo: qux}}").unwrap();
     let m4 = Mapping::from_str("qux: {foo: {bar: baz}}").unwrap();
-    base.merge(&m1).unwrap();
-    base.merge(&m2).unwrap();
-    base.merge(&m3).unwrap();
-    base.merge(&m4).unwrap();
+    base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m2, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m3, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m4, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let mut v = Value::Mapping(base);
     v.render(&Mapping::new(), &RenderOpts::default()).unwrap();

@@ -71,7 +71,7 @@ impl ResolveState {
     }
 
     /// Formats current key by joining the segements with dots.
-    fn current_key(&self) -> String {
+    pub(crate) fn current_key(&self) -> String {
         self.current_keys.join(".")
     }
 

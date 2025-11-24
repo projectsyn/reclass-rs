@@ -18,3 +18,7 @@ parameters:
     ${complex:data:structure:missing}
     ${complex:data:structure:overwritten}
     ${complex:data:structure:references}
+
+  ~missing_top: hard override
+  missing:
+    ~nested: hard override

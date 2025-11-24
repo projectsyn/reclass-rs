@@ -690,7 +690,7 @@ impl Value {
             }
             Self::Mapping(m) => match other {
                 // merge mapping and mapping
-                Self::Mapping(other) => m.merge(&other)?,
+                Self::Mapping(other) => m.merge(&other, state, opts)?,
                 _ => {
                     return Err(state.render_flattening_error(&format!(
                         "Can't merge {} over mapping",
