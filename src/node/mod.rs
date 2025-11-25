@@ -136,8 +136,7 @@ impl Node {
                 std::path::Component::CurDir => {}
                 _ => {
                     return Err(anyhow!(
-                        "Unexpected non-normal path segment in class lookup: {:?}",
-                        d
+                        "Unexpected non-normal path segment in class lookup: {d:?}",
                     ))
                 }
             }

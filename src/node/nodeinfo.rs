@@ -98,8 +98,10 @@ impl NodeInfoMeta {
             self.parts
                 .iter()
                 .map(|s| {
-                    s.to_str()
-                        .ok_or(anyhow!("Unable to convert path segment {s:?} to a string"))
+                    s.to_str().ok_or(anyhow!(
+                        "Unable to convert path segment {} to a string",
+                        s.display()
+                    ))
                 })
                 .collect::<Result<Vec<&str>, _>>()?
         };
