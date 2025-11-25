@@ -211,7 +211,10 @@ pub fn parse_ref(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
         if tokens.len() > 1 {
             Token::Combined(tokens)
         } else {
-            tokens.into_iter().next().unwrap()
+            tokens
+                .into_iter()
+                .next()
+                .expect("Expected coalesced parsed reference to have at least one token")
         }
     })
     .parse(input)
