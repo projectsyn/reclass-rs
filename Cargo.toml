@@ -2,7 +2,7 @@
 name = "reclass-rs"
 version = "0.0.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 license = "BSD-3-Clause"
 authors = ["VSHN AG <info@vshn.ch>"]
 repository = "https://github.com/projectsyn/reclass-rs"

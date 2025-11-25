@@ -43,7 +43,7 @@ Documentation on Reclass extensions introduced in the Kapicorp Reclass fork can 
 ## Prerequisites
 
 * Python >= 3.9
-* Rust >= 1.85 (we recommend installing the latest stable toolchain with [rustup])
+* Rust >= 1.87 (we recommend installing the latest stable toolchain with [rustup])
 
 ## Setup local development environment for Python bindings
 
