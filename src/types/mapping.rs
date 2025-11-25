@@ -401,32 +401,31 @@ impl Mapping {
                 if let Some(p) = p {
                     let mut st = state.clone();
                     st.push_mapping_key(k)?;
-                    let key = st.current_key();
-                    match p {
-                        Value::ResolveError(errmsg) => {
-                            if opts.ignore_overwritten_missing_references {
-                                #[cfg(not(feature = "bench"))]
-                                eprintln!("[WARN] Ignoring resolve error: {errmsg}");
-                            } else {
-                                return Err(anyhow!(errmsg));
-                            }
+                    if let Some(errmsg) = p.as_resolve_error() {
+                        if opts.ignore_overwritten_missing_references {
+                            #[cfg(not(feature = "bench"))]
+                            eprintln!("[WARN] Ignoring resolve error: {errmsg}");
+                        } else {
+                            return Err(anyhow!(errmsg.clone()));
                         }
-                        Value::String(s) => {
+                    } else if opts.verbose_warnings {
+                        if let Value::String(s) = p {
                             if s.contains("${") {
                                 #[cfg(not(feature = "bench"))]
                                 eprintln!(
                                     "[WARN] Dropping potentially missing reference in \
-                                    overrridden unrendered value '{s}' for parameter '{key}'"
+                                    overrridden unrendered value '{s}' for parameter '{}'",
+                                    st.current_key()
                                 );
                             }
-                        }
-                        _ => {
+                        } else {
                             // TODO(sg): can we make this more accurate?
                             #[cfg(not(feature = "bench"))]
                             eprintln!(
                                 "[WARN] Dropping unrendered {} which may contain \
-                                missing references for parameter '{key}'",
-                                p.variant()
+                                missing references for parameter '{}'",
+                                p.variant(),
+                                st.current_key()
                             );
                         }
                     }

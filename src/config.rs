@@ -169,6 +169,7 @@ impl ClassMapping {
 #[derive(Clone, Debug, Default)]
 pub struct RenderOpts {
     pub ignore_overwritten_missing_references: bool,
+    pub verbose_warnings: bool,
     pub(crate) preserve_resolve_error_in_flattened: bool,
 }
 
@@ -221,6 +222,12 @@ pub struct Config {
     /// Defaults to `true` to retain kapicorp-reclass compatibility.
     #[pyo3(get)]
     pub ignore_overwritten_missing_references: bool,
+    /// This flag controls the amount of warnings emitted by reclass-rs. When verbose warnings are
+    /// enabled, reclass-rs will warn users when they're dropping unrendered values which may
+    /// contain unresolved references if `ignore_overwritten_missing_references` is set to `true`.
+    /// Defaults to `false`.
+    #[pyo3(get)]
+    pub verbose_warnings: bool,
 }
 
 impl Config {
@@ -278,6 +285,7 @@ impl Config {
             class_mappings_patterns: Vec::new(),
             class_mappings_match_path: false,
             ignore_overwritten_missing_references: true,
+            verbose_warnings: false,
         })
     }
 
@@ -367,6 +375,11 @@ impl Config {
             "ignore_overwritten_missing_references" => {
                 self.ignore_overwritten_missing_references = v.as_bool().ok_or(anyhow!(
                     "Expected value of config key 'ignore_overwritten_missing_references' to be a boolean"
+                ))?;
+            }
+            "verbose_warnings" => {
+                self.verbose_warnings = v.as_bool().ok_or(anyhow!(
+                    "Expected value of config key 'verbose_warnings' to be a boolean"
                 ))?;
             }
             _ => {
@@ -476,6 +489,7 @@ impl From<&Config> for RenderOpts {
     fn from(value: &Config) -> Self {
         Self {
             ignore_overwritten_missing_references: value.ignore_overwritten_missing_references,
+            verbose_warnings: value.verbose_warnings,
             ..Default::default()
         }
     }
