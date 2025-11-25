@@ -124,17 +124,17 @@ impl From<Value> for serde_json::Value {
                     // those values.
                     return Self::String(n.to_string());
                 }
-                let jn = if n.is_i64() {
+                let jn = if let Some(num) = n.as_i64() {
                     // While the lint is enabled generally, we don't care if we lose some precision
                     // here. If this turns out to be a real problem, we can enable serde_json's
                     // arbitrary precision numbers feature.
                     #[allow(clippy::cast_precision_loss)]
-                    serde_json::Number::from_f64(n.as_i64().unwrap() as f64).unwrap()
-                } else if n.is_u64() {
+                    serde_json::Number::from_f64(num as f64).unwrap()
+                } else if let Some(num) = n.as_u64() {
                     #[allow(clippy::cast_precision_loss)]
-                    serde_json::Number::from_f64(n.as_u64().unwrap() as f64).unwrap()
-                } else if n.is_f64() {
-                    serde_json::Number::from_f64(n.as_f64().unwrap()).unwrap()
+                    serde_json::Number::from_f64(num as f64).unwrap()
+                } else if let Some(num) = n.as_f64() {
+                    serde_json::Number::from_f64(num).unwrap()
                 } else {
                     unreachable!(
                         "Serializing Number to JSON: {} is neither NaN, inf, or representable as i64, u64, or f64?",
@@ -470,14 +470,12 @@ impl Value {
             Value::Literal(s) | Value::String(s) => s.into_pyobject(py)?.into_any(),
             Value::Bool(b) => pyo3::types::PyBool::new(py, *b).to_owned().into_any(),
             Value::Number(n) => {
-                if n.is_i64() {
-                    // NOTE(sg): We allow the missing panics doc because we already checked that
-                    // `as_i64()` can't panic here.
-                    n.as_i64().unwrap().into_pyobject(py)?.into_any()
-                } else if n.is_u64() {
-                    n.as_u64().unwrap().into_pyobject(py)?.into_any()
-                } else if n.is_f64() {
-                    n.as_f64().unwrap().into_pyobject(py)?.into_any()
+                if let Some(num) = n.as_i64() {
+                    num.into_pyobject(py)?.into_any()
+                } else if let Some(num) = n.as_u64() {
+                    num.into_pyobject(py)?.into_any()
+                } else if let Some(num) = n.as_f64() {
+                    num.into_pyobject(py)?.into_any()
                 } else {
                     Option::<()>::None.into_pyobject(py)?.into_any()
                 }
