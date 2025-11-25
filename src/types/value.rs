@@ -410,12 +410,11 @@ impl Value {
         match self {
             Self::Mapping(m) => m.get(k),
             Self::Sequence(s) | Self::ValueList(s) => {
-                if let Some(idx) = k.as_u64() {
-                    if let Ok(idx) = usize::try_from(idx) {
-                        if idx < s.len() {
-                            return Some(&s[idx]);
-                        }
-                    }
+                if let Some(idx) = k.as_u64()
+                    && let Ok(idx) = usize::try_from(idx)
+                    && idx < s.len()
+                {
+                    return Some(&s[idx]);
                 }
                 None
             }
@@ -437,11 +436,11 @@ impl Value {
         match self {
             Self::Mapping(m) => m.get_mut(k),
             Self::Sequence(s) | Self::ValueList(s) => {
-                if let Some(idx) = k.as_u64() {
-                    let idx = usize::try_from(idx)?;
-                    if idx < s.len() {
-                        return Ok(Some(&mut s[idx]));
-                    }
+                if let Some(idx) = k.as_u64()
+                    && let Ok(idx) = usize::try_from(idx)
+                    && idx < s.len()
+                {
+                    return Ok(Some(&mut s[idx]));
                 }
                 Ok(None)
             }
@@ -625,14 +624,13 @@ impl Value {
                     let mut st = state.clone();
                     let iv = v.interpolate(root, &mut st, opts);
 
-                    let v = if iv.is_err()
+                    let v = if let Err(e) = &iv
                         && opts.ignore_overwritten_missing_references
                         && i < l.len() - 1
                     {
                         // if it's not the last layer of a ValueList and we're ignoring overwritten
                         // missing references, convert interpolation errors into
                         // Value::ResolveError and continue merging.
-                        let e = iv.err().unwrap();
                         Self::ResolveError(format!("{e}"))
                     } else {
                         iv?
@@ -665,11 +663,12 @@ impl Value {
     /// Note that this method will call [`Value::flatten()`] after merging two Mappings to ensure
     /// that the resulting Value doesn't contain any `ValueList` elements.
     fn merge(&mut self, other: Self, state: &mut ResolveState, opts: &RenderOpts) -> Result<()> {
-        if !opts.ignore_overwritten_missing_references && self.is_error() {
+        if !opts.ignore_overwritten_missing_references
+            && let Some(errmsg) = self.as_resolve_error()
+        {
             // Merging into a Value::ResolveError is always an error if
             // `ignore_overwritten_missing_references=false`.
-            let errmsg = self.as_resolve_error().unwrap().clone();
-            return Err(anyhow!(errmsg));
+            return Err(anyhow!(errmsg.clone()));
         }
 
         if other.is_null() {

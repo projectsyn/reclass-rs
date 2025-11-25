@@ -134,12 +134,9 @@ fn walk_entity_dir(
     for entry in WalkDir::new(root).follow_links(true) {
         let entry = entry?;
         // We use `entry.path()` here to get the symlink name for symlinked files.
-        let ext = if let Some(ext) = entry.path().extension() {
-            ext.to_str()
-        } else {
-            None
-        };
-        if ext.is_some() && SUPPORTED_YAML_EXTS.contains(&ext.unwrap()) {
+        if let Some(ext) = entry.path().extension().and_then(|e| e.to_str())
+            && SUPPORTED_YAML_EXTS.contains(&ext)
+        {
             // it's an entity (class or node), process it
             let abspath = to_lexical_absolute(entry.path())?;
             let relpath = abspath.strip_prefix(&entity_root)?;

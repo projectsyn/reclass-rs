@@ -18,18 +18,13 @@ fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
     let mut tokiter = tokens.into_iter();
     let mut res = vec![tokiter.next().unwrap()];
     for tok in tokiter {
-        if res.last().unwrap().is_literal() && tok.is_literal() {
-            // TODO(sg): Move the if-let bindings into the if above this comment once the
-            // corresponding Rust feature is stabilized.
-            if let Token::Literal(t) = res.pop().unwrap() {
-                if let Token::Literal(tok) = tok {
-                    res.push(Token::Literal(format!("{t}{tok}")));
-                } else {
-                    unreachable!("Literal token isn't a literal?");
-                }
-            } else {
-                unreachable!("Literal token isn't a literal?");
-            }
+        if let Some(l) = res.last()
+            && l.is_literal()
+            && tok.is_literal()
+            && let Some(Token::Literal(t)) = res.pop()
+            && let Token::Literal(tok) = tok
+        {
+            res.push(Token::Literal(format!("{t}{tok}")));
         } else {
             res.push(tok);
         }
