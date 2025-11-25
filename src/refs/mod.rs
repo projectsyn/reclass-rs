@@ -5,7 +5,7 @@ use crate::{
     types::{Mapping, Value},
 };
 use anyhow::{anyhow, Result};
-use nom::error::{convert_error, VerboseError};
+use nom_language::error::{convert_error, VerboseError};
 use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Eq)]
