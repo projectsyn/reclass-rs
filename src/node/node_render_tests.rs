@@ -664,6 +664,11 @@ fn test_render_n26() {
         missing_top: hard override
         missing:
           nested: hard override
+          nested_list:
+            - value2
+        list:
+          - value
+          - bar
         "#,
     );
     println!("{:#?}", n.parameters);

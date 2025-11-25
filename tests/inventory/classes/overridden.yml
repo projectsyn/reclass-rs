@@ -14,3 +14,8 @@ parameters:
   missing_top: ${missingref}
   missing:
     nested: ${missingref}
+    nested_list:
+      - ${missing_list_entry}
+
+  list:
+    - ${missingref}
