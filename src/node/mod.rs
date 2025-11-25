@@ -5,6 +5,7 @@ use std::path::PathBuf;
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::config::RenderOpts;
 use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
@@ -135,8 +136,7 @@ impl Node {
                 std::path::Component::CurDir => {}
                 _ => {
                     return Err(anyhow!(
-                        "Unexpected non-normal path segment in class lookup: {:?}",
-                        d
+                        "Unexpected non-normal path segment in class lookup: {d:?}",
                     ))
                 }
             }
@@ -199,7 +199,7 @@ impl Node {
     }
 
     /// Merges self into other, then updates self with merged values from other
-    fn merge_into(&mut self, other: &mut Self) -> Result<()> {
+    fn merge_into(&mut self, other: &mut Self, opts: &RenderOpts) -> Result<()> {
         // We use std::mem::take() here so we can merge self.applications into other.applications
         // without having to call `clone()` twice. This doesn't destroy `self.applications` because
         // we update `self.applications` with the result of the merge immediately afterwards.
@@ -214,7 +214,9 @@ impl Node {
         other.classes.merge(self_classes);
         self.classes = other.classes.clone();
 
-        other.parameters.merge(&self.parameters)?;
+        other
+            .parameters
+            .merge(&self.parameters, &ResolveState::default(), opts)?;
         self.parameters = other.parameters.clone();
         Ok(())
     }
@@ -231,17 +233,17 @@ impl Node {
                     // `raw_string()` to ensure no spurious quotes are injected.
                     let mut state = ResolveState::default();
                     clstoken
-                        .render(&root.parameters, &mut state)?
+                        .render(&root.parameters, &mut state, &r.config.get_render_opts())?
                         .raw_string()?
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
                     // just convert cls into an owned String.
-                    cls.to_string()
+                    cls.clone()
                 }
             } else {
                 // If the class name doesn't contain any opening reference symbols, it can't
                 // contain any references, just convert cls into an owned String.
-                cls.to_string()
+                cls.clone()
             };
 
             // Check if we've seen the class already after resolving any references in the class
@@ -266,19 +268,19 @@ impl Node {
             // NOTE(sg): we don't need to merge here, since we've already merged into root as part
             // of the recursive call to `render_impl()`
 
-            seen.push(cls.to_string());
+            seen.push(cls.clone());
         }
 
         // merge self into root, then update self with merged values
-        self.merge_into(root)
+        self.merge_into(root, &r.config.get_render_opts())
     }
 
     /// Renders the Node's parameters by interpolating Reclass references and flattening
     /// ValueLists.
-    fn render_parameters(&mut self) -> Result<()> {
+    fn render_parameters(&mut self, opts: &RenderOpts) -> Result<()> {
         let p = std::mem::take(&mut self.parameters);
         let mut f = Value::Mapping(p);
-        f.render_with_self()?;
+        f.render_with_self(opts)?;
         match f {
             Value::Mapping(m) => {
                 self.parameters = m;
@@ -314,7 +316,7 @@ impl Node {
         base.render_impl(r, &mut seen, &mut root)?;
         // Then render ourselves into the rendered base and update ourselves with the result
         self.render_impl(r, &mut seen, &mut base)?;
-        self.render_parameters()
+        self.render_parameters(&r.config.get_render_opts())
     }
 }
 

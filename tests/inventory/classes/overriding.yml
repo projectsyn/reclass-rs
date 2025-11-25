@@ -1,0 +1,30 @@
+parameters:
+  foo: bar
+  baz: ${qux}
+  base: ${cluster:data:base}
+  complex:
+    data:
+      structure:
+        with: with
+        some: some
+        missing: ${complex:data:structure:invalider}
+        references: ${complex:data:structure:overwritten:references}
+  extra: ${complex:data:structure:with}
+  nested:
+    extra: ${complex:data:structure}
+  embedded: >-
+    ${complex:data:structure:with}
+    ${complex:data:structure:some}
+    ${complex:data:structure:missing}
+    ${complex:data:structure:overwritten}
+    ${complex:data:structure:references}
+
+  ~missing_top: hard override
+  missing:
+    ~nested: hard override
+    ~nested_list:
+      - value2
+
+  ~list:
+    - value
+    - ${foo}

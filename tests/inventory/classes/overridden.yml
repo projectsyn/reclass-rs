@@ -1,0 +1,21 @@
+parameters:
+  foo: ${bar}
+  baz: baz
+  base: base
+  complex:
+    data:
+      structure:
+        with: ${complex:some:missing}
+        some: ${data:another:missing}
+        missing: ${complex:data:structure:invalid}
+        overwritten: overwritten
+        references: ${complex:data:structure:overwritten:references}
+
+  missing_top: ${missingref}
+  missing:
+    nested: ${missingref}
+    nested_list:
+      - ${missing_list_entry}
+
+  list:
+    - ${missingref}

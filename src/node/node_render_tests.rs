@@ -17,9 +17,13 @@ fn expected_params(nodename: &str, yaml: &str) -> Mapping {
     .unwrap();
 
     let mut expected = Mapping::from_str(yaml).unwrap();
-    expected.merge(&reclass).unwrap();
+    expected
+        .merge(&reclass, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     let mut expected = Value::Mapping(expected);
-    expected.render(&Mapping::new()).unwrap();
+    expected
+        .render(&Mapping::new(), &RenderOpts::default())
+        .unwrap();
     expected.as_mapping().unwrap().clone()
 }
 
@@ -627,4 +631,47 @@ fn test_render_n25() {
     println!("{:#?}", n.parameters);
     assert_eq!(n.parameters, expected);
     assert_eq!(n.classes, vec!["bar", "foo"]);
+}
+
+#[test]
+fn test_render_n26() {
+    let r = make_reclass();
+    let n = r.render_node("n26").unwrap();
+
+    let expected = expected_params(
+        "n26",
+        r#"
+        foo: bar
+        baz: qux
+        base: n26
+        complex:
+          data:
+            structure:
+              with: with
+              some: some
+              missing: missing
+              overwritten: overwritten
+              references: references
+        extra: with
+        nested:
+          extra:
+            with: with
+            some: some
+            missing: missing
+            overwritten: overwritten
+            references: references
+        embedded: with some missing overwritten references
+        missing_top: hard override
+        missing:
+          nested: hard override
+          nested_list:
+            - value2
+        list:
+          - value
+          - bar
+        "#,
+    );
+    println!("{:#?}", n.parameters);
+    assert_eq!(n.parameters, expected);
+    assert_eq!(n.classes, vec!["overridden", "overriding"]);
 }

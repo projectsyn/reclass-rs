@@ -64,6 +64,11 @@ impl From<Value> for serde_yaml::Value {
                 Self::Sequence(seq)
             }
             Value::Mapping(m) => Self::Mapping(serde_yaml::Mapping::from(m)),
+            Value::ResolveError(errmsg) => {
+                unreachable!(
+                    "`ResolveError({errmsg})` should never be converted to serde_json::Value"
+                )
+            }
         }
     }
 }

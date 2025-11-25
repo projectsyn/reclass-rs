@@ -5,14 +5,14 @@ use std::str::FromStr;
 impl Mapping {
     pub(super) fn render(&self, root: &Self) -> Result<Self> {
         let mut state = ResolveState::default();
-        self.interpolate(root, &mut state)
+        self.interpolate(root, &mut state, &RenderOpts::default())
     }
 }
 
 fn sequence_literal(v: Vec<Value>) -> Value {
     let mut state = ResolveState::default();
     Value::Sequence(v)
-        .interpolate(&Mapping::new(), &mut state)
+        .interpolate(&Mapping::new(), &mut state, &RenderOpts::default())
         .unwrap()
 }
 
@@ -32,7 +32,8 @@ fn test_extend_sequence() {
     o.insert(Value::String("l".into()), Value::Sequence(vec!["d".into()]))
         .unwrap();
 
-    p.merge(&o).unwrap();
+    p.merge(&o, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(
@@ -56,7 +57,8 @@ fn test_override_sequence() {
     )
     .unwrap();
 
-    p.merge(&o).unwrap();
+    p.merge(&o, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(
@@ -87,7 +89,8 @@ fn test_extend_mapping() {
     r.insert(Value::String("b".into()), Value::Bool(true))
         .unwrap();
 
-    p.merge(&o).unwrap();
+    p.merge(&o, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(r));
@@ -109,7 +112,8 @@ fn test_override_mapping() {
     o.insert(Value::String("~m".into()), Value::Mapping(n.clone()))
         .unwrap();
 
-    p.merge(&o).unwrap();
+    p.merge(&o, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"m".into()).unwrap(), &Value::Mapping(n));
@@ -124,13 +128,15 @@ fn test_constant_param_overwrite_panics() {
     n.insert(Value::String("=c".into()), Value::String("p".into()))
         .unwrap();
 
-    p.merge(&n).unwrap();
+    p.merge(&n, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let mut o = Mapping::new();
     o.insert(Value::String("c".into()), Value::String("o".into()))
         .unwrap();
 
-    p.merge(&o).unwrap();
+    p.merge(&o, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 }
 
 #[test]
@@ -162,7 +168,8 @@ fn test_embedded_ref() {
     )
     .unwrap();
 
-    p.merge(&m).unwrap();
+    p.merge(&m, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"foo".into()).unwrap(), &Value::Literal("foo".into()));
@@ -198,7 +205,8 @@ fn test_ref_in_sequence() {
     )
     .unwrap();
 
-    p.merge(&m).unwrap();
+    p.merge(&m, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(p.get(&"foo".into()).unwrap(), &Value::Literal("foo".into()));
@@ -229,7 +237,8 @@ fn test_nested_ref() {
     )
     .unwrap();
 
-    p.merge(&m).unwrap();
+    p.merge(&m, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     assert_eq!(
@@ -248,13 +257,15 @@ fn test_merge_over_ref() {
       qux: qux
     foo: ${foodict}"#;
     let base = Mapping::from_str(base).unwrap();
-    p.merge(&base).unwrap();
+    p.merge(&base, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let overlay = r#"
     foo:
       bar: barer"#;
     let overlay = Mapping::from_str(overlay).unwrap();
-    p.merge(&overlay).unwrap();
+    p.merge(&overlay, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     p = p.render(&p).unwrap();
     dbg!(&p);
@@ -280,7 +291,8 @@ fn test_merge_over_ref_nested() {
     some:
       foo: ${foodict}"#;
     let base = Mapping::from_str(base).unwrap();
-    p.merge(&base).unwrap();
+    p.merge(&base, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let overlay = r#"
     some:
@@ -288,7 +300,8 @@ fn test_merge_over_ref_nested() {
         bar: barer"#;
     let overlay = Mapping::from_str(overlay).unwrap();
 
-    p.merge(&overlay).unwrap();
+    p.merge(&overlay, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     let merged_some = r#"
@@ -315,7 +328,8 @@ fn test_merge_over_null() {
     some:
       foo: null"#;
     let base = Mapping::from_str(base).unwrap();
-    p.merge(&base).unwrap();
+    p.merge(&base, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let overlay = r#"
     some:
@@ -323,7 +337,8 @@ fn test_merge_over_null() {
         bar: barer"#;
     let overlay = Mapping::from_str(overlay).unwrap();
 
-    p.merge(&overlay).unwrap();
+    p.merge(&overlay, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     let merged_some = r#"
@@ -347,14 +362,16 @@ fn test_merge_null() {
         baz: baz
         qux: qux"#;
     let base = Mapping::from_str(base).unwrap();
-    p.merge(&base).unwrap();
+    p.merge(&base, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let overlay = r#"
     some:
       foo: null"#;
     let overlay = Mapping::from_str(overlay).unwrap();
 
-    p.merge(&overlay).unwrap();
+    p.merge(&overlay, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     let merged_some = r#"
@@ -382,7 +399,8 @@ fn test_merge_interpolate_embedded_nested_ref() {
         release-1.23: foo-1.22
     "#;
     let base = Mapping::from_str(base).unwrap();
-    p.merge(&base).unwrap();
+    p.merge(&base, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let config1 = r#"
     version: release-1.21
@@ -391,7 +409,8 @@ fn test_merge_interpolate_embedded_nested_ref() {
         baz: baz-${bar:foo:${version}}
     "#;
     let config1 = Mapping::from_str(config1).unwrap();
-    p.merge(&config1).unwrap();
+    p.merge(&config1, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let config2 = r#"
     version: release-${dynamic:major}.${dynamic:minor}
@@ -400,7 +419,8 @@ fn test_merge_interpolate_embedded_nested_ref() {
       minor: "22"
     "#;
     let config2 = Mapping::from_str(config2).unwrap();
-    p.merge(&config2).unwrap();
+    p.merge(&config2, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     p = p.render(&p).unwrap();
 
     let val = p
@@ -469,15 +489,13 @@ fn test_interpolate_nested_mapping_no_loop() {
 }
 
 #[test]
-#[should_panic(
-    expected = "While resolving references: Detected reference loop with reference paths [\"bar\", \"foo\"]."
-)]
+#[should_panic(expected = "Detected reference loop with reference paths [\"bar\", \"foo\"].")]
 fn test_merge_interpolate_loop() {
     let base = r#"
     foo:
       bar: ${bar}
     bar:
-      baz: baz
+      baz: {}
       qux: qux
     "#;
     let base = Mapping::from_str(base).unwrap();
@@ -488,16 +506,17 @@ fn test_merge_interpolate_loop() {
     let config1 = Mapping::from_str(config1).unwrap();
 
     let mut p = Mapping::new();
-    p.merge(&base).unwrap();
-    p.merge(&config1).unwrap();
+    p.merge(&base, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    p.merge(&config1, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let mut v = Value::from(p);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
 
 #[test]
-#[should_panic(expected = "While resolving references: \
-    Detected reference loop with reference paths [\"baz\", \"foo\"].")]
+#[should_panic(expected = "Detected reference loop with reference paths [\"baz\", \"foo\"].")]
 fn test_interpolate_sequence_loop() {
     let base = r#"
     foo:
@@ -512,12 +531,13 @@ fn test_interpolate_sequence_loop() {
     let base = Mapping::from_str(base).unwrap();
 
     let mut v = Value::from(base);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
 
 #[test]
-#[should_panic(expected = "While resolving references: \
-    Detected reference loop with reference paths [\"foo:bar:qux\", \"foo:baz:qux\", \"foo:qux:foo\"]")]
+#[should_panic(
+    expected = "Detected reference loop with reference paths [\"foo:bar:qux\", \"foo:baz:qux\", \"foo:qux:foo\"]"
+)]
 fn test_interpolate_nested_mapping_loop() {
     let m = r#"
     foo:
@@ -533,14 +553,12 @@ fn test_interpolate_nested_mapping_loop() {
     let m = Mapping::from_str(m).unwrap();
 
     let mut v = Value::from(m);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }
 
 #[test]
-#[should_panic(
-    expected = "While resolving references: Token resolution exceeded recursion depth of 64 \
-    for parameter 'baz'. We've seen the following reference paths: []."
-)]
+#[should_panic(expected = "Token resolution exceeded recursion depth of 64 \
+    for parameter 'baz'. We've seen the following reference paths: [].")]
 fn test_interpolate_depth_exceeded() {
     // construct a reference string which is a nested sequence of ${foo:....${foo}} with 70 nesting
     // levels. Note that the expected error has an empty list of reference paths because we hit the
@@ -554,5 +572,5 @@ fn test_interpolate_depth_exceeded() {
     });
     map.insert("baz".into(), refstr.into()).unwrap();
     let mut v = Value::from(map);
-    v.render_with_self().unwrap();
+    v.render_with_self(&RenderOpts::default()).unwrap();
 }

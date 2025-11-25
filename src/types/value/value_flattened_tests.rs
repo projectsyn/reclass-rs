@@ -5,7 +5,9 @@ use std::str::FromStr;
 #[test]
 fn test_flattened_null() {
     assert_eq!(
-        Value::Null.flattened(&mut ResolveState::default()).unwrap(),
+        Value::Null
+            .flattened(&mut ResolveState::default(), &RenderOpts::default())
+            .unwrap(),
         Value::Null
     );
 }
@@ -17,7 +19,7 @@ macro_rules! test_flattened_simple {
             #[test]
             fn [<test_flattened_simple_ $variant:snake>]() {
                 let v = Value::$variant($val);
-                let f = v.flattened(&mut ResolveState::default()).unwrap();
+                let f = v.flattened(&mut ResolveState::default(), &RenderOpts::default()).unwrap();
                 assert_eq!(f, $expected);
             }
             }
@@ -41,13 +43,13 @@ fn test_flattened_string() {
     let v = Value::String("foo".into());
     let mut st = ResolveState::default();
     st.push_mapping_key(&"test".into()).unwrap();
-    v.flattened(&mut st).unwrap();
+    v.flattened(&mut st, &RenderOpts::default()).unwrap();
 }
 
 #[test]
 fn test_flattened_nested_mapping() {
     let m = Value::Mapping(Mapping::from_str("{foo: {foo: foo, bar: bar}, bar: bar}").unwrap());
-    let f = m.rendered(&Mapping::new()).unwrap();
+    let f = m.rendered(&Mapping::new(), &RenderOpts::default()).unwrap();
     let mut foo = Mapping::new();
     foo.insert("foo".into(), Value::Literal("foo".to_string()))
         .unwrap();
@@ -68,7 +70,9 @@ fn test_flattened_simple_value_list() {
         Value::Literal("foo".into()),
         Value::Literal("bar".into()),
     ]);
-    let f = v.flattened(&mut ResolveState::default()).unwrap();
+    let f = v
+        .flattened(&mut ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     assert!(f.is_literal());
     assert_eq!(f, Value::Literal("bar".into()));
 }
@@ -80,7 +84,9 @@ fn test_flattened_mixed_value_list() {
         Value::Null,
         Value::Literal("bar".into()),
     ]);
-    let f = v.flattened(&mut ResolveState::default()).unwrap();
+    let f = v
+        .flattened(&mut ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     assert!(f.is_literal());
     assert_eq!(f, Value::Literal("bar".into()));
 }
@@ -92,7 +98,9 @@ fn test_flattened_sequence_value_list() {
         Value::Sequence(vec!["baz".into(), "qux".into()]),
         Value::Sequence(vec!["foo".into()]),
     ]);
-    let f = v.flattened(&mut ResolveState::default()).unwrap();
+    let f = v
+        .flattened(&mut ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     assert_eq!(
         f,
         Value::Sequence(vec![
@@ -113,7 +121,9 @@ fn test_flattened_mapping_value_list() {
             .into(),
         Mapping::from_str("{baz: baz, qux: qux}").unwrap().into(),
     ]);
-    let f = v.flattened(&mut ResolveState::default()).unwrap();
+    let f = v
+        .flattened(&mut ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     assert!(f.is_mapping());
 
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
@@ -130,7 +140,9 @@ fn test_flattened_null_over_mapping() {
             .into(),
         Value::Null,
     ]);
-    let f = v.flattened(&mut ResolveState::default()).unwrap();
+    let f = v
+        .flattened(&mut ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     assert!(f.is_null());
     assert_eq!(f, Value::Null);
 }
@@ -141,7 +153,9 @@ fn test_flattened_null_over_sequence() {
         Value::Sequence(vec!["foo".into(), "bar".into()]),
         Value::Null,
     ]);
-    let f = v.flattened(&mut ResolveState::default()).unwrap();
+    let f = v
+        .flattened(&mut ResolveState::default(), &RenderOpts::default())
+        .unwrap();
     assert!(f.is_null());
     assert_eq!(f, Value::Null);
 }
@@ -152,7 +166,7 @@ fn test_flattened_map_over_sequence_error() {
         Value::Sequence(vec!["foo".into(), "bar".into()]),
         Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
     ]);
-    let f = v.flattened(&mut ResolveState::default());
+    let f = v.flattened(&mut ResolveState::default(), &RenderOpts::default());
     assert!(f.is_err());
 }
 
@@ -162,7 +176,7 @@ fn test_flattened_map_over_simple_value_error() {
         Value::Bool(true),
         Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
     ]);
-    let f = v.flattened(&mut ResolveState::default());
+    let f = v.flattened(&mut ResolveState::default(), &RenderOpts::default());
     assert!(f.is_err());
 }
 
@@ -172,7 +186,7 @@ fn test_flattened_sequence_over_map_error() {
         Value::Mapping(Mapping::from_str("foo: foo").unwrap()),
         Value::Sequence(vec!["foo".into(), "bar".into()]),
     ]);
-    let f = v.flattened(&mut ResolveState::default());
+    let f = v.flattened(&mut ResolveState::default(), &RenderOpts::default());
     assert!(f.is_err());
 }
 
@@ -182,7 +196,7 @@ fn test_flattened_sequence_over_simple_value_error() {
         Value::Bool(true),
         Value::Sequence(vec!["foo".into(), "bar".into()]),
     ]);
-    let f = v.flattened(&mut ResolveState::default());
+    let f = v.flattened(&mut ResolveState::default(), &RenderOpts::default());
     assert!(f.is_err());
 }
 
@@ -214,7 +228,7 @@ fn test_flattened_nested_mapping_value_list() {
     ]);
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
-    let f = v.rendered(&Mapping::new()).unwrap();
+    let f = v.rendered(&Mapping::new(), &RenderOpts::default()).unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected =
@@ -255,7 +269,7 @@ fn test_flattened_nested_mapping_value_list_2() {
     ]);
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
-    let f = v.rendered(&Mapping::new()).unwrap();
+    let f = v.rendered(&Mapping::new(), &RenderOpts::default()).unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
     let expected = serde_yaml::from_str(
@@ -272,15 +286,19 @@ fn test_flattened_nested_mapping_value_list_3() {
     let m2 = Mapping::from_str("{foo: [qux], qux: {foo: {bar: bar}}}").unwrap();
     let m3 = Mapping::from_str("qux: {foo: {foo: qux}}").unwrap();
     let m4 = Mapping::from_str("qux: {foo: {bar: baz}}").unwrap();
-    base.merge(&m1).unwrap();
-    base.merge(&m2).unwrap();
-    base.merge(&m3).unwrap();
-    base.merge(&m4).unwrap();
+    base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m2, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m3, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m4, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     // We use `.rendered()` instead of `.flattened()` here since we can't flatten arbitrary Values
     // anymore without interpolating them first.
     let f = Value::Mapping(dbg!(base))
-        .rendered(&Mapping::new())
+        .rendered(&Mapping::new(), &RenderOpts::default())
         .unwrap();
     assert!(f.is_mapping());
     let m: serde_yaml::Mapping = f.as_mapping().unwrap().clone().into();
@@ -301,13 +319,17 @@ fn test_flatten_value_list() {
     let m2 = Mapping::from_str("{foo: [qux], qux: {foo: {bar: bar}}}").unwrap();
     let m3 = Mapping::from_str("qux: {foo: {foo: qux}}").unwrap();
     let m4 = Mapping::from_str("qux: {foo: {bar: baz}}").unwrap();
-    base.merge(&m1).unwrap();
-    base.merge(&m2).unwrap();
-    base.merge(&m3).unwrap();
-    base.merge(&m4).unwrap();
+    base.merge(&m1, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m2, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m3, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
+    base.merge(&m4, &ResolveState::default(), &RenderOpts::default())
+        .unwrap();
 
     let mut v = Value::Mapping(base);
-    v.render(&Mapping::new()).unwrap();
+    v.render(&Mapping::new(), &RenderOpts::default()).unwrap();
     assert!(v.is_mapping());
 
     let m: serde_yaml::Mapping = v.as_mapping().unwrap().clone().into();
