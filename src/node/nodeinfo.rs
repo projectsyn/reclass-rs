@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use chrono::DateTime;
 use chrono::offset::FixedOffset;
 use chrono::offset::Local;
-use chrono::DateTime;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::path::PathBuf;
@@ -84,13 +84,14 @@ impl NodeInfoMeta {
             self.name.split('.').collect::<Vec<&str>>()
         } else if part0.starts_with('_') {
             // Always drop path prefix for paths that start with `_`
-            vec![self
-                .parts
-                .iter()
-                .next_back()
-                .ok_or(anyhow!("Unable to extract last segment from node"))?
-                .to_str()
-                .ok_or(anyhow!("Unable to convert path segment to a string"))?]
+            vec![
+                self.parts
+                    .iter()
+                    .next_back()
+                    .ok_or(anyhow!("Unable to extract last segment from node"))?
+                    .to_str()
+                    .ok_or(anyhow!("Unable to convert path segment to a string"))?,
+            ]
         } else {
             // If the compat flag isn't set, we generate the parts list from the provided shortened
             // pathbuf containing the path within `nodes_path` which preserves literal dots in the

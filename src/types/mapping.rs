@@ -1,15 +1,15 @@
 // This implementation is inspired by `serde_yaml::Mapping`
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use super::value::Value;
 use super::KeyPrefix;
+use super::value::Value;
 use crate::config::RenderOpts;
 use crate::refs::ResolveState;
 

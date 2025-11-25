@@ -1,6 +1,6 @@
 // Inspired by `serde_yaml::Value`
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use pyo3::prelude::*;
 use serde_yaml::Number;
 use std::hash::{Hash, Hasher};
@@ -136,7 +136,10 @@ impl From<Value> for serde_json::Value {
                 } else if n.is_f64() {
                     serde_json::Number::from_f64(n.as_f64().unwrap()).unwrap()
                 } else {
-                    unreachable!("Serializing Number to JSON: {} is neither NaN, inf, or representable as i64, u64, or f64?", n);
+                    unreachable!(
+                        "Serializing Number to JSON: {} is neither NaN, inf, or representable as i64, u64, or f64?",
+                        n
+                    );
                 };
                 serde_json::Value::Number(jn)
             }
@@ -695,7 +698,7 @@ impl Value {
                     return Err(state.render_flattening_error(&format!(
                         "Can't merge {} over mapping",
                         other.variant()
-                    )))
+                    )));
                 }
             },
             Self::Sequence(s) => match other {
@@ -705,7 +708,7 @@ impl Value {
                     return Err(state.render_flattening_error(&format!(
                         "Can't merge {} over sequence",
                         other.variant()
-                    )))
+                    )));
                 }
             },
             Self::Literal(_) | Self::Bool(_) | Self::Number(_) => {

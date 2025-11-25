@@ -1,18 +1,18 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use fancy_regex::Regex;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
 use regex::RegexSet;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
+use crate::NodeInfoMeta;
 use crate::fsutil::to_lexical_normal;
 use crate::list::{List, UniqueList};
-use crate::NodeInfoMeta;
 
 /// Flags to change reclass-rs behavior to be compaible with Python reclass
 #[pyclass(eq, eq_int)]

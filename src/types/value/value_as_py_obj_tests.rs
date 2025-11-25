@@ -50,11 +50,12 @@ fn test_as_py_obj_sequence() {
         let s: Value = vec![1, 2, 3].into();
         let s = s.as_py_obj(py).unwrap();
         assert!(s.is_instance_of::<pyo3::types::PyList>());
-        assert!(s
-            .cast_exact::<pyo3::types::PyList>()
-            .unwrap()
-            .eq(&vec![1, 2, 3])
-            .unwrap());
+        assert!(
+            s.cast_exact::<pyo3::types::PyList>()
+                .unwrap()
+                .eq(&vec![1, 2, 3])
+                .unwrap()
+        );
     });
 }
 

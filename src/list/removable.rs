@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{item_pos, List};
+use super::{List, item_pos};
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(from = "Vec<String>")]

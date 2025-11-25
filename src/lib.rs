@@ -18,13 +18,13 @@ mod node;
 mod refs;
 pub mod types;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR};
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use walkdir::WalkDir;
 
 use config::{CompatFlag, Config};

@@ -1,4 +1,5 @@
 use nom::{
+    IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take},
     character::complete::none_of,
@@ -6,7 +7,6 @@ use nom::{
     error::context,
     multi::many1,
     sequence::{delimited, preceded},
-    IResult, Parser,
 };
 use nom_language::error::VerboseError;
 
