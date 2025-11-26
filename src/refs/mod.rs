@@ -109,6 +109,13 @@ impl ResolveState {
         )
     }
 
+    fn render_default_value_error(&self, refpath: &str, e: &anyhow::Error) -> anyhow::Error {
+        let current_key = self.current_key();
+        anyhow!(
+            "Error parsing default value for reference '{refpath}' in parameter '{current_key}': {e}"
+        )
+    }
+
     pub(crate) fn render_flattening_error(&self, msg: &str) -> anyhow::Error {
         let current_key = self.current_key();
         anyhow!("In {current_key}: {msg}")
@@ -232,7 +239,7 @@ impl Token {
                 if v.is_err()
                     && let Some(dv) = default
                 {
-                    return dv;
+                    return dv.map_err(|e| state.render_default_value_error(&path, &e));
                 }
                 let mut v = v?;
 
@@ -264,7 +271,7 @@ impl Token {
                             if nv.is_err()
                                 && let Some(dv) = default
                             {
-                                return dv;
+                                return dv.map_err(|e| state.render_default_value_error(&path, &e));
                             }
                             v = nv?;
                         }
