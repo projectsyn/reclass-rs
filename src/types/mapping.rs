@@ -540,6 +540,18 @@ impl From<Mapping> for serde_json::Map<String, serde_json::Value> {
     }
 }
 
+impl From<serde_json::Map<String, serde_json::Value>> for Mapping {
+    fn from(m: serde_json::Map<String, serde_json::Value>) -> Self {
+        let mut new = Self::with_capacity(m.len());
+        for (k, v) in m {
+            // unwrap is safe here, since we know that no keys are marked constant in a freshly
+            // created map.
+            new.insert(Value::String(k), Value::from(v)).unwrap();
+        }
+        new
+    }
+}
+
 impl std::str::FromStr for Mapping {
     type Err = anyhow::Error;
 
