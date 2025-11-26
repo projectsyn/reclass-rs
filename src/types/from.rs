@@ -66,7 +66,7 @@ impl From<Value> for serde_yaml::Value {
             Value::Mapping(m) => Self::Mapping(serde_yaml::Mapping::from(m)),
             Value::ResolveError(errmsg) => {
                 unreachable!(
-                    "`ResolveError({errmsg})` should never be converted to serde_json::Value"
+                    "`ResolveError({errmsg})` should never be converted to serde_yaml::Value"
                 )
             }
         }
