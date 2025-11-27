@@ -1,0 +1,24 @@
+parameters:
+  _compile:
+    jsonnet:
+      - input_paths:
+          - ${_base_directory}/foo.jsonnet
+        type: jsonnet
+        output_path: foo
+    helm:
+      - input_paths:
+          - ${_base_directory}/charts/foo
+        type: helm
+        helm_values: ${helm_values}
+        output_path: foo
+    kustomize:
+      - input_paths:
+          - ${_base_directory}/kustomization.jsonnet
+        type: jsonnet
+        output_path: ${_base_directory}/kustomizations/foo
+      - input_paths:
+          - ${_base_directory}/kustomizations/foo/
+        type: kustomize
+        output_path: foo
+
+  compile: ${_compile:${method::jsonnet}}
