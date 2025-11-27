@@ -1,16 +1,16 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
 use std::path::PathBuf;
 // TODO(sg): Switch to serde_yaml's `apply_merge()` once it supports recursive merges, cf.
 // https://github.com/dtolnay/serde-yaml/issues/362
 use yaml_merge_keys::merge_keys_serde;
 
+use crate::Reclass;
 use crate::config::RenderOpts;
 use crate::fsutil::to_lexical_absolute;
 use crate::list::{List, RemovableList, UniqueList};
 use crate::refs::{ResolveState, Token};
 use crate::types::{Mapping, Value};
-use crate::Reclass;
 
 mod nodeinfo;
 
@@ -137,7 +137,7 @@ impl Node {
                 _ => {
                     return Err(anyhow!(
                         "Unexpected non-normal path segment in class lookup: {d:?}",
-                    ))
+                    ));
                 }
             }
         }

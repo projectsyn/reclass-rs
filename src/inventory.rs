@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::Local;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

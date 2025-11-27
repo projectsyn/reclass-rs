@@ -4,8 +4,8 @@ use crate::{
     config::RenderOpts,
     types::{Mapping, Value},
 };
-use anyhow::{anyhow, Result};
-use nom_language::error::{convert_error, VerboseError};
+use anyhow::{Result, anyhow};
+use nom_language::error::{VerboseError, convert_error};
 use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Eq)]

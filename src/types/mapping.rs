@@ -1,15 +1,15 @@
 // This implementation is inspired by `serde_yaml::Mapping`
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use super::value::Value;
 use super::KeyPrefix;
+use super::value::Value;
 use crate::config::RenderOpts;
 use crate::refs::ResolveState;
 
@@ -397,37 +397,37 @@ impl Mapping {
                 other.is_const(k),
                 other.is_override(k),
             )?;
-            if other.is_override(k) {
-                if let Some(p) = p {
-                    let mut st = state.clone();
-                    st.push_mapping_key(k)?;
-                    if let Some(errmsg) = p.as_resolve_error() {
-                        if opts.ignore_overwritten_missing_references {
-                            #[cfg(not(feature = "bench"))]
-                            eprintln!("[WARN] Ignoring resolve error: {errmsg}");
-                        } else {
-                            return Err(anyhow!(errmsg.clone()));
-                        }
-                    } else if opts.verbose_warnings {
-                        if let Value::String(s) = p {
-                            if s.contains("${") {
-                                #[cfg(not(feature = "bench"))]
-                                eprintln!(
-                                    "[WARN] Dropping potentially missing reference in \
-                                    overrridden unrendered value '{s}' for parameter '{}'",
-                                    st.current_key()
-                                );
-                            }
-                        } else {
-                            // TODO(sg): can we make this more accurate?
+            if other.is_override(k)
+                && let Some(p) = p
+            {
+                let mut st = state.clone();
+                st.push_mapping_key(k)?;
+                if let Some(errmsg) = p.as_resolve_error() {
+                    if opts.ignore_overwritten_missing_references {
+                        #[cfg(not(feature = "bench"))]
+                        eprintln!("[WARN] Ignoring resolve error: {errmsg}");
+                    } else {
+                        return Err(anyhow!(errmsg.clone()));
+                    }
+                } else if opts.verbose_warnings {
+                    if let Value::String(s) = p {
+                        if s.contains("${") {
                             #[cfg(not(feature = "bench"))]
                             eprintln!(
-                                "[WARN] Dropping unrendered {} which may contain \
-                                missing references for parameter '{}'",
-                                p.variant(),
+                                "[WARN] Dropping potentially missing reference in \
+                                overrridden unrendered value '{s}' for parameter '{}'",
                                 st.current_key()
                             );
                         }
+                    } else {
+                        // TODO(sg): can we make this more accurate?
+                        #[cfg(not(feature = "bench"))]
+                        eprintln!(
+                            "[WARN] Dropping unrendered {} which may contain \
+                            missing references for parameter '{}'",
+                            p.variant(),
+                            st.current_key()
+                        );
                     }
                 }
             }
