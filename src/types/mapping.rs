@@ -796,10 +796,10 @@ mod mapping_tests {
             assert_eq!(format!("{:?}", m.keys()), "['a', 'b', 'c', 'd', 'e', 'f']");
             let a = m.get_item(&"a").unwrap().unwrap();
             assert!(a.is_instance_of::<pyo3::types::PyInt>());
-            assert!(a.downcast_exact::<pyo3::types::PyInt>().unwrap().eq(&1));
+            assert!(a.cast_exact::<pyo3::types::PyInt>().unwrap().eq(&1));
             let f = m.get_item(&"f").unwrap().unwrap();
             assert!(f.is_instance_of::<PyDict>());
-            let f = f.downcast_exact::<PyDict>().unwrap();
+            let f = f.cast_exact::<PyDict>().unwrap();
             assert_eq!(f.len(), 1);
             assert_eq!(format!("{:?}", f.keys()), "['foo']");
             assert_eq!(format!("{:?}", f.values()), "['bar']");
