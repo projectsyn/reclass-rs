@@ -415,7 +415,19 @@ fn extract_path_and_default(
 ) -> (String, Option<Result<Value>>) {
     if let Some((path, default)) = path_with_default.split_once(sep) {
         let default_value: Result<Value> = serde_yaml::from_str(default)
-            .map(|v: serde_yaml::Value| Value::from(v))
+            .map(|v: serde_yaml::Value| {
+                let v = Value::from(v);
+                match v {
+                    // Convert parsed string default value into Value::Literal to avoid incorrect
+                    // additional reference resolution. We know that we've already resolved the
+                    // top-level nested references at the time we call `extract_path_and_default`.
+                    // NOTE(sg): We don't want to recursively replace `Value::String` with
+                    // `Value::Literal` so that default values which are references that expand to
+                    // complex values still get resolved correctly.
+                    Value::String(s) => Value::Literal(s),
+                    _ => v,
+                }
+            })
             .map_err(|e| anyhow!(format!("{e}")));
         (path.to_string(), Some(default_value))
     } else {
