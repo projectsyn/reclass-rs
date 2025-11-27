@@ -3,11 +3,12 @@ use nom::{
     bytes::complete::{tag, take},
     character::complete::none_of,
     combinator::{all_consuming, map, not, peek},
-    error::{context, VerboseError},
+    error::context,
     multi::many1,
-    sequence::{delimited, preceded, tuple},
-    IResult,
+    sequence::{delimited, preceded},
+    IResult, Parser,
 };
+use nom_language::error::VerboseError;
 
 use super::Token;
 
@@ -37,46 +38,50 @@ fn coalesce_literals(tokens: Vec<Token>) -> Vec<Token> {
 }
 
 fn ref_open(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-    context("ref_open", tag("${"))(input)
+    context("ref_open", tag("${")).parse(input)
 }
 
 fn ref_close(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-    context("ref_close", tag("}"))(input)
+    context("ref_close", tag("}")).parse(input)
 }
 
 fn inv_open(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-    context("inv_open", tag("$["))(input)
+    context("inv_open", tag("$[")).parse(input)
 }
 
 fn ref_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context("ref_escape_open", preceded(tag("\\"), ref_open)),
         String::from,
-    )(input)
+    )
+    .parse(input)
 }
 
 fn inv_escape_open(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context("inv_escape_open", preceded(tag("\\"), inv_open)),
         String::from,
-    )(input)
+    )
+    .parse(input)
 }
 
 fn ref_escape_close(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context("ref_escape_close", preceded(tag("\\"), ref_close)),
         String::from,
-    )(input)
+    )
+    .parse(input)
 }
 
 fn double_escape(input: &str) -> IResult<&str, String, VerboseError<&str>> {
     map(
         context(
             "double_escape",
-            tuple((tag(r"\\"), peek(alt((ref_open, ref_close))))),
+            (tag(r"\\"), peek(alt((ref_open, ref_close)))),
         ),
         |_| r"\".to_string(),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn ref_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
@@ -84,15 +89,16 @@ fn ref_not_open(input: &str) -> IResult<&str, (), VerboseError<&str>> {
     map(
         context(
             "ref_not_open",
-            tuple((
+            (
                 not(tag("${")),
                 not(tag("\\${")),
                 not(tag("\\\\${")),
                 not(tag("\\$[")),
-            )),
+            ),
         ),
         |_| (),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parses a section of the input which can't contain a reference (escaped or otherwise)
@@ -102,10 +108,11 @@ fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         map(
             context(
                 "ref_not_close",
-                tuple((not(tag("}")), not(tag("\\}")), not(tag("\\\\}")))),
+                (not(tag("}")), not(tag("\\}")), not(tag("\\\\}"))),
             ),
             |((), (), ())| (),
-        )(input)
+        )
+        .parse(input)
     }
 
     fn ref_text(input: &str) -> IResult<&str, String, VerboseError<&str>> {
@@ -113,21 +120,19 @@ fn ref_content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
             "ref_text",
             alt((
                 map(many1(none_of("\\${}")), |ch| ch.iter().collect::<String>()),
-                map(
-                    tuple((not(tag("}")), take(1usize))),
-                    |((), c): ((), &str)| c.to_string(),
-                ),
+                map((not(tag("}")), take(1usize)), |((), c): ((), &str)| {
+                    c.to_string()
+                }),
             )),
-        )(input)
+        )
+        .parse(input)
     }
 
     map(
-        context(
-            "ref_content",
-            tuple((ref_not_open, ref_not_close, ref_text)),
-        ),
+        context("ref_content", (ref_not_open, ref_not_close, ref_text)),
         |((), (), t)| t,
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parses a section of the contents of a reference which doesn't contain nested Reclass
@@ -145,7 +150,8 @@ fn ref_string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
             ))),
         ),
         |s| s.join(""),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parses the contents of a reference, taking into account that there may be nested references
@@ -153,7 +159,8 @@ fn ref_item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
     context(
         "ref_item",
         alt((reference, map(ref_string, Token::Literal))),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parses a single Reclass reference which may contain nested references
@@ -163,7 +170,8 @@ fn reference(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
         map(delimited(ref_open, many1(ref_item), ref_close), |tokens| {
             Token::Ref(coalesce_literals(tokens))
         }),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parses a section of the input which doesn't contain any Reclass references
@@ -175,27 +183,30 @@ fn string(input: &str) -> IResult<&str, String, VerboseError<&str>> {
                 map(many1(none_of("${}\\")), |ch| ch.iter().collect::<String>()),
                 map(take(1usize), std::string::ToString::to_string),
             )),
-        )(input)
+        )
+        .parse(input)
     }
 
     fn content(input: &str) -> IResult<&str, String, VerboseError<&str>> {
         context(
             "content",
-            map(many1(tuple((ref_not_open, text))), |strings| {
+            map(many1((ref_not_open, text)), |strings| {
                 strings.iter().map(|((), s)| s.clone()).collect::<String>()
             }),
-        )(input)
+        )
+        .parse(input)
     }
 
     context(
         "string",
         alt((double_escape, ref_escape_open, inv_escape_open, content)),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parses either a Reclass reference or a section of the input with no references
 fn item(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
-    context("item", alt((reference, map(string, Token::Literal))))(input)
+    context("item", alt((reference, map(string, Token::Literal)))).parse(input)
 }
 
 /// Parses a string containing zero or more Reclass references
@@ -207,7 +218,8 @@ pub fn parse_ref(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
         } else {
             tokens.into_iter().next().unwrap()
         }
-    })(input)
+    })
+    .parse(input)
 }
 
 #[cfg(test)]
