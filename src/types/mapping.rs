@@ -627,6 +627,16 @@ impl<'a> IntoIterator for &'a Mapping {
     }
 }
 
+impl IntoIterator for Mapping {
+    type Item = (Value, Value);
+    type IntoIter = indexmap::map::IntoIter<Value, Value>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.into_iter()
+    }
+}
+
 impl Hash for Mapping {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Hash the kv pairs in a way that is not sensitive to their order.
