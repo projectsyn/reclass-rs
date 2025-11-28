@@ -236,9 +236,12 @@ impl Token {
                 let v = params
                     .get(&k0.into())
                     .ok_or_else(|| state.render_missing_key_error(&path, k0));
-                if v.is_err()
+                if let Some(verr) = v.as_ref().err()
                     && let Some(dv) = default
                 {
+                    if opts.verbose_warnings {
+                        eprintln!("[INFO] Returning default value due to error: {verr}");
+                    }
                     return dv.map_err(|e| state.render_default_value_error(&path, &e));
                 }
                 let mut v = v?;
@@ -268,9 +271,14 @@ impl Token {
                             let nv = newv
                                 .get(&key.into())
                                 .ok_or_else(|| state.render_missing_key_error(&path, key));
-                            if nv.is_err()
+                            if let Some(verr) = nv.as_ref().err()
                                 && let Some(dv) = default
                             {
+                                if opts.verbose_warnings {
+                                    eprintln!(
+                                        "[INFO] Returning default value due to error: {verr}"
+                                    );
+                                }
                                 return dv.map_err(|e| state.render_default_value_error(&path, &e));
                             }
                             v = nv?;
