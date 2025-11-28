@@ -66,9 +66,87 @@ impl From<Value> for serde_yaml::Value {
             Value::Mapping(m) => Self::Mapping(serde_yaml::Mapping::from(m)),
             Value::ResolveError(errmsg) => {
                 unreachable!(
+                    "`ResolveError({errmsg})` should never be converted to serde_yaml::Value"
+                )
+            }
+        }
+    }
+}
+
+impl From<Value> for serde_json::Value {
+    fn from(v: Value) -> Self {
+        match v {
+            Value::Null => Self::Null,
+            Value::Bool(b) => Self::Bool(b),
+            Value::Number(n) => {
+                if n.is_nan() || n.is_infinite() {
+                    // Render NaN and -+inf as strings, since JSON's number type doesn't support
+                    // those values.
+                    return Self::String(n.to_string());
+                }
+                let jn = if let Some(num) = n.as_i64() {
+                    // While the lint is enabled generally, we don't care if we lose some precision
+                    // here. If this turns out to be a real problem, we can enable serde_json's
+                    // arbitrary precision numbers feature.
+                    #[allow(clippy::cast_precision_loss)]
+                    serde_json::Number::from_f64(num as f64).unwrap()
+                } else if let Some(num) = n.as_u64() {
+                    #[allow(clippy::cast_precision_loss)]
+                    serde_json::Number::from_f64(num as f64).unwrap()
+                } else if let Some(num) = n.as_f64() {
+                    serde_json::Number::from_f64(num).unwrap()
+                } else {
+                    unreachable!(
+                        "Serializing Number to JSON: {} is neither NaN, inf, or representable as i64, u64, or f64?",
+                        n
+                    );
+                };
+                serde_json::Value::Number(jn)
+            }
+            Value::Literal(s) | Value::String(s) => Self::String(s),
+            Value::Sequence(s) => {
+                let mut seq: Vec<Self> = Vec::with_capacity(s.len());
+                for v in s {
+                    seq.push(Self::from(v));
+                }
+                Self::Array(seq)
+            }
+            Value::Mapping(m) => Self::Object(serde_json::Map::<String, Self>::from(m)),
+            Value::ValueList(_) => todo!(),
+            Value::ResolveError(errmsg) => {
+                unreachable!(
                     "`ResolveError({errmsg})` should never be converted to serde_json::Value"
                 )
             }
+        }
+    }
+}
+
+impl From<serde_json::Value> for Value {
+    fn from(value: serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::Null => Self::Null,
+            serde_json::Value::Bool(b) => Self::Bool(b),
+            serde_json::Value::String(s) => Self::String(s),
+            serde_json::Value::Number(n) => {
+                if let Some(num) = n.as_u64() {
+                    Self::from(num)
+                } else if let Some(num) = n.as_i64() {
+                    Self::from(num)
+                } else if let Some(num) = n.as_f64() {
+                    Self::from(num)
+                } else {
+                    todo!("Converting i128/u128 JSON numbers to reclass numbers NYI")
+                }
+            }
+            serde_json::Value::Array(s) => {
+                let mut seq: Vec<Self> = Vec::with_capacity(s.len());
+                for v in s {
+                    seq.push(Self::from(v));
+                }
+                Self::Sequence(seq)
+            }
+            serde_json::Value::Object(m) => Self::Mapping(Mapping::from(m)),
         }
     }
 }

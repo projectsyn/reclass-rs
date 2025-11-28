@@ -1,0 +1,11 @@
+
+classes:
+  - component.defaults
+  - component.component
+
+parameters:
+  _base_directory: /n9
+  method: helm
+  helm_values:
+    a: n10
+    c: c

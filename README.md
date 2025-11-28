@@ -30,6 +30,14 @@ The implementation currently supports the following features of Kapicorp Reclass
   * reclass-rs uses the `fancy-regex` crate for regex patterns in `class_mappings`.
     The `fancy-regex` crate should support most regex patterns supported by Python.
 
+Additionally the implementation introduces the following new features:
+
+* Option `verbose_warnings` which generates additional informational messages on standard error
+* Default values for references
+
+> [!TIP]
+> Documentation for Reclass extensions introduced by reclass-rs can be found at [README-extensions.md](./README-extensions.md).
+
 The following Kapicorp Reclass features aren't supported:
 
 * Inventory Queries

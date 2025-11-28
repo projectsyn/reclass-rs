@@ -1,0 +1,8 @@
+classes:
+  - base
+
+parameters:
+  _base_directory: /n3
+  expected_table:
+    - type: a list
+    - type: of items

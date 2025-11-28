@@ -1,0 +1,6 @@
+parameters:
+  data:
+    b: b
+    foobar:
+      foo: ${foobar:foo::${foo}}
+      bar: ${foobar:bar::${bar}}

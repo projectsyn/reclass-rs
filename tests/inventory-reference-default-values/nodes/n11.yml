@@ -1,0 +1,9 @@
+parameters:
+  text: >-
+    Test for embedding a reference with a
+    ${embedded::default value}
+    in a string
+
+  expected: >-
+    Test for embedding a reference with a
+    default value in a string

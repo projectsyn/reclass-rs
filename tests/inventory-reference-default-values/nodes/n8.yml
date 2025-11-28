@@ -1,0 +1,16 @@
+classes:
+  - layers.a
+  - layers.b
+  - layers.c
+
+parameters:
+  foobar:
+    foo: foobar.foo
+    bar: foobar.bar
+  expected:
+    a: a
+    b: b
+    c: c
+    foobar:
+      foo: foobar.foo
+      bar: foobar.bar

@@ -1,0 +1,4 @@
+parameters:
+  data:
+    c: c
+    foobar: ${foobar::${qux}}

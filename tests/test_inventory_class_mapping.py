@@ -19,7 +19,7 @@ def test_inventory_class_mappings(compose_node_name, class_mappings_match_path):
     config_options = {
         "nodes_uri": "nodes",
         "classes_uri": "classes",
-        "compose_node_name": True,
+        "compose_node_name": compose_node_name,
         "class_mappings": [
             "\\*              common",
             "*                defaults",
@@ -32,7 +32,7 @@ def test_inventory_class_mappings(compose_node_name, class_mappings_match_path):
             "/^test.*-stg-test.*/      cluster.staging",
             "/.*c$/                    class1 class2",
         ],
-        "class_mappings_match_path": False,
+        "class_mappings_match_path": class_mappings_match_path,
     }
     c = reclass_rs.Config.from_dict("./tests/inventory-class-mapping", config_options)
     assert c is not None

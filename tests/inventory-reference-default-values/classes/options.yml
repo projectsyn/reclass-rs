@@ -1,0 +1,2 @@
+classes:
+  - options.${config:option::default}

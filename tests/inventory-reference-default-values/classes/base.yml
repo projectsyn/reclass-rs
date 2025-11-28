@@ -1,0 +1,13 @@
+parameters:
+  _lookup_table:
+    foo:
+      - type: a list
+      - type: of items
+    bar:
+      - type: another
+      - type: list
+      - type: of
+      - type: items
+      - type: with
+        a_ref: ${_base_directory}/foo
+  table: ${_lookup_table:${variant::foo}}

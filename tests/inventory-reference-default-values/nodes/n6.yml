@@ -1,0 +1,23 @@
+parameters:
+  _table:
+    "True": doit
+    "False": dont
+
+  yah: true
+  nah: false
+
+  expected:
+    yeh: doit
+    neh: dont
+
+  direct:
+    yeh: ${_table:${yah}}
+    neh: ${_table:${nah}}
+
+  default:
+    yeh: ${_table:${surely::true}}
+    neh: ${_table:${surely::false}}
+
+  defaultref:
+    yeh: ${_table:${surely::${yah}}}
+    neh: ${_table:${surely::${nah}}}

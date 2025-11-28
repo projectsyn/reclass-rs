@@ -1,0 +1,47 @@
+classes:
+  - class1
+  - class2
+
+parameters:
+  n1_a: ${class3::${class1}}
+  n1_list:
+    - a
+    - \${bar}
+  n1_b: ${foo::${n1_list}}
+  class2:
+    foo: foo
+    bar: ${class1}
+    qux:
+      foo: ${class1:bar::${class1:foo}}
+
+  expected:
+    class1:
+      foo: default
+      foo2: default
+      qux: \${foo}
+      qux2: \${foo}
+    class2:
+      foo: foo
+      bar:
+        foo: default
+        foo2: default
+        qux: \${foo}
+        qux2: \${foo}
+        baz:
+          foo: foo
+          qux:
+            foo: foo
+            bar: bar
+      qux:
+        foo: default
+    n1_a:
+      foo: default
+      foo2: default
+      qux: \${foo}
+      qux2: \${foo}
+    n1_list:
+      - a
+      - \${bar}
+    n1_b:
+      - a
+      - \${bar}

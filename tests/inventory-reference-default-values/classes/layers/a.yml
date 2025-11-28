@@ -1,0 +1,11 @@
+parameters:
+  foo: foo
+  bar: bar
+  baz: baz
+  qux:
+    foo: qux.foo
+    bar: qux.bar
+    baz: qux.baz
+  data:
+    a: a
+    b: a

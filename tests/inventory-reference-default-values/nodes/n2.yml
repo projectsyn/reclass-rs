@@ -1,0 +1,13 @@
+classes:
+  - base
+
+parameters:
+  _base_directory: /n2
+  variant: bar
+  expected_table:
+    - type: another
+    - type: list
+    - type: of
+    - type: items
+    - type: with
+      a_ref: /n2/foo

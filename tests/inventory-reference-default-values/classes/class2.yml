@@ -1,0 +1,11 @@
+parameters:
+  class2:
+    foo: ${bar::default}
+    bar:
+      baz:
+        foo: foo
+        qux:
+          foo: foo
+          bar: bar
+    qux:
+      foo: class2foo
