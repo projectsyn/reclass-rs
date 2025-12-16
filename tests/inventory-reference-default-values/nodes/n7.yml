@@ -1,0 +1,14 @@
+classes:
+  - layers.a
+  - layers.b
+  - layers.c
+
+parameters:
+  expected:
+    a: a
+    b: b
+    c: c
+    foobar:
+      foo: qux.foo
+      bar: qux.bar
+      baz: qux.baz

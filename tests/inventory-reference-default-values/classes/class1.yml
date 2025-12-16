@@ -1,0 +1,6 @@
+parameters:
+  class1:
+    foo: ${class1:bar::default}
+    foo2: ${class1:foo}
+    qux: \${foo}
+    qux2: ${foo::\${foo\}}

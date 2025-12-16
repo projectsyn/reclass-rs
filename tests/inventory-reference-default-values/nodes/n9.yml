@@ -1,0 +1,6 @@
+classes:
+  - component.defaults
+  - component.component
+
+parameters:
+  _base_directory: /n9
