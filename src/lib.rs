@@ -413,20 +413,18 @@ fn buildinfo() -> HashMap<&'static str, &'static str> {
 }
 
 #[pymodule]
-fn reclass_rs(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // Register the top-level `Reclass` Python class which is used to configure the library
-    m.add_class::<Reclass>()?;
-    // Register the `Config` class and `CompatFlag` enum
-    m.add_class::<Config>()?;
-    m.add_class::<CompatFlag>()?;
-    // Register the NodeInfoMeta and NodeInfo classes
-    m.add_class::<NodeInfoMeta>()?;
-    m.add_class::<NodeInfo>()?;
-    // Register the Inventory class
-    m.add_class::<Inventory>()?;
-    // Register the buildinfo method
-    m.add_function(wrap_pyfunction!(buildinfo, m)?)?;
-    Ok(())
+mod reclass_rs {
+    #[pymodule_export]
+    use super::Reclass;
+    #[pymodule_export]
+    use super::buildinfo;
+
+    #[pymodule_export]
+    use crate::config::{CompatFlag, Config};
+    #[pymodule_export]
+    use crate::inventory::Inventory;
+    #[pymodule_export]
+    use crate::node::{NodeInfo, NodeInfoMeta};
 }
 
 #[cfg(test)]
