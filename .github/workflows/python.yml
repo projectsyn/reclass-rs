@@ -94,7 +94,9 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install reclass-rs --find-links dist --force-reinstall
-          pip install pytest kapicorp-reclass
+          pip install pytest mypy kapicorp-reclass
+          stubtest reclass_rs
+          mypy --check-untyped-defs --ignore-missing-imports tests/
           pytest
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
