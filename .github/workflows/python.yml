@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-edit
       - name: Set package version
@@ -133,7 +133,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-edit
       - name: Set package version
@@ -200,7 +200,7 @@ jobs:
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-edit
       - name: Set package version
@@ -245,7 +245,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-edit
       - name: Set package version
@@ -278,7 +278,7 @@ jobs:
     needs: get-version
     steps:
       - uses: actions/checkout@v6
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-edit
       - name: Set package version
