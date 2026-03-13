@@ -15,7 +15,7 @@ use crate::fsutil::to_lexical_normal;
 use crate::list::{List, UniqueList};
 
 /// Flags to change reclass-rs behavior to be compaible with Python reclass
-#[pyclass(eq, eq_int)]
+#[pyclass(eq, eq_int, from_py_object)]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub enum CompatFlag {
     /// This flag enables Python Reclass-compatible rendering of fields `path` and `parts` in
@@ -173,7 +173,7 @@ pub struct RenderOpts {
     pub(crate) preserve_resolve_error_in_flattened: bool,
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Default)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Config {
