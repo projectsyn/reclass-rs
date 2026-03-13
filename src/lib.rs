@@ -77,7 +77,7 @@ impl EntityKind {
 }
 
 /// This struct holds configuration fields for various library behaviors
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct Reclass {
     /// Reclass config
