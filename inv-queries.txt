@@ -1,0 +1,23 @@
+Open points:
+* Parser
+* expression execution
+** expression complexity is limited:
+   `$[ E ]` and `$[ E if cond ]` are valid inventory queries, 
+   where `E ::= "exports:" fieldExpr`
+   where `fieldExpr ::= <literal> (":" <literal>)*`
+   where `cond ::= comp | comp and cond | comp or cond`
+   where `comp ::= E == <literal> | E != <literal>`
+** reclass references aren't evaluated inside inv query expressions
+
+* We need to somehow process inventory queries outside of the parallelized section since we need to be able to access all nodes' exports
+* How can inv queries and reclass references interact in ValueLists? Is this even feasible in the multi-threaded model?
+** Most likely, reclass-rs won't support mixing reclass references and inventory queries for the same parameter
+* Inv query parsing must happen together with ref parsing, otherwise escapes can't be detected anymore.
+** Use https://github.com/kapicorp/reclass/blob/eeb5aab98610c46f0f9aca91ee4447846a20fa3e/reclass/values/parser_funcs.py#L103-L168 as guideline to extend `src/refs/parser.rs`
+
+New approach idea:
+1. Parse inv queries together with references (/)
+2. Render `exports` first, resolving references as necessary
+   * error out if an export refers to another export via inv query in parameter reference -- we could probably cover this, but IMO not worth the effort --> this also throws an exception in the python impl 
+3. Pass rendered global exports data (collected from all nodes) when fully rendering parameters
+   * Replace inv queries with the pre-rendered data in value lists so we can support flattening with inv query layers

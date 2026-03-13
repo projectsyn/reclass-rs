@@ -10,6 +10,7 @@ use std::hash::{Hash, Hasher};
 
 use super::KeyPrefix;
 use super::value::Value;
+use crate::Exports;
 use crate::config::RenderOpts;
 use crate::refs::ResolveState;
 
@@ -460,9 +461,10 @@ impl Mapping {
     /// The method looks up reference values in parameter `root`. After interpolation of each
     /// Mapping key-value pair, the resulting value is flattened before it's inserted in the new
     /// Mapping. Mapping keys are inserted into the new mapping unchanged.
-    pub(super) fn interpolate(
+    pub(crate) fn interpolate(
         &self,
         root: &Self,
+        exports: &Exports,
         state: &mut ResolveState,
         opts: &RenderOpts,
     ) -> Result<Self> {
@@ -477,7 +479,7 @@ impl Mapping {
             // don't and the whole interpolation is aborted.
             let mut st = state.clone();
             st.push_mapping_key(k)?;
-            let iv = v.interpolate(root, &mut st, opts);
+            let iv = v.interpolate(root, exports, &mut st, opts);
             let v = if let Err(e) = iv {
                 // convert interpolation errors into `Value::ResolveError` when interpolating
                 // Mapping
