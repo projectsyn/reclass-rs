@@ -10,7 +10,7 @@ use crate::config::{CompatFlag, Config};
 use crate::types::{Mapping, Value};
 
 /// Contains metadata for a Reclass node's rendered data
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct NodeInfoMeta {
     /// Inventory path of node
@@ -149,7 +149,7 @@ impl NodeInfoMeta {
 }
 
 /// Rendered data for a Reclass node
-#[pyclass]
+#[pyclass(skip_from_py_object)]
 #[derive(Clone, Debug)]
 pub struct NodeInfo {
     /// Reclass metadata for the node.
