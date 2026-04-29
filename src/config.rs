@@ -25,6 +25,13 @@ pub enum CompatFlag {
     /// file path when rendering fields `path` and `parts` in `NodeInfoMeta` when
     /// `compose-node-name` is enabled.
     ComposeNodeNameLiteralDots,
+    /// This flag enables Python Reclass-compatible rendering of nested references that resolve to
+    /// a YAML `null` value. When this flag is set, YAML `null` values encountered during nested
+    /// reference resolution will be serialized as `"None"`.
+    ///
+    /// By default, if this flag isn't enabled, reclass-rs will serialize YAML `null` values as
+    /// string `"null"` during nested reference resolution.
+    NestedReferenceNullAsNone,
 }
 
 #[pymethods]
@@ -43,6 +50,9 @@ impl TryFrom<&str> for CompatFlag {
             "compose-node-name-literal-dots"
             | "compose_node_name_literal_dots"
             | "ComposeNodeNameLiteralDots" => Ok(Self::ComposeNodeNameLiteralDots),
+            "nested-reference-null-as-none"
+            | "nested_reference_null_as_none"
+            | "NestedReferenceNullAsNone" => Ok(Self::NestedReferenceNullAsNone),
             _ => Err(anyhow!("Unknown compatibility flag '{value}'")),
         }
     }
@@ -166,11 +176,13 @@ impl ClassMapping {
     }
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug, Default)]
 pub struct RenderOpts {
     pub ignore_overwritten_missing_references: bool,
     pub verbose_warnings: bool,
     pub(crate) preserve_resolve_error_in_flattened: bool,
+    pub(crate) nested_reference_null_as_none: bool,
 }
 
 #[pyclass(from_py_object)]
@@ -490,6 +502,9 @@ impl From<&Config> for RenderOpts {
         Self {
             ignore_overwritten_missing_references: value.ignore_overwritten_missing_references,
             verbose_warnings: value.verbose_warnings,
+            nested_reference_null_as_none: value
+                .compatflags
+                .contains(&CompatFlag::NestedReferenceNullAsNone),
             ..Default::default()
         }
     }

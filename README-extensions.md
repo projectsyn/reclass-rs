@@ -21,8 +21,16 @@ For example, given the following inventory, the node's internal path is parsed a
 ```
 
 However, optionally, reclass-rs can be configured to handle `compose_node_name` the same way that kapicorp-reclass does, by naively splitting node names on each dot.
-To enable this compatibility mode, set `compat_flags: ['ComposeNodeNameLiteralDots']` in your inventory's `reclass-config.yml`.
+To enable this compatibility mode, set `reclass_rs_compat_flags: ['ComposeNodeNameLiteralDots']` in your inventory's `reclass-config.yml`.
 In compatibility mode, the node's internal path for the previous inventory is `['path', 'to', 'the', 'node']`.
+
+## Handling of YAML `null` values in nested references
+
+By default, reclass-rs resolves YAML `null` values in nested references to the string `null`.
+This behavior ensures that references which resolve to YAML `null` are correctly preserved when using them as reference default values (see below).
+
+Optionally, reclass-rs can be configured to preserve the kapicorp-reclass behavior of resolving YAML `null` values in nested references to string "None".
+To enable this compatibility mode, set `reclass_rs_compat_flags: ['NestedReferenceNullAsNone']` in your inventory's `reclass-config.yml`.
 
 ## Verbose warnings
 

@@ -234,7 +234,7 @@ impl Node {
                     let mut state = ResolveState::default();
                     clstoken
                         .render(&root.parameters, &mut state, &r.config.get_render_opts())?
-                        .raw_string()?
+                        .raw_string(&r.config.get_render_opts())?
                 } else {
                     // If Token::parse() returns None, the class name can't contain any references,
                     // just convert cls into an owned String.
