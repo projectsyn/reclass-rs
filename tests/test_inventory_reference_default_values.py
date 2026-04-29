@@ -61,3 +61,10 @@ def test_inventory_reference_default_values():
 
     n11 = inv["nodes"]["n11"]["parameters"]
     assert n11["text"] == n11["expected"]
+
+    n12 = inv["nodes"]["n12"]["parameters"]
+    assert n12["nullref"] is None
+    assert n12["nulldefault"] is None
+    assert n12["boolref"]
+    assert n12["numref"] == 1.25
+    assert n12["nonestrref"] == "None"

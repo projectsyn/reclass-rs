@@ -301,7 +301,7 @@ fn test_raw_string_literal() {
 
 #[test]
 fn test_raw_string_null() {
-    assert_eq!(Value::Null.raw_string().unwrap(), "None".to_string());
+    assert_eq!(Value::Null.raw_string().unwrap(), "null".to_string());
 }
 
 #[test]
