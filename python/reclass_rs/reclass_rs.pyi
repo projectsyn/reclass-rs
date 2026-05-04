@@ -15,6 +15,7 @@ __all__: list[str] = [
 @final
 class CompatFlag(Enum):
     ComposeNodeNameLiteralDots = "ComposeNodeNameLiteralDots"
+    NestedReferenceNullAsNone = "NestedReferenceNullAsNone"
 
 @final
 class Config:

@@ -401,7 +401,7 @@ impl Mapping {
                 && let Some(p) = p
             {
                 let mut st = state.clone();
-                st.push_mapping_key(k)?;
+                st.push_mapping_key(k, opts)?;
                 if let Some(errmsg) = p.as_resolve_error() {
                     if opts.ignore_overwritten_missing_references {
                         #[cfg(not(feature = "bench"))]
@@ -476,7 +476,7 @@ impl Mapping {
             // either manage to interpolate a value (in which case it doesn't contain a loop) or we
             // don't and the whole interpolation is aborted.
             let mut st = state.clone();
-            st.push_mapping_key(k)?;
+            st.push_mapping_key(k, opts)?;
             let iv = v.interpolate(root, &mut st, opts);
             let v = if let Err(e) = iv {
                 // convert interpolation errors into `Value::ResolveError` when interpolating

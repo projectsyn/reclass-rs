@@ -294,45 +294,65 @@ fn test_strip_prefix() {
 #[test]
 fn test_raw_string_literal() {
     assert_eq!(
-        Value::Literal("foo".into()).raw_string().unwrap(),
+        Value::Literal("foo".into())
+            .raw_string(&RenderOpts::default())
+            .unwrap(),
         "foo".to_string()
     );
 }
 
 #[test]
 fn test_raw_string_null() {
-    assert_eq!(Value::Null.raw_string().unwrap(), "None".to_string());
+    assert_eq!(
+        Value::Null.raw_string(&RenderOpts::default()).unwrap(),
+        "null".to_string()
+    );
+}
+
+#[test]
+fn test_raw_string_null_as_none() {
+    let opts = RenderOpts {
+        nested_reference_null_as_none: true,
+        ..RenderOpts::default()
+    };
+    assert_eq!(Value::Null.raw_string(&opts).unwrap(), "None".to_string());
 }
 
 #[test]
 fn test_raw_string_number() {
     assert_eq!(
-        Value::Number(5.into()).raw_string().unwrap(),
+        Value::Number(5.into())
+            .raw_string(&RenderOpts::default())
+            .unwrap(),
         "5".to_string()
     );
     assert_eq!(
-        Value::Number((-1).into()).raw_string().unwrap(),
+        Value::Number((-1).into())
+            .raw_string(&RenderOpts::default())
+            .unwrap(),
         "-1".to_string()
     );
     assert_eq!(
-        Value::Number(3.14.into()).raw_string().unwrap(),
+        Value::Number(3.14.into())
+            .raw_string(&RenderOpts::default())
+            .unwrap(),
         "3.14".to_string()
     );
     assert_eq!(
         Value::Number(serde_yaml::Number::from(f64::INFINITY))
-            .raw_string()
+            .raw_string(&RenderOpts::default())
             .unwrap(),
         ".inf".to_string()
     );
     assert_eq!(
         Value::Number(serde_yaml::Number::from(f64::NEG_INFINITY))
-            .raw_string()
+            .raw_string(&RenderOpts::default())
             .unwrap(),
         "-.inf".to_string()
     );
     assert_eq!(
         Value::Number(serde_yaml::Number::from(f64::NAN))
-            .raw_string()
+            .raw_string(&RenderOpts::default())
             .unwrap(),
         ".nan".to_string()
     );
@@ -343,7 +363,7 @@ fn test_raw_string_mapping() {
     let mut m = Value::Mapping(Mapping::from_str("{foo: foo, bar: true, baz: 1.23}").unwrap());
     // turn string values into literals by calling flatten
     m.render(&Mapping::new(), &RenderOpts::default()).unwrap();
-    let mstr = m.raw_string().unwrap();
+    let mstr = m.raw_string(&RenderOpts::default()).unwrap();
     // NOTE(sg): serde_json output is sorted by keys
     assert_eq!(mstr, r#"{"bar":true,"baz":1.23,"foo":"foo"}"#);
 }
@@ -351,7 +371,7 @@ fn test_raw_string_mapping() {
 #[test]
 fn test_raw_string_sequence() {
     let v = Value::Sequence(vec!["foo".into(), 3.14.into(), Value::Bool(true)]);
-    let vstr = v.raw_string().unwrap();
+    let vstr = v.raw_string(&RenderOpts::default()).unwrap();
     assert_eq!(vstr, r#"["foo",3.14,true]"#);
 }
 
@@ -364,7 +384,7 @@ fn test_raw_string_mapping_nonstring_keys() {
     let m = Value::Mapping(m)
         .rendered(&Mapping::new(), &RenderOpts::default())
         .unwrap();
-    let mstr = m.raw_string().unwrap();
+    let mstr = m.raw_string(&RenderOpts::default()).unwrap();
     // NOTE(sg): serde_json output is sorted by keys
     assert_eq!(mstr, r#"{"3.14":true,"null":1.23,"true":"foo"}"#);
 }

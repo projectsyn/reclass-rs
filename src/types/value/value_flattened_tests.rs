@@ -42,7 +42,8 @@ test_flattened_simple! {
 fn test_flattened_string() {
     let v = Value::String("foo".into());
     let mut st = ResolveState::default();
-    st.push_mapping_key(&"test".into()).unwrap();
+    st.push_mapping_key(&"test".into(), &RenderOpts::default())
+        .unwrap();
     v.flattened(&mut st, &RenderOpts::default()).unwrap();
 }
 

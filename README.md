@@ -19,6 +19,7 @@ The implementation currently supports the following features of Kapicorp Reclass
 * Merging referenced lists and dictionaries
 * Constant parameters
 * Nested references
+  * By default reclass-rs uses a non-compatible mode which resolves YAML `null` values in nested references to string "null".
 * References in class names
 * Loading classes with relative names
 * Loading Reclass configuration options from `reclass-config.yaml`

@@ -1,0 +1,13 @@
+parameters:
+  facts:
+    level: level
+  data:
+    "null": null
+    nonestr: None
+    bool: true
+    num: 1.25
+  nullref: ${data:${facts:level}::${data:null}}
+  nulldefault: ${data:${facts:level}::~}
+  boolref: ${data:${facts:level}::${data:bool}}
+  numref: ${data:${facts:level}::${data:num}}
+  nonestrref: ${data:${facts:level}::${data:nonestr}}

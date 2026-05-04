@@ -481,11 +481,20 @@ impl Value {
     /// strings which match Python's `str()` for other types.
     ///
     #[inline]
-    pub(crate) fn raw_string(&self) -> Result<String> {
+    pub(crate) fn raw_string(&self, opts: &RenderOpts) -> Result<String> {
         match self {
             Value::Literal(s) => Ok(s.clone()),
-            // We serialize Null as `None` to be compatible with Python's str()
-            Value::Null => Ok("None".to_string()),
+            // We serialize Null as `null` unless the `NestedReferenceNullAsNone` compat flag is
+            // set, in which case we serialize Null as `None`. The default serialization isn't
+            // compatible with Python's str(), but ensures that a reclass-rs reference default
+            // value which is a reference that resolves to a Null value is preserved correctly.
+            Value::Null => {
+                if opts.nested_reference_null_as_none {
+                    Ok("None".to_string())
+                } else {
+                    Ok("null".to_string())
+                }
+            }
             // We need custom formatting for bool instead of `format!("{b}")`, so that this
             // function returns strings which match Python's `str()` implementation.
             Value::Bool(b) => match b {

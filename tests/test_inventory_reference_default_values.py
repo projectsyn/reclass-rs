@@ -61,3 +61,35 @@ def test_inventory_reference_default_values():
 
     n11 = inv["nodes"]["n11"]["parameters"]
     assert n11["text"] == n11["expected"]
+
+    n12 = inv["nodes"]["n12"]["parameters"]
+    assert n12["nullref"] is None
+    assert n12["nulldefault"] is None
+    assert n12["boolref"]
+    assert n12["numref"] == 1.25
+    assert n12["nonestrref"] == "None"
+
+
+def test_inventory_reference_default_values_null_as_none():
+    config_options = {
+        "nodes_uri": "nodes",
+        "classes_uri": "classes",
+        "reclass_rs_compat_flags": ["NestedReferenceNullAsNone"],
+    }
+    c = reclass_rs.Config.from_dict(
+        "./tests/inventory-reference-default-values", config_options
+    )
+    assert c is not None
+
+    r = reclass_rs.Reclass.from_config(c)
+    assert r is not None
+
+    inv = r.inventory().as_dict()
+    n12 = inv["nodes"]["n12"]["parameters"]
+    # With NestedReferenceNullAsNone compat mode the nested ref to `data.null` is resolved as
+    # string "None" which isn't recognized as a YAML `null` by reclass-rs's default value handling.
+    assert n12["nullref"] == "None"
+    assert n12["nulldefault"] is None
+    assert n12["boolref"]
+    assert n12["numref"] == 1.25
+    assert n12["nonestrref"] == "None"

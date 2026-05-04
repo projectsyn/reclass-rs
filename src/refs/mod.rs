@@ -46,8 +46,8 @@ impl ResolveState {
     /// Pushes mapping key into the `current_keys` list. If possible, the provided value is
     /// formatted with `raw_string()`. Additionally, unprocessed `String` values are pushed as-is.
     /// This function will return an error when it's called with a `Value::ValueList`.
-    pub(crate) fn push_mapping_key(&mut self, key: &Value) -> Result<()> {
-        let kstr = match key.raw_string() {
+    pub(crate) fn push_mapping_key(&mut self, key: &Value, opts: &RenderOpts) -> Result<()> {
+        let kstr = match key.raw_string(opts) {
             Ok(s) => s,
             Err(_) => match key {
                 Value::String(s) => Ok(s.clone()),
@@ -173,7 +173,7 @@ impl Token {
                 .interpolate(params, state, opts)
         } else {
             Ok(Value::Literal(
-                self.resolve(params, state, opts)?.raw_string()?,
+                self.resolve(params, state, opts)?.raw_string(opts)?,
             ))
         }
     }
@@ -374,7 +374,7 @@ fn interpolate_token_slice(
         while v.is_string() {
             v = v.interpolate(params, &mut st, opts)?;
         }
-        res.push_str(&v.raw_string()?);
+        res.push_str(&v.raw_string(opts)?);
     }
     Ok(res)
 }
