@@ -55,6 +55,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: 3.x
+          freethreaded: true
       - uses: taiki-e/cache-cargo-install-action@v3
         with:
           tool: cargo-edit
