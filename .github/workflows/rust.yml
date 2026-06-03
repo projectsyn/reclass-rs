@@ -8,9 +8,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   lints:
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
       - uses: actions/checkout@v6
       - run: |
