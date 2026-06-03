@@ -4,6 +4,10 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: write # For creating releases
+  pull-requests: read # For building changelog from PRs with labels
+
 jobs:
   release:
     runs-on: ubuntu-latest
