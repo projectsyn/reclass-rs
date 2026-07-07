@@ -44,6 +44,10 @@ jobs:
           command: test
 
   benchmarks:
+    permissions:
+      # Required for criterion-compare-action to be able to add a comment to
+      # the PR.
+      pull-requests: write
     runs-on: ubuntu-latest
     if: github.base_ref != ''
     steps:
