@@ -675,3 +675,74 @@ fn test_render_n26() {
     assert_eq!(n.parameters, expected);
     assert_eq!(n.classes, vec!["overridden", "overriding"]);
 }
+
+/// Writes a small inventory with nested classes, a class name with a reference and
+/// applications from several classes. Returns the inventory path.
+fn write_merge_inventory() -> std::path::PathBuf {
+    let base = std::env::temp_dir().join(format!("reclass-rs-merge-test-{}", std::process::id()));
+    std::fs::remove_dir_all(&base).ok();
+    let files = [
+        (
+            "classes/outer.yml",
+            "classes: [inner, '${leaf_class}']\napplications: [outer_app]\nparameters:\n  data:\n    outer: o\n    list: [outer]\n",
+        ),
+        (
+            "classes/inner.yml",
+            "applications: [inner_app, dropped_app]\nparameters:\n  leaf_class: nested.leaf\n  data:\n    inner: i\n    list: [inner]\n",
+        ),
+        (
+            "classes/nested/leaf.yml",
+            "applications: [leaf_app, ~dropped_app]\nparameters:\n  data:\n    leaf: '${data:inner}-l'\n    list: [leaf]\n",
+        ),
+        (
+            "nodes/n.yml",
+            "classes: [outer]\napplications: [node_app]\nparameters:\n  data:\n    node: '${data:outer}-n'\n",
+        ),
+    ];
+    for (path, contents) in files {
+        let p = base.join(path);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, contents).unwrap();
+    }
+    base
+}
+
+#[test]
+fn test_render_merges_nested_classes() {
+    let base = write_merge_inventory();
+    let r = Reclass::new(base.to_str().unwrap(), "nodes", "classes", false).unwrap();
+    let mut n = Node::parse(&r, "n").unwrap();
+    n.render(&r).unwrap();
+    std::fs::remove_dir_all(&base).unwrap();
+
+    assert_eq!(
+        n.classes,
+        UniqueList::from(vec![
+            "inner".to_owned(),
+            "${leaf_class}".to_owned(),
+            "outer".to_owned()
+        ])
+    );
+    assert_eq!(
+        n.applications,
+        RemovableList::from(vec![
+            "inner_app".to_owned(),
+            "leaf_app".to_owned(),
+            "outer_app".to_owned(),
+            "node_app".to_owned()
+        ])
+    );
+    let expected = expected_params(
+        "n",
+        r"
+    leaf_class: nested.leaf
+    data:
+      inner: i
+      leaf: i-l
+      outer: o
+      node: o-n
+      list: [inner, leaf, outer]
+    ",
+    );
+    assert_eq!(n.parameters, expected);
+}

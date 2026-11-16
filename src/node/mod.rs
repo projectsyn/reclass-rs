@@ -201,27 +201,28 @@ impl Node {
         ))
     }
 
-    /// Merges self into other, then updates self with merged values from other
+    /// Merges self into other. Self's applications and classes are moved out, and self's
+    /// parameters are merged from a borrow and left in place.
+    ///
+    /// We don't copy the merged result back into self here. Doing so cloned the whole
+    /// accumulated root once per class, which made rendering O(classes * parameters).
+    /// Callers which need the merged result take it from `other` with `take_merged()`.
     fn merge_into(&mut self, other: &mut Self, opts: &RenderOpts) -> Result<()> {
-        // We use std::mem::take() here so we can merge self.applications into other.applications
-        // without having to call `clone()` twice. This doesn't destroy `self.applications` because
-        // we update `self.applications` with the result of the merge immediately afterwards.
-        let self_apps = std::mem::take(&mut self.applications);
-        other.applications.merge(self_apps);
-        self.applications = other.applications.clone();
-
-        // We use std::mem::take() here so we can merge self.classes into other.classes without
-        // having to call `clone()` twice. This doesn't destroy `self.classes` because we update
-        // `self.classes` with the result of the merge immediately afterwards.
-        let self_classes = std::mem::take(&mut self.classes);
-        other.classes.merge(self_classes);
-        self.classes = other.classes.clone();
-
+        other
+            .applications
+            .merge(std::mem::take(&mut self.applications));
+        other.classes.merge(std::mem::take(&mut self.classes));
         other
             .parameters
             .merge(&self.parameters, &ResolveState::default(), opts)?;
-        self.parameters = other.parameters.clone();
         Ok(())
+    }
+
+    /// Moves the merged applications, classes and parameters of `other` into self.
+    fn take_merged(&mut self, other: &mut Self) {
+        self.applications = std::mem::take(&mut other.applications);
+        self.classes = std::mem::take(&mut other.classes);
+        self.parameters = std::mem::take(&mut other.parameters);
     }
 
     /// Recursively loads classes and merges loaded data into self
@@ -274,7 +275,7 @@ impl Node {
             seen.push(cls.clone());
         }
 
-        // merge self into root, then update self with merged values
+        // merge self into root
         self.merge_into(root, &r.config.get_render_opts())
     }
 
@@ -317,8 +318,10 @@ impl Node {
         // First render base (i.e. mapped classes) into an empty Node, and update base with the
         // result
         base.render_impl(r, &mut seen, &mut root)?;
+        base.take_merged(&mut root);
         // Then render ourselves into the rendered base and update ourselves with the result
         self.render_impl(r, &mut seen, &mut base)?;
+        self.take_merged(&mut base);
         self.render_parameters(&r.config.get_render_opts())
     }
 }

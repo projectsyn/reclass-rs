@@ -52,3 +52,8 @@ required-features = ["bench"]
 name = "inventory_multi_threaded"
 harness = false
 required-features = ["bench"]
+
+[[bench]]
+name = "render_many_classes"
+harness = false
+required-features = ["bench"]
