@@ -4,6 +4,12 @@
     "config:base",
     ":disableDependencyDashboard"
   ],
+  "packageRules": [
+    {
+      "matchManagers": ["cargo"],
+      "rangeStrategy": "bump"
+    }
+  ],
   "labels": [
     "dependency"
   ]
