@@ -1,8 +1,10 @@
 use anyhow::{Result, anyhow};
 use serde::Deserialize;
 use std::path::PathBuf;
-// TODO(sg): Switch to serde_yaml's `apply_merge()` once it supports recursive merges, cf.
-// https://github.com/dtolnay/serde-yaml/issues/362
+// NOTE(sg): serde_yaml is deprecated, eventually we should migrate to another
+// YAML parsing library. For now, just silence the deprecation warning added in
+// `yaml-merge-keys` 0.9.1.
+#[allow(deprecated)]
 use yaml_merge_keys::merge_keys_serde;
 
 use crate::Reclass;
@@ -80,6 +82,7 @@ impl Node {
         n.classes = classes;
 
         // Resolve YAML merge keys in `params`
+        #[allow(deprecated)]
         let p = merge_keys_serde(serde_yaml::Value::from(n.params))?
             .as_mapping()
             .unwrap()
