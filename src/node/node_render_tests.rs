@@ -675,3 +675,41 @@ fn test_render_n26() {
     assert_eq!(n.parameters, expected);
     assert_eq!(n.classes, vec!["overridden", "overriding"]);
 }
+
+#[test]
+fn test_render_merges_nested_classes() {
+    let r = Reclass::new("./tests/inventory-class-merge", "nodes", "classes", false).unwrap();
+    let mut n = Node::parse(&r, "n1").unwrap();
+    n.render(&r).unwrap();
+
+    assert_eq!(
+        n.classes,
+        UniqueList::from(vec![
+            "inner".to_owned(),
+            "${leaf_class}".to_owned(),
+            "outer".to_owned()
+        ])
+    );
+    assert_eq!(
+        n.applications,
+        RemovableList::from(vec![
+            "inner_app".to_owned(),
+            "leaf_app".to_owned(),
+            "outer_app".to_owned(),
+            "node_app".to_owned()
+        ])
+    );
+    let expected = expected_params(
+        "n1",
+        r"
+    leaf_class: nested.leaf
+    data:
+      inner: i
+      leaf: i-l
+      outer: o
+      node: o-n
+      list: [inner, leaf, outer]
+    ",
+    );
+    assert_eq!(n.parameters, expected);
+}

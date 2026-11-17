@@ -1,0 +1,7 @@
+classes:
+  - outer
+applications:
+  - node_app
+parameters:
+  data:
+    node: ${data:outer}-n

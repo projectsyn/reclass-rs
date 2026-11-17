@@ -1,0 +1,8 @@
+applications:
+  - leaf_app
+  - ~dropped_app
+parameters:
+  data:
+    leaf: ${data:inner}-l
+    list:
+      - leaf
