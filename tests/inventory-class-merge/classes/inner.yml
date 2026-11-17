@@ -1,0 +1,9 @@
+applications:
+  - inner_app
+  - dropped_app
+parameters:
+  leaf_class: nested.leaf
+  data:
+    inner: i
+    list:
+      - inner

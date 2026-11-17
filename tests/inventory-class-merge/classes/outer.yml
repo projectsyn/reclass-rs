@@ -1,0 +1,10 @@
+classes:
+  - inner
+  - ${leaf_class}
+applications:
+  - outer_app
+parameters:
+  data:
+    outer: o
+    list:
+      - outer
