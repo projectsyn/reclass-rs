@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 bench = false
 
 [dependencies]
-anyhow = "1.0.104"
+anyhow = "1.0.105"
 chrono = "0.4.45"
 fancy-regex = "0.20.2"
 glob = "0.3.4"
